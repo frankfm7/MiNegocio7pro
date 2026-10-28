@@ -1,5 +1,10 @@
-node_modules
-dist
-*.local
-.env
-*.tsbuildinfo
+node_modules/
+.git/
+*.zip
+*.rar
+*.mp4
+*.mov
+*.psd
+Thumbs.db
+desktop.ini
+*.log
