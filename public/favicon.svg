@@ -9,6 +9,12 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <text x="256" y="318" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="124" letter-spacing="-2"><tspan fill="#ffffff">N</tspan><tspan fill="url(#gold)">7pro</tspan></text>
-  <rect x="186" y="378" width="140" height="8" rx="4" fill="url(#gold)" opacity=".9"/>
+  <!-- carrito de supermercado al fondo -->
+  <g transform="translate(66 74) scale(15)" fill="none" stroke="#ffffff" stroke-opacity=".32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="8" cy="21" r="1.2"/><circle cx="19" cy="21" r="1.2"/>
+    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+    <path d="M9 8.5h12M9.7 12h10.4" stroke-width="1"/>
+  </g>
+  <!-- N7 al frente -->
+  <text x="256" y="338" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="250" letter-spacing="-8" stroke="#2a1340" stroke-opacity=".35" stroke-width="6" paint-order="stroke"><tspan fill="#ffffff">N</tspan><tspan fill="url(#gold)">7</tspan></text>
 </svg>

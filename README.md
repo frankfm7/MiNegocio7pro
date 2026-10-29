@@ -1,4 +1,4 @@
-# MiNegocio7pro · v3.2
+# MiNegocio7pro · v3.3
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -83,7 +83,7 @@ Subir a GitHub (Vercel publica solo):
 
 ```bash
 git add .
-git commit -m "MiNegocio7pro v3.2"
+git commit -m "MiNegocio7pro v3.3"
 git push
 ```
 

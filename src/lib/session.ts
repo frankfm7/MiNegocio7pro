@@ -6,6 +6,7 @@ import { SoundEffects } from './sound';
 import { readJSON } from './format';
 import { AVATAR_KEY } from './constants';
 
+const NO_DB = 'Falta conectar Supabase: en Vercel agrega VITE_SUPABASE_URL y VITE_SUPABASE_KEY y haz Redeploy';
 const ACTIVE_KEY = 'mc7_active';
 const MEMBERSHIPS_KEY = 'mc7_memberships';
 
@@ -132,7 +133,7 @@ export async function initSession() {
 // CUENTA
 // ==========================================
 export async function signIn(email: string, password: string) {
-  if (!supabaseClient) throw new Error('Base de datos no disponible');
+  if (!supabaseClient) throw new Error(NO_DB);
   const { data, error } = await supabaseClient.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
   if (error) throw friendly(error);
   setState({ authUser: toAuthUser(data.user), accountStep: 'stores' });
@@ -142,7 +143,7 @@ export async function signIn(email: string, password: string) {
 
 /** Devuelve true si la cuenta quedó lista; false si hay que confirmar el correo */
 export async function signUp(email: string, password: string, name: string) {
-  if (!supabaseClient) throw new Error('Base de datos no disponible');
+  if (!supabaseClient) throw new Error(NO_DB);
   const { data, error } = await supabaseClient.auth.signUp({
     email: email.trim().toLowerCase(), password,
     options: { data: { name: name.trim() }, emailRedirectTo: location.origin + location.pathname + location.search },
@@ -155,7 +156,7 @@ export async function signUp(email: string, password: string, name: string) {
 
 /** Inicia sesión con Google: la foto y el nombre vienen de la cuenta de Google */
 export async function signInWithGoogle() {
-  if (!supabaseClient) throw new Error('Base de datos no disponible');
+  if (!supabaseClient) throw new Error(NO_DB);
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: location.origin + location.pathname + location.search },
@@ -164,7 +165,7 @@ export async function signInWithGoogle() {
 }
 
 export async function resetPassword(email: string) {
-  if (!supabaseClient) throw new Error('Base de datos no disponible');
+  if (!supabaseClient) throw new Error(NO_DB);
   const { error } = await supabaseClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: location.origin + '/' });
   if (error) throw friendly(error);
 }
