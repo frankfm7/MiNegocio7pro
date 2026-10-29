@@ -242,8 +242,8 @@ export async function exportPDF(catalogId: string | null = null, withCosts = fal
     // Datos para volver a importar (sin costos en el PDF para clientes)
     const records = sc.records.map(r => withCosts ? r : { ...r, cost_price: 0, min_price: 0, stock: 0 });
     const payload = utf8ToB64(JSON.stringify({ app: APP_NAME, v: 3, withCosts, catalogs: sc.catalogs, records }));
-    doc.setDocumentProperties({ title: `${store} - ${withCosts ? 'Inventario' : 'Catálogo'}`, creator: APP_NAME, subject: 'Catálogo de productos', keywords: 'mi-catalogo-7pro' });
-    doc.addMetadata(`${PDF_MARK_START}${payload}${PDF_MARK_END}`, 'https://mi-catalogo-7pro.app/ns/');
+    doc.setDocumentProperties({ title: `${store} - ${withCosts ? 'Inventario' : 'Catálogo'}`, creator: APP_NAME, subject: 'Catálogo de productos', keywords: 'minegocio7pro' });
+    doc.addMetadata(`${PDF_MARK_START}${payload}${PDF_MARK_END}`, 'https://minegocio7pro.app/ns/');
 
     doc.save(`${fileSafe(sc.label)}_${withCosts ? 'inventario' : 'catalogo'}_${stamp()}.pdf`);
     toast(`✅ PDF descargado: ${sc.records.length} productos`);
@@ -479,7 +479,7 @@ async function pageImages(page: import('pdfjs-dist').PDFPageProxy, pdfjs: typeof
 async function parsePDFFile(file: File) {
   toast('Leyendo PDF...', 4000);
   const buf = await file.arrayBuffer();
-  // 1) PDF creado por Mi Catálogo 7pro: trae todos los datos y fotos
+  // 1) PDF creado por MiNegocio7pro: trae todos los datos y fotos
   const pdfjs = await loadPdfJs();
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
   let raw = new TextDecoder('latin1').decode(new Uint8Array(buf));

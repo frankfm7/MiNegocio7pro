@@ -47,13 +47,13 @@ export function openTeam() {
 }
 
 export function enterStore() {
-  localStorage.setItem(WELCOME_KEY, 'true');
+  try { sessionStorage.setItem(WELCOME_KEY, 'true'); } catch { /* modo privado */ }
   setState({ welcomeVisible: false, currentView: 'catalogs', currentCatalogId: null });
   SoundEffects.play('success');
 }
 
 export function showWelcome() {
-  localStorage.removeItem(WELCOME_KEY);
+  try { sessionStorage.removeItem(WELCOME_KEY); } catch { /* modo privado */ }
   setState({ welcomeVisible: true, sidebarOpen: false });
 }
 

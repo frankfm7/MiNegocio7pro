@@ -4,6 +4,7 @@ import { getState, localUser, openModal, runAfterAccount, setState, toast } from
 import { DB, startAutoSync, startHeartbeat, stopAutoSync, stopHeartbeat, uploadLocalToStore } from './db';
 import { SoundEffects } from './sound';
 import { readJSON } from './format';
+import { AVATAR_KEY } from './constants';
 
 const ACTIVE_KEY = 'mc7_active';
 const MEMBERSHIPS_KEY = 'mc7_memberships';
@@ -22,6 +23,7 @@ function friendly(e: unknown): Error {
   if (/Email not confirmed/i.test(msg)) return new Error('Debes confirmar tu correo. Revisa tu bandeja de entrada.');
   if (/User already registered/i.test(msg)) return new Error('Ese correo ya tiene una cuenta. Inicia sesión.');
   if (/Password should be at least/i.test(msg)) return new Error('La contraseña debe tener al menos 6 caracteres');
+  if (/provider is not enabled|Unsupported provider/i.test(msg)) return new Error('Falta activar Google en Supabase (Authentication → Providers → Google)');
   if (/rate limit/i.test(msg)) return new Error('Demasiados intentos. Espera unos minutos.');
   if (/Failed to fetch|NetworkError/i.test(msg)) return new Error('Sin conexión a internet');
   if (/function .* does not exist|Could not find the function/i.test(msg)) return new Error('Falta ejecutar el archivo supabase/1-migracion-multi-tienda.sql en Supabase');
@@ -29,7 +31,19 @@ function friendly(e: unknown): Error {
 }
 
 function toAuthUser(u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthUser {
-  return { id: u.id, email: u.email || '', name: String(u.user_metadata?.name || (u.email || '').split('@')[0]) };
+  const m = u.user_metadata || {};
+  // Google entrega la foto como avatar_url (o picture) y el nombre como full_name (o name)
+  const avatar = String(m.avatar_url || m.picture || '');
+  if (avatar) cacheAvatar(u.id, avatar); // se recuerda para mostrarla al abrir sin internet
+  return { id: u.id, email: u.email || '', name: String(m.name || m.full_name || (u.email || '').split('@')[0]), avatar: avatar || cachedAvatar(u.id) || undefined };
+}
+
+/** Última foto conocida (para verla al instante y sin internet) */
+function cachedAvatar(uid: string) {
+  try { const c = JSON.parse(localStorage.getItem(AVATAR_KEY) || 'null'); return c?.uid === uid ? String(c.url) : ''; } catch { return ''; }
+}
+function cacheAvatar(uid: string, url: string) {
+  try { if (url) localStorage.setItem(AVATAR_KEY, JSON.stringify({ uid, url })); else localStorage.removeItem(AVATAR_KEY); } catch { /* sin espacio */ }
 }
 
 // ==========================================
@@ -137,6 +151,16 @@ export async function signUp(email: string, password: string, name: string) {
   if (!data.session || !data.user) return false;
   setState({ authUser: toAuthUser(data.user), accountStep: 'stores', memberships: [] });
   return true;
+}
+
+/** Inicia sesión con Google: la foto y el nombre vienen de la cuenta de Google */
+export async function signInWithGoogle() {
+  if (!supabaseClient) throw new Error('Base de datos no disponible');
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: location.origin + location.pathname + location.search },
+  });
+  if (error) throw friendly(error);
 }
 
 export async function resetPassword(email: string) {
@@ -282,7 +306,7 @@ export function inviteLink(code: string) {
 
 export function inviteMessage(code: string, role: Role) {
   const store = getState().activeStore?.store_name || 'mi tienda';
-  return `Hola 👋 Te invito a ${store} en *Mi Catálogo 7pro* como ${roleLabel(role)}.\n\n` +
+  return `Hola 👋 Te invito a ${store} en *MiNegocio7pro* como ${roleLabel(role)}.\n\n` +
     `1. Abre este enlace e instala la app: ${inviteLink(code)}\n` +
     `2. Crea tu cuenta con tu correo (o inicia sesión).\n` +
     `3. Si te lo pide, escribe el código: *${code}*`;

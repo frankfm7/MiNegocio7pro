@@ -4,10 +4,11 @@ import {
 } from 'lucide-react';
 import { setState, toast, useStore } from '../store';
 import {
-  createStore, joinStore, loadMemberships, openStore, resetPassword, roleLabel, signIn, signOut, signUp, switchToLocal,
+  createStore, joinStore, loadMemberships, openStore, resetPassword, roleLabel, signIn, signInWithGoogle, signOut, signUp, switchToLocal,
 } from '../lib/session';
 import { SoundEffects } from '../lib/sound';
-import { APP_NAME } from '../lib/constants';
+import Brand from './Brand';
+import Avatar from './Avatar';
 
 function PasswordInput({ value, onChange, placeholder = '••••••••', autoComplete }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete: string }) {
   const [show, setShow] = useState(false);
@@ -51,6 +52,12 @@ function AuthStep() {
     setLoading(false);
   };
 
+  const google = async () => {
+    setError(''); setLoading(true);
+    try { await signInWithGoogle(); } // redirige a Google; al volver la sesión queda iniciada
+    catch (err) { setError('❌ ' + (err as Error).message); SoundEffects.play('error'); setLoading(false); }
+  };
+
   const tabCls = (t: string) => `flex-1 py-2.5 rounded-xl text-sm font-bold transition ${tab === t ? 'bg-white text-[#7c43ba] shadow-sm' : 'text-[#756c7e]'}`;
 
   return (
@@ -60,6 +67,15 @@ function AuthStep() {
           <button type="button" className={tabCls('login')} onClick={() => { setTab('login'); setError(''); }}>Iniciar sesión</button>
           <button type="button" className={tabCls('register')} onClick={() => { setTab('register'); setError(''); }}>Crear cuenta</button>
         </div>
+      )}
+      {tab !== 'forgot' && (
+        <>
+          <button type="button" disabled={loading} onClick={google} className="w-full py-3 rounded-xl border-2 border-[#e8dfec] bg-white hover:bg-[#f6f1f8] font-bold text-sm text-[#201728] flex items-center justify-center gap-3">
+            <svg viewBox="0 0 48 48" className="w-5 h-5" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+            Continuar con Google
+          </button>
+          <div className="flex items-center gap-3 my-4 text-[11px] uppercase tracking-wider text-[#756c7e] font-bold"><span className="flex-1 h-px bg-[#e8dfec]" />o con tu correo<span className="flex-1 h-px bg-[#e8dfec]" /></div>
+        </>
       )}
       <form className="space-y-4" onSubmit={submit}>
         {tab === 'register' && (
@@ -115,7 +131,7 @@ function StoresStep() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#f6f1f8]">
-        <div className="w-10 h-10 rounded-full bg-[#7c43ba] text-white grid place-items-center font-bold">{authUser.name.charAt(0).toUpperCase()}</div>
+        <Avatar size={44} />
         <div className="min-w-0 flex-1"><p className="font-bold text-sm truncate">{authUser.name}</p><p className="text-xs text-[#756c7e] truncate">{authUser.email}</p></div>
         <button type="button" onClick={signOut} className="w-9 h-9 rounded-full hover:bg-white grid place-items-center text-[#a43658]" title="Cerrar sesión"><LogOut className="w-4 h-4" /></button>
       </div>
@@ -186,7 +202,7 @@ export default function AccountScreen() {
       <div className="login-container relative my-auto">
         <button type="button" onClick={close} className="absolute top-4 left-4 w-9 h-9 rounded-full bg-[#f3eef6] grid place-items-center hover:bg-[#e8dfec] text-[#756c7e]" aria-label="Volver"><ArrowLeft className="w-4 h-4" /></button>
         <div className="login-logo"><img src="/icon-192.png" alt="" className="w-14 h-14 rounded-2xl" /></div>
-        <h1 className="hero-title text-2xl sm:text-3xl font-bold text-center text-[#201728]">{APP_NAME}</h1>
+        <h1 className="hero-title text-2xl sm:text-3xl font-bold text-center text-[#201728]"><Brand /></h1>
         <p className="text-center text-[#756c7e] mt-2 mb-6 text-sm">
           {reason || (authUser ? 'Elige tu tienda o únete con un código' : 'Inicia sesión para conectarte a una tienda')}
         </p>

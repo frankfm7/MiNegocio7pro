@@ -1,7 +1,7 @@
 @tailwind base;
 @tailwind components;
 
-/* Estilos propios de Catálogo Pro (antes styles.css). Van antes de las utilidades
+/* Estilos propios de MiNegocio7pro (antes styles.css). Van antes de las utilidades
    para que las clases de Tailwind sigan teniendo prioridad, igual que con el CDN. */
 
 /* ==========================================
@@ -115,6 +115,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   overflow:hidden; color:#fff; 
   display:flex; align-items:center; justify-content:center;
   min-height:100dvh; cursor:pointer;
+  background:linear-gradient(160deg,#9a5ee0 0%,#5a2d8c 55%,#2a1340 100%);
 }
 .welcome.hidden-welcome { display:none !important; }
 .welcome img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
@@ -933,3 +934,47 @@ body:not(.dark-mode) .product-image, body:not(.dark-mode) #detail-image { mix-bl
 .safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 0px); }
 
 @tailwind utilities;
+
+/* ==========================================
+   Dorado metálico (efecto espejo) — solo "7Pro" y el 7 del icono
+   ========================================== */
+/* Para fondos claros / oscuros (encabezados) */
+.gold-text {
+  background: linear-gradient(135deg, #8a5a00 0%, #c79100 22%, #ffe58a 46%, #fff6c9 52%, #e0a800 68%, #8a5a00 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+  background-size: 220% 100%;
+  animation: gold-shine 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,.25));
+}
+/* Más claro y brillante, para fondos morados (pantalla de bienvenida) */
+.gold-text-bright {
+  background: linear-gradient(135deg, #ffd24d 0%, #fff1a8 32%, #ffffff 50%, #ffd24d 66%, #f0a500 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+  background-size: 220% 100%;
+  animation: gold-shine 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+}
+@keyframes gold-shine {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gold-text, .gold-text-bright { animation: none; background-position: 50% 50%; }
+}
+
+/* Foto de perfil */
+.avatar {
+  border-radius: 9999px; overflow: hidden; flex-shrink: 0;
+  display: grid; place-items: center; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, #9a5ee0, #5a2d8c);
+  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(44,25,57,.25);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.login-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  border-radius: 9999px; background: #7c43ba; color: #fff; font-weight: 700; font-size: 13px;
+  box-shadow: 0 4px 14px rgba(124,67,186,.35); flex-shrink: 0; white-space: nowrap;
+}
+.login-pill:hover { background: #6d389f; }

@@ -1,5 +1,5 @@
 -- =====================================================================
--- Mi Catálogo 7pro · Migración a tiendas separadas (multi-tienda)
+-- MiNegocio7pro · Migración a tiendas separadas (multi-tienda)
 -- =====================================================================
 -- Ejecuta este archivo UNA VEZ en Supabase → SQL Editor → New query → Run.
 -- Se puede volver a ejecutar sin problema (no borra datos).

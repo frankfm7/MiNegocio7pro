@@ -156,6 +156,8 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  /** URL pública de la foto de perfil (bucket "avatars" de Supabase) */
+  avatar?: string;
 }
 
 /** Producto en revisión antes de importarlo */

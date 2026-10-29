@@ -1,7 +1,7 @@
-// Service Worker de Mi Catálogo 7pro
+// Service Worker de MiNegocio7pro
 // - Hace que la app sea instalable (PWA) en Android, iPhone y computadora.
 // - Permite abrirla y usarla sin internet.
-const VERSION = 'mc7-v3.0.0';
+const VERSION = 'n7p-v3.2.0';
 const APP_CACHE = `${VERSION}-app`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const OFFLINE_URL = '/index.html';

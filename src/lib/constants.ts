@@ -5,7 +5,8 @@ export const DB_KEY = 'catalog_pro_data_v12';
 export const CONTACT_KEY = 'catalog_pro_contact_v12';
 export const QR_KEY = 'catalog_pro_qr_v12';
 export const PENDING_KEY = 'pending_changes';
-export const WELCOME_KEY = 'welcome_seen_v12';
+/** Se guarda por sesión: la bienvenida aparece cada vez que se abre la app */
+export const WELCOME_KEY = 'welcome_seen_v31';
 
 /** Unidades disponibles para el campo "Contenido / Presentación" */
 export const CONTENT_UNITS = [
@@ -22,8 +23,10 @@ export const CONTENT_UNITS = [
   { value: 'u', label: 'unidades' },
 ];
 
-export const APP_NAME = 'Mi Catálogo 7pro';
-export const APP_SHORT_NAME = 'Catálogo 7pro';
+export const APP_NAME = 'MiNegocio7pro';
+export const APP_SHORT_NAME = 'N7pro';
+export const APP_VERSION = '3.2';
+export const AVATAR_KEY = 'mc7_avatar';
 
 /** Portada generada con el color del catálogo (funciona sin internet) */
 export function coverFor(color = '#7c43ba', name = '') {

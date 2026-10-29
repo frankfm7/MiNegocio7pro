@@ -1,5 +1,5 @@
 -- =====================================================================
--- Mi Catálogo 7pro · Pasar tus datos actuales a TU tienda
+-- MiNegocio7pro · Pasar tus datos actuales a TU tienda
 -- =====================================================================
 -- Ejecútalo DESPUÉS de:
 --   1. haber ejecutado 1-migracion-multi-tienda.sql

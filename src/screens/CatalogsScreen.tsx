@@ -8,6 +8,7 @@ import { coverFor, fallbackCover } from '../lib/constants';
 import { searchProducts } from '../lib/selectors';
 import { captureFromCamera } from '../lib/camera';
 import ProductCard from '../components/ProductCard';
+import AccountButton from '../components/AccountButton';
 import type { Catalog } from '../types';
 import { searchByImage } from '../lib/imageSearch';
 
@@ -116,13 +117,16 @@ export default function CatalogsScreen() {
             <TopbarMenuButton />
             <div className="min-w-0">
               <p className="uppercase tracking-[.16em] font-bold text-[11px] text-[#756c7e]">Explora</p>
-              <h1 className="hero-title mt-0.5 text-xl sm:text-2xl truncate">Nuestros Catálogos</h1>
+              <h1 className="hero-title mt-0.5 text-xl sm:text-2xl truncate">Mis Catálogos</h1>
             </div>
           </div>
-          <button id="open-cart-from-catalogs" type="button" onClick={() => openModal('cart-modal')} className="relative w-11 h-11 grid place-items-center rounded-full bg-[#f0e8f7] text-[#7442a4] hover:bg-[#e0d4f0] transition flex-shrink-0 shadow-sm" aria-label="Abrir pedido">
-            <ShoppingCart className="w-5 h-5" />
-            <CartBadge id="cart-badge-a" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button id="open-cart-from-catalogs" type="button" onClick={() => openModal('cart-modal')} className="relative w-11 h-11 grid place-items-center rounded-full bg-[#f0e8f7] text-[#7442a4] hover:bg-[#e0d4f0] transition flex-shrink-0 shadow-sm" aria-label="Abrir pedido">
+              <ShoppingCart className="w-5 h-5" />
+              <CartBadge id="cart-badge-a" />
+            </button>
+            <AccountButton />
+          </div>
         </div>
         <div className="page-inner pb-4">
           <label className="search rounded-full h-11 flex items-center gap-2 px-4">

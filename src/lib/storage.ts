@@ -1,7 +1,7 @@
 import { createStore, del, get, set } from 'idb-keyval';
 
 // IndexedDB: guarda catálogos con fotos sin el límite de 5 MB de localStorage
-const store = createStore('mi-catalogo-7pro', 'datos');
+const store = createStore('minegocio7pro', 'datos');
 
 export async function idbGet<T>(key: string, def: T): Promise<T> {
   try {

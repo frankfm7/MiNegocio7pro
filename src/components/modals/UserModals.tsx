@@ -3,6 +3,7 @@ import { AlertCircle, Camera, Cloud, EyeOff, FileUp, Maximize2, QrCode, ScanLine
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, localUser, setState, toast, useStore } from '../../store';
 import { changePassword, roleLabel, updateMyName } from '../../lib/session';
+import Avatar from '../Avatar';
 import { CONTACT_KEY } from '../../lib/constants';
 
 export function ChangePasswordModal() {
@@ -68,6 +69,10 @@ export function UserProfileModal() {
       <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5"><h2 className="font-bold text-xl hero-title">Mi perfil</h2><CloseButton onClick={() => closeModal('user-profile-modal')} /></div>
         <div className="space-y-4">
+          <div className="flex flex-col items-center gap-1">
+            <Avatar size={96} />
+            <p className="text-[11px] text-[#756c7e]">{authUser?.avatar ? 'Foto de tu cuenta de Google' : 'Inicia sesión con Google para mostrar tu foto'}</p>
+          </div>
           <div><label className="block font-bold text-sm mb-1.5">Nombre (aparece en las ventas)</label><input value={name} onChange={e => setName(e.target.value)} type="text" className="w-full input-field rounded-xl p-3" /></div>
           <div><label className="block font-bold text-sm mb-1.5">Correo electrónico</label><input value={authUser?.email || ''} type="email" className="w-full input-field rounded-xl p-3 bg-[#f6f1f8]" readOnly /></div>
           {store && <div><label className="block font-bold text-sm mb-1.5">Rol en {store.store_name}</label><input value={roleLabel(user.role)} type="text" className="w-full input-field rounded-xl p-3 bg-[#f6f1f8]" readOnly /></div>}

@@ -14,7 +14,7 @@ import { APP_NAME } from './constants';
 // El QR guarda TEXTO normal: cualquier lector de QR (cámara del celular,
 // Google Lens, etc.) muestra solo la información pública del producto.
 // Nunca lleva costos ni ganancias. La última línea "Ref: MC7:<id>" permite
-// que Mi Catálogo 7pro encuentre el producto al instante.
+// que MiNegocio7pro encuentre el producto al instante.
 
 const REF_PREFIX = 'MC7:';
 

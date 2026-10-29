@@ -10,7 +10,9 @@ import { roleLabel, signOut } from '../lib/session';
 import { refreshData } from '../lib/db';
 import { getLowStockProducts, getOutOfStockProducts } from '../lib/selectors';
 import { installApp } from './InstallPrompt';
-import { APP_NAME } from '../lib/constants';
+import { APP_VERSION } from '../lib/constants';
+import Brand from './Brand';
+import Avatar from './Avatar';
 import type { View } from '../types';
 
 const icon = 'w-4 h-4';
@@ -65,8 +67,9 @@ export default function Sidebar() {
       <div id="sidebar-overlay" className={`sidebar-overlay ${open ? 'open' : ''}`} onClick={close} />
       <aside id="sidebar" className={`sidebar ${open ? 'open' : ''}`}>
         <div className="p-5 border-b border-[#e8dfec] flex items-center justify-between gap-2">
+          {authUser && <button type="button" onClick={() => { close(); setTimeout(() => openModal('user-profile-modal'), 150); }} aria-label="Mi perfil"><Avatar size={48} /></button>}
           <div className="flex-1 min-w-0">
-            <h1 className="hero-title font-bold text-xl text-[#201728] truncate">{cloud ? store?.store_name : APP_NAME}</h1>
+            <h1 className="hero-title font-bold text-xl text-[#201728] truncate">{cloud ? store?.store_name : <Brand />}</h1>
             <p className="text-xs text-[#756c7e] mt-1 truncate flex items-center gap-1.5" id="sidebar-user-info">
               {cloud ? <Cloud className="w-3 h-3 text-[#7c43ba]" /> : <Smartphone className="w-3 h-3 text-[#3875a5]" />}
               <span>{cloud ? `${user.name} (${roleLabel(user.role)})` : 'Datos en este dispositivo'}</span>
@@ -152,7 +155,7 @@ export default function Sidebar() {
           <Item onClick={toggleSound}>{soundEnabled ? <><Volume2 className={icon} /> Sonido activado</> : <><VolumeX className={icon} /> Sonido silenciado</>}</Item>
         </nav>
         <div className="p-3 border-t border-[#e8dfec]">
-          <p className="text-[10px] text-[#756c7e] px-3 py-2">{APP_NAME} · v3.0</p>
+          <p className="text-[10px] text-[#756c7e] px-3 py-2"><Brand /> · v{APP_VERSION}</p>
         </div>
       </aside>
     </>

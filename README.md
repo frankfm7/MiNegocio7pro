@@ -1,32 +1,37 @@
-# Mi Catálogo 7pro · v3.0
+# MiNegocio7pro · v3.2
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
 
 ---
 
-## 1. Pasos en Supabase (una sola vez)
+## 1. Pasos en Supabase (proyecto NUEVO, una sola vez)
 
-1. **SQL Editor → New query**: pega y ejecuta `supabase/1-migracion-multi-tienda.sql`.
-   - Crea tiendas, miembros e invitaciones, y separa los datos de cada tienda.
-   - Activa la seguridad (RLS): quien descargue la app **sin cuenta no ve ningún dato tuyo**.
-   - Bloquea la tabla antigua `users` (guardaba contraseñas sin cifrar).
-2. **Authentication → Providers → Email**: déjalo activado.
-   (Opcional: desactiva *Confirm email* si no quieres que tus vendedores confirmen el correo.)
-3. **Authentication → URL Configuration**: en *Site URL* pon la dirección de tu app en Vercel
-   (ej. `https://mi-catalogo-7pro.vercel.app`) y agrégala también en *Redirect URLs*.
-4. Abre la app → menú → **Iniciar sesión → Crear cuenta** con tu correo → **Crear mi propia tienda**.
-5. Ejecuta `supabase/2-mover-mis-datos.sql` cambiando `TU_CORREO@ejemplo.com` por tu correo:
-   tus catálogos, productos, ventas y QR actuales pasan a tu tienda.
-6. Tus vendedores: menú → **Equipo e invitaciones → Invitar** → envías el código/enlace por WhatsApp.
-   Ellos crean su cuenta con su correo y quedan unidos a tu tienda.
+1. Entra a https://supabase.com → **New project** (nombre: `minegocio7pro`).
+2. **Project Settings → API**: copia la **Project URL** y la clave **publishable / anon**.
+3. **SQL Editor → New query**: pega y ejecuta `supabase/1-migracion-multi-tienda.sql`
+   (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
+   vienes de la app anterior con datos; en un proyecto nuevo se omite.
+4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
+   (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
+   (agrega además `http://localhost:5173` para probar en tu computadora).
+5. **Iniciar sesión con Google (la foto de perfil sale de tu cuenta de Google):**
+   1. https://console.cloud.google.com → crea un proyecto → **APIs y servicios → Pantalla de consentimiento OAuth**
+      (tipo Externo; nombre de la app `MiNegocio7pro`, tu correo).
+   2. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
+      En *URI de redireccionamiento autorizados* pega: `https://TU-PROYECTO.supabase.co/auth/v1/callback`
+      (Supabase → Authentication → Providers → Google te muestra esa URL).
+   3. Copia el **Client ID** y el **Client Secret**.
+   4. Supabase → **Authentication → Providers → Google**: actívalo, pega Client ID y Secret → Save.
+6. **Conectar la app al proyecto nuevo**: en Vercel → Settings → Environment Variables crea
+   `VITE_SUPABASE_URL` y `VITE_SUPABASE_KEY` (datos del paso 2) y haz *Redeploy*.
+   (En tu computadora: copia `.env.example` como `.env` con los mismos valores.)
+7. Abre la app → **Entrar → Continuar con Google** → **Crear mi propia tienda**.
+   Tu foto de Google aparece arriba a la derecha. También se puede entrar con correo y contraseña
+   (en ese caso se muestra tu inicial).
+8. Tus vendedores: menú → **Equipo e invitaciones → Invitar** → envías el código/enlace por WhatsApp.
 
-> ⚠️ Al ejecutar el paso 1 la versión anterior de la app deja de ver los datos. Publica esta versión el mismo día.
-
-## 2. Cómo funciona (modos de datos)
-
-| Situación | Qué ve |
-|---|---|
+---|---|
 | Alguien descarga la app y no inicia sesión | Una app vacía con todas las funciones. Sus catálogos quedan **solo en su dispositivo**. |
 | Tu vendedor inicia sesión y escribe tu código | Tus catálogos. Puede vender, pero no ve costos ni edita (según el rol). |
 | Otro comerciante crea su propia tienda | Solo sus datos; puede invitar a sus propios vendedores. No ve los tuyos ni tú los suyos. |
@@ -78,7 +83,7 @@ Subir a GitHub (Vercel publica solo):
 
 ```bash
 git add .
-git commit -m "Mi Catálogo 7pro v3: PWA instalable, multi-tienda, QR, importar/exportar"
+git commit -m "MiNegocio7pro v3.2"
 git push
 ```
 

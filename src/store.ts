@@ -143,7 +143,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   modals: {},
   sidebarOpen: false,
   formOpen: false,
-  welcomeVisible: localStorage.getItem(WELCOME_KEY) !== 'true',
+  welcomeVisible: sessionStorage.getItem(WELCOME_KEY) !== 'true',
   accountVisible: false,
   accountStep: 'auth',
   accountReason: '',
