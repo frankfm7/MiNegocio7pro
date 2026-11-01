@@ -1,9 +1,11 @@
-# MiNegocio7pro · v3.3
+# MiNegocio7pro · v3.5
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
 
 ---
+
+> 📘 **Guía completa y detallada de Supabase: `GUIA-SUPABASE.md`.** (Resumen abajo.)
 
 ## 1. Pasos en Supabase (proyecto NUEVO, una sola vez)
 
@@ -70,6 +72,18 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
+## 4b. Novedades v3.5
+
+- **Fotos del equipo** (de la cuenta de Google) en equipo, ventas y cierre de caja.
+- **Aviso de stock bajo** con mínimo general y por producto, número en el menú, aviso al abrir y notificación opcional.
+- **Cierre de caja** por día: por método de pago, por vendedor y abonos; envío por WhatsApp, copiar o imagen.
+- **Clientes y fiados**: libreta con deudas y abonos, pago “Fiado” al vender, recordatorios por WhatsApp.
+- **Ticket por WhatsApp** al terminar una venta (texto) o como imagen.
+- **Catálogo público** (`?tienda=nombre`): solo lectura, sin cuenta, pedido por WhatsApp, sin costos.
+- **Etiquetas imprimibles** con QR + código de barras (A4 o térmica 40×25, 50×30, 60×40).
+- **Historial de cambios de precio** (quién y cuándo).
+- **Respaldos en la nube** automáticos y manuales, con restauración.
+
 ## 5. Desarrollo
 
 ```bash
@@ -83,7 +97,7 @@ Subir a GitHub (Vercel publica solo):
 
 ```bash
 git add .
-git commit -m "MiNegocio7pro v3.3"
+git commit -m "MiNegocio7pro v3.5"
 git push
 ```
 

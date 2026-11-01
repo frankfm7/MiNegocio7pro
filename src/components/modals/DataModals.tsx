@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  AlertCircle, Download, FileImage, FileJson, FileSpreadsheet, FileText, FileType, Images, Info, Loader, QrCode, ScanText, ShieldCheck, Upload,
+  AlertCircle, Cloud, Download, FileImage, FileJson, FileSpreadsheet, FileText, FileType, Images, Info, Loader, QrCode, ScanText, ShieldCheck, Upload,
 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
-import { closeModal, setState, useStore } from '../../store';
+import { closeModal, setState, toast, useStore } from '../../store';
+import { backupNow, isAutoBackupOn, listCloudBackups, restoreCloudBackup, setAutoBackup } from '../../lib/cloudBackup';
+import type { CloudBackup } from '../../types';
 import { createBackup, restoreBackup } from '../../lib/exporters';
 import { commitImport, exportCSV, exportExcel, exportJSON, exportPDF, importAnyFile, importPhotosAsProducts, importPriceListImage } from '../../lib/io';
 import { exportCatalogQRsPDF } from '../../lib/qr';
@@ -146,10 +148,68 @@ export function ImportPreviewModal() {
   );
 }
 
+const BACKUP_KIND: Record<string, string> = { auto: 'Automático', manual: 'Manual', 'antes-de-restaurar': 'Antes de restaurar' };
+const kb = (n: number | null) => (n ? (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`) : '');
+
+/** Respaldos guardados en Supabase (un respaldo diario automático y los que hagas a mano) */
+function CloudBackups() {
+  const store = useStore(s => s.activeStore);
+  const isAdmin = useStore(s => s.isAdmin());
+  const isOwnerAdmin = useStore(s => s.currentUser.role === 'admin');
+  const [list, setList] = useState<CloudBackup[] | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState('');
+  const [auto, setAuto] = useState(isAutoBackupOn());
+
+  const load = () => listCloudBackups().then(l => { setList(l); setError(''); }).catch(e => { setList([]); setError((e as Error).message); });
+  useEffect(() => { if (store && isAdmin) load(); }, [store, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!store || !isAdmin) return null;
+
+  const now = async () => {
+    setBusy('now');
+    try { await backupNow('manual'); toast('Respaldo en la nube creado ✓'); await load(); } catch (e) { toast((e as Error).message, 4500); }
+    setBusy('');
+  };
+  const restore = async (b: CloudBackup) => {
+    if (!confirm(`¿Restaurar el respaldo del ${new Date(b.created_at).toLocaleString('es')}?\n\nSe reemplazarán catálogos, productos, clientes y fiados por los de ese respaldo. Las ventas se conservan.\nAntes se guarda una copia del estado actual.`)) return;
+    setBusy(b.id);
+    try { await restoreCloudBackup(b.id); toast('Respaldo restaurado ✓', 3500); closeModal('backup-modal'); } catch (e) { toast((e as Error).message, 5000); }
+    setBusy('');
+  };
+
+  return (
+    <div className="mt-5 pt-5 border-t border-[#ede7f0]">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="font-bold text-sm flex items-center gap-2"><Cloud className="w-4 h-4 text-[#7c43ba]" /> Respaldos en la nube</p>
+        <button type="button" disabled={busy === 'now'} onClick={now} className="btn-primary rounded-full px-3 py-1.5 text-xs font-bold">{busy === 'now' ? 'Respaldando...' : 'Respaldar ahora'}</button>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-[#756c7e] mb-3 cursor-pointer">
+        <input type="checkbox" checked={auto} onChange={e => { setAuto(e.target.checked); setAutoBackup(e.target.checked); }} className="accent-[#7c43ba]" />
+        Respaldo automático diario (al abrir la app, en este dispositivo)
+      </label>
+      {error && <p className="text-xs text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-xl p-3 mb-2">{error}</p>}
+      {list === null && <p className="text-xs text-[#756c7e]">Cargando...</p>}
+      {list && list.length === 0 && !error && <p className="text-xs text-[#756c7e]">Aún no hay respaldos en la nube.</p>}
+      <div className="space-y-2 max-h-56 overflow-y-auto">
+        {list?.map(b => (
+          <div key={b.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-[#faf7fc]">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-xs">{new Date(b.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {BACKUP_KIND[b.kind] || b.kind}</p>
+              <p className="text-[10px] text-[#756c7e]">{b.counts?.products ?? 0} productos · {b.counts?.customers ?? 0} clientes · {b.counts?.sales ?? 0} ventas {kb(b.size_bytes) && `· ${kb(b.size_bytes)}`}</p>
+            </div>
+            {isOwnerAdmin && <button type="button" disabled={!!busy} onClick={() => restore(b)} className="btn-ghost rounded-full px-3 py-1.5 text-[11px] font-bold">{busy === b.id ? '...' : 'Restaurar'}</button>}
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-[#756c7e] mt-2">Se guardan los 20 más recientes. Solo el administrador puede restaurar.</p>
+    </div>
+  );
+}
+
 export function BackupModal() {
   return (
     <Modal id="backup-modal">
-      <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6">
+      <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[92vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5"><h2 className="font-bold text-xl hero-title">Respaldo de datos</h2><CloseButton onClick={() => closeModal('backup-modal')} /></div>
         <div className="p-4 rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0] mb-4">
           <div className="flex items-start gap-3"><ShieldCheck className="w-5 h-5 text-[#166534] flex-shrink-0 mt-0.5" /><div><p className="font-bold text-sm text-[#166534]">Protege tus datos</p><p className="text-xs text-[#756c7e] mt-1">Copia de seguridad de todos tus productos (con fotos), ventas y catálogos.</p></div></div>
@@ -170,6 +230,7 @@ export function BackupModal() {
           </label>
         </div>
         <div className="mt-4 p-3 rounded-xl bg-[#fffbeb] border border-[#fde68a]"><p className="text-xs text-[#92400e]"><AlertCircle className="w-3 h-3 inline" /> <b>Importante:</b> Al restaurar se reemplazan los datos actuales. Crea un respaldo antes de restaurar.</p></div>
+        <CloudBackups />
       </article>
     </Modal>
   );

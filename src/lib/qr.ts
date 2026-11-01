@@ -11,26 +11,30 @@ import { APP_NAME } from './constants';
 // ==========================================
 // QR DE PRODUCTOS
 // ==========================================
-// El QR guarda TEXTO normal: cualquier lector de QR (cámara del celular,
-// Google Lens, etc.) muestra solo la información pública del producto.
-// Nunca lleva costos ni ganancias. La última línea "Ref: MC7:<id>" permite
-// que MiNegocio7pro encuentre el producto al instante.
+// El QR guarda un ENLACE a la app: al escanearlo con la cámara del celular se
+// abre MiNegocio7pro directamente en ese producto (no un texto suelto).
+//   https://tu-app.vercel.app/?p=<id>&n=<nombre>&pr=<precio>...
+// Si quien escanea no tiene acceso a la tienda, la app muestra la ficha pública
+// con los datos del propio enlace. Nunca lleva costos ni ganancias.
+// Para que los QR apunten siempre a tu dirección oficial (y no a una vista previa),
+// define VITE_PUBLIC_URL en Vercel (ej. https://minegocio7pro.vercel.app).
 
-const REF_PREFIX = 'MC7:';
+const appOrigin = () => ((import.meta.env.VITE_PUBLIC_URL as string | undefined) || location.origin).replace(/\/+$/, '');
 
 export function generateProductQRText(p: Product): string {
-  const lines = [p.name];
-  if (p.brand) lines.push(`Marca: ${p.brand}`);
+  const q = new URLSearchParams();
+  q.set('p', p.id);
+  q.set('n', p.name);
+  if (p.brand) q.set('b', p.brand);
   const content = formatContent(p);
-  if (content) lines.push(`Contenido: ${content}`);
-  if (p.type || p.category) lines.push([p.type, p.category].filter(Boolean).join(' · '));
-  lines.push(`Precio: ${formatUSD(p.sale_price)}`);
-  if (p.offer_text) lines.push(`Oferta: ${p.offer_text}`);
-  if (p.description) lines.push(p.description.length > 90 ? p.description.slice(0, 87) + '...' : p.description);
-  const store = getState().activeStore?.store_name || getState().contactInfo?.business;
-  if (store) lines.push(`Tienda: ${store}`);
-  lines.push(`Ref: ${REF_PREFIX}${p.id}`);
-  return lines.join('\n');
+  if (content) q.set('c', content);
+  q.set('pr', formatUSD(p.sale_price));
+  if (p.offer_text) q.set('o', p.offer_text);
+  const st = getState().activeStore;
+  const storeName = st?.store_name || getState().contactInfo?.business;
+  if (storeName) q.set('s', storeName);
+  if (st?.store_id) q.set('t', st.store_id);
+  return `${appOrigin()}/?${q.toString()}`;
 }
 
 const b64decode = (s: string) => {
@@ -38,9 +42,24 @@ const b64decode = (s: string) => {
   try { return decodeURIComponent(escape(raw)); } catch { return raw; }
 };
 
-/** Lee un QR de producto (formato nuevo o el antiguo "CATPRO:") */
-export function decodeProductQR(text: string): { id: string | null; public: PublicProductData } | null {
+/** Datos públicos de un enlace de producto (?p=...). Devuelve null si no lo es */
+export function publicFromParams(q: URLSearchParams): PublicProductData | null {
+  const id = q.get('p');
+  if (!id) return null;
+  return { id, n: q.get('n') || 'Producto', b: q.get('b') || undefined, cv: q.get('c') || undefined, p: q.get('pr') || undefined, o: q.get('o') || undefined, s: q.get('s') || undefined };
+}
+
+/** Lee un QR de producto: enlace nuevo, texto con "Ref: MC7:" o el formato antiguo "CATPRO:" */
+export function decodeProductQR(text: string): { id: string | null; public: PublicProductData; storeId?: string } | null {
   const t = text.trim();
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t);
+      const pub = publicFromParams(u.searchParams);
+      if (pub && u.searchParams.get('n')) return { id: pub.id!, public: pub, storeId: u.searchParams.get('t') || undefined };
+    } catch { /* no es un enlace válido */ }
+    return null;
+  }
   if (t.startsWith('CATPRO:')) {
     try {
       const decoded = JSON.parse(b64decode(t.substring(7)));

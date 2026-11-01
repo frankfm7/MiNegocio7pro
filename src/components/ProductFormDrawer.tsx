@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Camera, Image as ImageIcon, ScanLine, X } from 'lucide-react';
+import { Camera, Download, Image as ImageIcon, Printer, ScanLine, X } from 'lucide-react';
 import { getState, setState, toast, useStore } from '../store';
 import { closeForm, openBarcodeScanner } from '../actions';
 import { DB } from '../lib/db';
-import { cardImage, formatUSD } from '../lib/format';
+import { cardImage, formatUSD, newId } from '../lib/format';
+import { generateProductQRImage, printProductQR } from '../lib/qr';
+import { downloadDataUrl } from '../lib/image';
 import { autoFrameProduct, compressImage } from '../lib/image';
 import { captureFromCamera } from '../lib/camera';
 import { CONTENT_UNITS } from '../lib/constants';
@@ -11,7 +13,7 @@ import type { Product } from '../types';
 
 const empty = {
   name: '', brand: '', type: '', category: '', catalog_id: '', content_value: '', content_unit: 'ml', barcode: '', description: '',
-  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1',
+  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1', min_stock: '',
 };
 type FormState = typeof empty;
 
@@ -21,6 +23,7 @@ function fromProduct(r: Product): FormState {
     content_value: r.content_value || '', content_unit: r.content_unit || 'ml', barcode: r.barcode || '', description: r.description || '',
     sale_price: String(r.sale_price ?? ''), min_price: String(r.min_price || 0), cost_price: String(r.cost_price ?? ''),
     offer_text: r.offer_text || '', stock: String(r.stock ?? 0),
+    min_stock: r.min_stock === null || r.min_stock === undefined ? '' : String(r.min_stock),
   };
 }
 
@@ -29,14 +32,18 @@ export default function ProductFormDrawer() {
   const editing = useStore(s => s.editing);
   const catalogs = useStore(s => s.catalogs);
   const scanned = useStore(s => s.scannedBarcodeForForm);
+  const lowDefault = useStore(s => s.lowStockDefault);
   const [f, setF] = useState<FormState>(empty);
   const [preview, setPreview] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [draftId, setDraftId] = useState('');
+  const [qrImage, setQrImage] = useState('');
   const [autoFrame, setAutoFrame] = useState(() => localStorage.getItem('mc7_autoframe') !== 'false');
 
   useEffect(() => {
     if (!open) return;
+    setDraftId(editing ? editing.id : newId()); // el producto nuevo ya tiene su id (y su QR) antes de guardarse
     setF(editing ? fromProduct(editing) : { ...empty, catalog_id: getState().currentCatalogId || '' });
     setPreview(editing ? cardImage(editing) : null);
     setPendingImage(null);
@@ -45,6 +52,21 @@ export default function ProductFormDrawer() {
   useEffect(() => {
     if (open && scanned) { setF(prev => ({ ...prev, barcode: scanned })); setState({ scannedBarcodeForForm: null }); }
   }, [open, scanned]);
+
+  // Producto tal como está en el formulario ahora mismo (para el QR en vivo)
+  const draft = {
+    ...(editing || {}), id: draftId, name: f.name.trim() || 'Producto nuevo', brand: f.brand.trim(), type: f.type.trim(), category: f.category.trim(),
+    content_value: f.content_value.trim(), content_unit: f.content_value.trim() ? f.content_unit : '',
+    sale_price: Number(f.sale_price) || 0, offer_text: f.offer_text.trim(), description: f.description.trim(),
+  } as Product;
+  const qrKey = open && draftId ? [draft.id, draft.name, draft.brand, draft.content_value, draft.content_unit, draft.sale_price, draft.offer_text].join('|') : '';
+  useEffect(() => {
+    if (!qrKey) return;
+    let live = true;
+    const t = setTimeout(() => { generateProductQRImage(draft, 400).then(img => { if (live) setQrImage(img); }).catch(() => {}); }, 250);
+    return () => { live = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrKey]);
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
   const profit = (Number(f.sale_price) || 0) - (Number(f.cost_price) || 0);
@@ -67,8 +89,9 @@ export default function ProductFormDrawer() {
       stock: Number(f.stock), sold: editing ? editing.sold : false, image_url: pendingImage !== null ? pendingImage : (editing ? editing.image_url : ''),
       description: f.description.trim(), offer_text: f.offer_text.trim(),
       content_value: f.content_value.trim(), content_unit: f.content_value.trim() ? f.content_unit : '',
+      min_stock: f.min_stock.trim() === '' ? null : Number(f.min_stock),
     };
-    const result = editing ? await DB.updateRecord({ ...editing, ...data }) : await DB.createRecord(data);
+    const result = editing ? await DB.updateRecord({ ...editing, ...data }) : await DB.createRecord({ ...data, id: draftId });
     if (result.isOk) { closeForm(); toast(editing ? 'Actualizado ✓' : 'Guardado ✓'); }
     else toast('No se pudo guardar');
     setSaving(false);
@@ -130,7 +153,11 @@ export default function ProductFormDrawer() {
               <p className="text-xs text-[#756c7e] mt-1">Texto que aparecerá en el producto para indicar promociones</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="block font-bold text-sm mb-1.5">Stock *</label><input value={f.stock} onChange={set('stock')} required min={0} className="w-full input-field rounded-xl p-3" type="number" /></div>
+              <div>
+                <label className="block font-bold text-sm mb-1.5">Stock *</label><input value={f.stock} onChange={set('stock')} required min={0} className="w-full input-field rounded-xl p-3" type="number" />
+                <label className="block font-bold text-xs mt-2 mb-1 text-[#756c7e]">Avisar cuando queden (opcional)</label>
+                <input value={f.min_stock} onChange={set('min_stock')} min={0} className="w-full input-field rounded-xl p-2 text-sm" type="number" placeholder={`General: ${lowDefault}`} />
+              </div>
               <div>
                 <label className="block font-bold text-sm mb-1.5">Imagen del producto</label>
                 <div className="flex gap-2">
@@ -157,6 +184,17 @@ export default function ProductFormDrawer() {
                 <button type="button" onClick={() => { setPreview(null); setPendingImage(''); }} className="absolute top-4 right-2 px-3 py-1.5 rounded-full bg-white/90 text-[#a43658] text-xs font-bold shadow">Quitar foto</button>
               </div>
             )}
+            <div className="p-4 rounded-2xl bg-[#f6f1f8] flex gap-4 items-center">
+              {qrImage ? <img src={qrImage} alt="Código QR del producto" className="w-28 h-28 rounded-xl bg-white p-1 flex-shrink-0" /> : <div className="w-28 h-28 rounded-xl bg-white flex-shrink-0" />}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm">Código QR del producto</p>
+                <p className="text-[11px] text-[#756c7e] leading-snug mt-0.5">Se actualiza solo al cambiar nombre, marca, contenido, precio u oferta. Al escanearlo con la cámara se abre este producto en la app.</p>
+                <div className="flex gap-2 mt-2">
+                  <button type="button" disabled={!qrImage} onClick={() => { downloadDataUrl(qrImage, `QR_${draft.name.replace(/[^a-z0-9]/gi, '_')}.png`); toast('QR descargado ✓'); }} className="px-3 py-1.5 rounded-full btn-ghost text-xs font-bold flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Descargar</button>
+                  <button type="button" disabled={!qrImage} onClick={() => printProductQR(draft, qrImage)} className="px-3 py-1.5 rounded-full btn-ghost text-xs font-bold flex items-center gap-1"><Printer className="w-3.5 h-3.5" /> Imprimir</button>
+                </div>
+              </div>
+            </div>
             <button id="save-product" type="submit" disabled={saving} className="w-full py-3.5 rounded-xl font-bold btn-primary">{saving ? 'Guardando...' : 'Guardar producto'}</button>
           </div>
         </form>

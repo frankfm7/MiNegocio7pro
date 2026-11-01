@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type {
-  AuthUser, CartLine, Catalog, ContactInfo, DraftProduct, PendingChange, Product, QuickScanItem, ReceiptData, Sale,
-  StoreMembership, User, View,
+  AuthUser, CartLine, Catalog, ContactInfo, Customer, CustomerMovement, DraftProduct, PendingChange, PriceChange, Product,
+  QuickScanItem, ReceiptData, Sale, StoreMembership, TeamPerson, User, View,
 } from './types';
 import { CONTACT_KEY, WELCOME_KEY } from './lib/constants';
 import { readJSON } from './lib/format';
@@ -13,7 +13,8 @@ export type ModalId =
   | 'invite-modal' | 'team-user-menu-modal' | 'team-change-role-modal' | 'change-password-modal'
   | 'user-profile-modal' | 'help-modal' | 'contacts-modal' | 'product-qr-modal' | 'quick-scan-modal'
   | 'quick-scan-manual-modal' | 'image-preview-modal' | 'sale-receipt-modal' | 'public-product-modal'
-  | 'import-preview-modal' | 'install-help-modal';
+  | 'import-preview-modal' | 'install-help-modal' | 'customer-form-modal' | 'customer-detail-modal' | 'movement-modal'
+  | 'price-history-modal' | 'labels-modal' | 'public-shop-modal';
 
 /** Información pública que lleva el QR de un producto */
 export interface PublicProductData {
@@ -28,6 +29,12 @@ interface State {
   records: Product[];
   catalogs: Catalog[];
   sales: Sale[];
+  customers: Customer[];
+  movements: CustomerMovement[];
+  /** Historial de precios guardado en el dispositivo (modo local) */
+  priceHistory: PriceChange[];
+  /** Equipo de la tienda activa: id de usuario → nombre y foto */
+  team: Record<string, TeamPerson>;
   pendingChanges: PendingChange[];
   dataReady: boolean;
 
@@ -51,6 +58,10 @@ interface State {
   isOnline: boolean;
   isSyncing: boolean;
   selectedPaymentMethod: string;
+  /** Cliente elegido cuando el pago es "Fiado" */
+  saleCustomerId: string;
+  /** Mínimo general de stock para avisar (por dispositivo) */
+  lowStockDefault: number;
 
   // UI
   modals: Partial<Record<ModalId, boolean>>;
@@ -82,6 +93,11 @@ interface State {
   barcodeScanTarget: 'form' | 'quick-scan' | null;
   scannedBarcodeForForm: string | null;
   publicProduct: PublicProductData | null;
+  customerId: string | null;
+  /** Producto preseleccionado para imprimir su etiqueta */
+  labelProductId: string | null;
+  movementDraft: { customerId: string; type: 'fiado' | 'abono' } | null;
+  priceHistoryProduct: Product | null;
   share: { text: string; catalog: Catalog } | null;
   barcodeProduct: Product | null;
   qrProduct: { product: Product; image: string } | null;
@@ -118,6 +134,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   records: [],
   catalogs: [],
   sales: [],
+  customers: [],
+  movements: [],
+  priceHistory: [],
+  team: {},
   pendingChanges: [],
   dataReady: false,
 
@@ -139,6 +159,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   isOnline: navigator.onLine,
   isSyncing: false,
   selectedPaymentMethod: 'Efec.',
+  saleCustomerId: '',
+  lowStockDefault: Math.max(0, parseInt(localStorage.getItem('mc7_low_default') || '3', 10) || 0),
 
   modals: {},
   sidebarOpen: false,
@@ -168,6 +190,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   barcodeScanTarget: null,
   scannedBarcodeForForm: null,
   publicProduct: null,
+  customerId: null,
+  labelProductId: null,
+  movementDraft: null,
+  priceHistoryProduct: null,
   share: null,
   barcodeProduct: null,
   qrProduct: null,

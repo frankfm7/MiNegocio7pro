@@ -116,15 +116,15 @@ export function HelpModal() {
 
 export function ContactsModal() {
   const open = useStore(s => !!s.modals['contacts-modal']);
-  const [c, setC] = useState({ name: '', whatsapp: '', email: '', business: '' });
+  const [c, setC] = useState({ name: '', whatsapp: '', email: '', business: '', countryCode: '' });
   useEffect(() => {
-    if (open) { const info = getState().contactInfo; setC({ name: info?.name || '', whatsapp: info?.whatsapp || '', email: info?.email || '', business: info?.business || '' }); }
+    if (open) { const info = getState().contactInfo; setC({ name: info?.name || '', whatsapp: info?.whatsapp || '', email: info?.email || '', business: info?.business || '', countryCode: info?.countryCode || '' }); }
   }, [open]);
   const set = (k: keyof typeof c) => (e: React.ChangeEvent<HTMLInputElement>) => setC(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const info = { name: c.name.trim(), whatsapp: c.whatsapp.trim(), email: c.email.trim(), business: c.business.trim() };
+    const info = { name: c.name.trim(), whatsapp: c.whatsapp.trim(), email: c.email.trim(), business: c.business.trim(), countryCode: c.countryCode.replace(/\D/g, '') };
     setState({ contactInfo: info, ...(getState().mode === 'local' ? { currentUser: localUser(info) } : {}) });
     localStorage.setItem(CONTACT_KEY, JSON.stringify(info));
     closeModal('contacts-modal');
@@ -138,6 +138,7 @@ export function ContactsModal() {
         <form className="space-y-4" onSubmit={submit}>
           <div><label className="block font-bold text-sm mb-1.5">Nombre completo</label><input value={c.name} onChange={set('name')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: María García" /></div>
           <div><label className="block font-bold text-sm mb-1.5">WhatsApp</label><input value={c.whatsapp} onChange={set('whatsapp')} type="tel" className="w-full input-field rounded-xl p-3" placeholder="Ej: +591 70000000" /></div>
+          <div><label className="block font-bold text-sm mb-1.5">Código de país (para enviar WhatsApp)</label><input value={c.countryCode} onChange={set('countryCode')} inputMode="numeric" className="w-full input-field rounded-xl p-3" placeholder="Ej: 591 (Bolivia), 51 (Perú), 57 (Colombia)" /></div>
           <div><label className="block font-bold text-sm mb-1.5">Correo electrónico</label><input value={c.email} onChange={set('email')} type="email" className="w-full input-field rounded-xl p-3" placeholder="Ej: maria@email.com" /></div>
           <div><label className="block font-bold text-sm mb-1.5">Negocio / Empresa</label><input value={c.business} onChange={set('business')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: Tienda María" /></div>
           <button type="submit" className="w-full py-3 rounded-xl btn-primary font-bold">Guardar datos</button>

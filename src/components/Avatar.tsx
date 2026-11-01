@@ -1,12 +1,17 @@
 import { useStore } from '../store';
 
-/** Foto de perfil del usuario (o su inicial si aún no tiene foto) */
-export default function Avatar({ size = 40, className = '' }: { size?: number; className?: string }) {
-  const user = useStore(s => s.authUser);
-  if (!user) return null;
+/**
+ * Foto de perfil redonda (o la inicial si no hay foto).
+ * Sin props muestra al usuario que inició sesión; con `name`/`url` muestra a otra persona.
+ */
+export default function Avatar({ size = 40, className = '', name, url }: { size?: number; className?: string; name?: string; url?: string }) {
+  const me = useStore(s => s.authUser);
+  const label = name ?? me?.name;
+  const src = name !== undefined ? url : me?.avatar;
+  if (!label) return null;
   return (
     <span className={`avatar ${className}`} style={{ width: size, height: size, fontSize: size * 0.42 }}>
-      {user.avatar ? <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer" /> : user.name.charAt(0).toUpperCase()}
+      {src ? <img src={src} alt={label} referrerPolicy="no-referrer" /> : (label.trim().charAt(0) || '?').toUpperCase()}
     </span>
   );
 }

@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { WifiOff } from 'lucide-react';
 import { getState, openModal, setState, toast, useStore } from './store';
-import { closeForm, navigate, openBarcodeScanner, startQuickScanMode } from './actions';
+import { closeForm, navigate, openBarcodeScanner, openProductFromLink, startQuickScanMode } from './actions';
 import { DB, refreshData, syncPendingChanges } from './lib/db';
 import { initSession } from './lib/session';
+import { getLowStockProducts, getOutOfStockProducts } from './lib/selectors';
 
 import WelcomeScreen from './components/WelcomeScreen';
 import AccountScreen from './components/AccountScreen';
@@ -16,6 +17,12 @@ import { ProductImageLightbox, QrLightbox } from './components/ImageLightboxes';
 import CatalogsScreen from './screens/CatalogsScreen';
 import ProductsScreen from './screens/ProductsScreen';
 import { DailySalesScreen, LowStockScreen, OutOfStockScreen, ReportsScreen } from './screens/SalesScreens';
+import CashCloseScreen from './screens/CashCloseScreen';
+import CustomersScreen from './screens/CustomersScreen';
+import PriceHistoryModal from './components/modals/PriceHistoryModal';
+import LabelsModal from './components/modals/LabelsModal';
+import PublicShopModal from './components/modals/PublicShopModal';
+import { CustomerDetailModal, CustomerFormModal, MovementModal } from './components/modals/CustomerModals';
 import { BarcodePrintModal, DetailModal, ProductQrModal, PublicProductModal, SaleModal } from './components/modals/ProductModals';
 import CartModal from './components/modals/CartModal';
 import { CatalogFormModal, CreateCatalogModal, ShareCatalogModal } from './components/modals/CatalogModals';
@@ -56,6 +63,26 @@ function useConnection() {
     window.addEventListener('offline', goOffline);
     return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
   }, []);
+}
+
+/** Al abrir la app avisa (una vez) si hay productos por reponer */
+function useStockAlerts() {
+  const ready = useStore(s => s.dataReady);
+  const welcome = useStore(s => s.welcomeVisible);
+  const low = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length);
+  const out = useStore(s => getOutOfStockProducts(s.records).length);
+  const told = useRef(false);
+  useEffect(() => {
+    if (!ready || welcome || told.current || (!low && !out)) return;
+    told.current = true;
+    const msg = `${low ? `${low} con stock bajo` : ''}${low && out ? ' y ' : ''}${out ? `${out} agotado${out === 1 ? '' : 's'}` : ''}`;
+    toast(`⚠️ Por reponer: ${msg}`, 4500);
+    try {
+      if (localStorage.getItem('mc7_notif') === 'true' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        navigator.serviceWorker?.ready.then(reg => reg.showNotification('Stock por reponer', { body: msg, icon: '/icon-192.png', tag: 'stock' })).catch(() => {});
+      }
+    } catch { /* sin permiso */ }
+  }, [ready, welcome, low, out]);
 }
 
 function useEscapeKey() {
@@ -103,6 +130,8 @@ function CurrentScreen() {
     case 'low-stock': return <LowStockScreen />;
     case 'out-of-stock': return <OutOfStockScreen />;
     case 'reports': return <ReportsScreen />;
+    case 'cash-close': return <CashCloseScreen />;
+    case 'customers': return <CustomersScreen />;
     default: return <CatalogsScreen />;
   }
 }
@@ -116,11 +145,18 @@ export default function App() {
   useConnection();
   useEscapeKey();
   useBackButton();
+  useStockAlerts();
 
   useEffect(() => {
     initSession().then(() => {
       // Accesos directos del ícono de la app (manifest "shortcuts")
-      const action = new URLSearchParams(location.search).get('action');
+      const params = new URLSearchParams(location.search);
+      if (params.get('p')) {
+        openProductFromLink(params);
+        history.replaceState(null, '', location.pathname);
+        return;
+      }
+      const action = params.get('action');
       if (action) {
         setState({ welcomeVisible: false });
         if (action === 'vender') startQuickScanMode();
@@ -187,6 +223,12 @@ export default function App() {
       <PublicProductModal />
       <ImportPreviewModal />
       <InstallHelpModal />
+      <CustomerFormModal />
+      <CustomerDetailModal />
+      <MovementModal />
+      <PriceHistoryModal />
+      <LabelsModal />
+      <PublicShopModal />
 
       <QrLightbox />
       <ProductImageLightbox />

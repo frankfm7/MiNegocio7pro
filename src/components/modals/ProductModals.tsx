@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import JsBarcode from 'jsbarcode';
 import {
-  Check, CheckCircle, Copy, Download, Info, Loader, Maximize2, Minus, MoreVertical, PackagePlus, Plus, Printer, QrCode, Share2, Trash2, X, XCircle,
+  Check, CheckCircle, Copy, Download, History, Info, Loader, Maximize2, Minus, MoreVertical, PackagePlus, Plus, Printer, QrCode, Share2, Tag, Trash2, X, XCircle,
 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
-import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
+import { closeModal, getState, openAccount, openModal, setState, toast, useStore } from '../../store';
 import { addCart, confirmSale, deleteProduct, duplicateProduct, openForm, openSaleModal } from '../../actions';
 import { cardImage, formatContent, formatUSD, formatUSDShort } from '../../lib/format';
 import { APP_NAME, fallback } from '../../lib/constants';
 import { generateProductQRImage, printProductQR } from '../../lib/qr';
 import { SoundEffects } from '../../lib/sound';
 import { downloadDataUrl } from '../../lib/image';
+import PaymentPicker from '../PaymentPicker';
 
 // ==========================================
 // DETALLE DE PRODUCTO
@@ -81,6 +82,8 @@ export function DetailModal() {
                   else { navigator.clipboard.writeText(msg); toast('Copiado ✓'); }
                 })}><Share2 className="w-4 h-4" /> Compartir</button>
                 <button className="dropdown-item" onClick={run(showProductQR)}><QrCode className="w-4 h-4" /> Generar código QR</button>
+                <button className="dropdown-item" onClick={run(() => { setState({ labelProductId: r.id }); openModal('labels-modal'); })}><Tag className="w-4 h-4" /> Imprimir etiqueta</button>
+                <button className="dropdown-item admin-only" onClick={run(() => { setState({ priceHistoryProduct: r }); openModal('price-history-modal'); })}><History className="w-4 h-4" /> Historial de precios</button>
                 <div className="my-1 border-t border-[#e8dfec]" />
                 <button className="dropdown-item danger admin-only" onClick={run(() => deleteProduct(r))}><Trash2 className="w-4 h-4" /> Eliminar</button>
               </div>
@@ -123,7 +126,6 @@ export function DetailModal() {
 // ==========================================
 export function SaleModal() {
   const r = useStore(s => s.saleProduct);
-  const method = useStore(s => s.selectedPaymentMethod);
   const open = useStore(s => !!s.modals['sale-modal']);
   const [qty, setQty] = useState(1);
   const [price, setPrice] = useState('');
@@ -143,9 +145,6 @@ export function SaleModal() {
   const actual = Number(price) || Number(r.sale_price) || 0;
   const total = actual * qty;
   const profit = (actual - Number(r.cost_price)) * qty;
-  const payBtn = (m: string) => m === method
-    ? 'pay-method-btn py-2 rounded-xl border-2 border-[#7c43ba] bg-[#f6f1f8] font-bold text-sm'
-    : 'pay-method-btn py-2 rounded-xl border-2 border-[#e8dfec] text-[#756c7e] font-bold text-sm';
 
   const confirm = async () => {
     if (processing) return;
@@ -183,9 +182,7 @@ export function SaleModal() {
           </div>
           <div className="mb-4">
             <label className="block text-xs font-bold mb-1">Método de pago</label>
-            <div className="grid grid-cols-2 gap-2">
-              {['Efec.', 'QR'].map(m => <button key={m} type="button" className={payBtn(m)} onClick={() => setState({ selectedPaymentMethod: m })}>{m}</button>)}
-            </div>
+            <PaymentPicker />
           </div>
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0]">
             <div className="flex justify-between items-center"><span className="text-sm font-bold text-[#166534]">Ganancia total:</span><span className={`font-bold text-lg ${profit >= 0 ? 'text-[#166534]' : 'text-[#a43658]'}`}>{formatUSD(profit)}</span></div>
@@ -207,6 +204,7 @@ export function SaleModal() {
 // ==========================================
 export function PublicProductModal() {
   const p = useStore(s => s.publicProduct);
+  const authUser = useStore(s => s.authUser);
   const field = (label: string, value: React.ReactNode, cls = '') => (
     <div><p className="text-xs text-[#756c7e] uppercase tracking-wide">{label}</p><p className={cls}>{value}</p></div>
   );
@@ -238,6 +236,9 @@ export function PublicProductModal() {
           <div className="mt-4 p-3 rounded-xl bg-[#f6f1f8]">
             <p className="text-xs text-[#756c7e] text-center"><Info className="w-3 h-3 inline" /> Este producto no está en los catálogos que tienes abiertos. Para comprarlo, contacta al vendedor.</p>
           </div>
+          {!authUser && (
+            <button type="button" onClick={() => { closeModal('public-product-modal'); openAccount(); }} className="w-full mt-3 py-2.5 rounded-xl btn-ghost font-bold text-sm">¿Eres de esta tienda? Iniciar sesión</button>
+          )}
         </article>
       )}
     </Modal>
@@ -262,7 +263,7 @@ export function ProductQrModal() {
             <h3 className="font-bold text-lg mb-1">{qr.product.name}</h3>
             <p className="text-[#7c43ba] font-bold text-xl mb-4">{formatUSD(qr.product.sale_price)}</p>
             <div className="p-3 rounded-xl bg-[#f6f1f8] mb-4">
-              <p className="text-xs text-[#756c7e]"><Info className="w-3 h-3 inline" /> Con cualquier lector de QR se ve solo el nombre, contenido y precio (nunca costos). Con {APP_NAME} se abre el producto al instante.</p>
+              <p className="text-xs text-[#756c7e]"><Info className="w-3 h-3 inline" /> Al escanearlo con la cámara del celular se abre {APP_NAME} directamente en este producto. Quien no tenga acceso a la tienda solo ve nombre, contenido y precio (nunca costos).</p>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => { downloadDataUrl(qr.image, `QR_${qr.product.name.replace(/[^a-z0-9]/gi, '_')}.png`); toast('QR descargado ✓'); SoundEffects.play('success'); }} className="flex-1 py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Descargar</button>

@@ -1,3 +1,4 @@
+import Avatar from '../Avatar';
 import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Ban, Copy, Link2, Loader, MessageCircle, MoreVertical, Pencil, Shield, Ticket, Trash2, UserPlus, Users } from 'lucide-react';
@@ -97,7 +98,9 @@ export function TeamModal() {
             return (
               <div key={m.user_id} className={`rounded-2xl border-2 ${blocked ? 'border-[#a43658] opacity-60' : 'border-[#ede7f0]'} bg-white`}>
                 <div className="flex items-center gap-3 p-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0" style={{ background: color + '20' }}>{icon}</div>
+                  {m.avatar_url
+                    ? <span className="relative flex-shrink-0"><Avatar size={44} name={m.name || m.email || '?'} url={m.avatar_url} /><span className="absolute -bottom-1 -right-1 text-sm leading-none bg-white rounded-full w-5 h-5 grid place-items-center shadow">{icon}</span></span>
+                    : <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0" style={{ background: color + '20' }}>{icon}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-sm truncate">{m.name || m.email}</p>

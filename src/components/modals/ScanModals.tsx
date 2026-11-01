@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CheckCircle, Download, Image as ImageIcon, Loader, Plus, ScanLine, Share2 } from 'lucide-react';
+import { Camera, CheckCircle, Download, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import {
-  addToQuickScan, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, openBarcodeScanner, openDetail, stopQuickScanMode,
+  addToQuickScan, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
 } from '../../actions';
 import { cardImage, formatContent, formatUSD } from '../../lib/format';
 import { searchByImage } from '../../lib/imageSearch';
 import { captureFromCamera } from '../../lib/camera';
 import { downloadDataUrl } from '../../lib/image';
 import { SoundEffects } from '../../lib/sound';
+import PaymentPicker from '../PaymentPicker';
 
 // ==========================================
 // ESCÁNER DE CÓDIGOS (barras y QR)
@@ -225,6 +226,10 @@ export function QuickScanModal() {
             ))}
           </div>
           <div className="border-t border-gray-200 pt-3">
+            <label className="block text-xs font-bold mb-2">Método de pago</label>
+            <PaymentPicker />
+          </div>
+          <div className="border-t border-gray-200 pt-3">
             <label className="block text-xs font-bold mb-2">Descuento</label>
             <div className="flex gap-2">
               <input type="number" min={0} step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="flex-1 input-field rounded-lg p-2 text-sm" placeholder="0.00" />
@@ -293,6 +298,8 @@ export function QuickScanManualModal() {
 // ==========================================
 export function SaleReceiptModal() {
   const r = useStore(s => s.receiptData);
+  const [waPhone, setWaPhone] = useState('');
+  useEffect(() => { setWaPhone(r?.customer?.phone || ''); }, [r]);
   return (
     <Modal id="sale-receipt-modal" className="z-[70] bg-[#1e1427]/60">
       {r && (
@@ -323,9 +330,17 @@ export function SaleReceiptModal() {
             <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Descuento:</span><span className="font-bold text-orange-600">{r.discount > 0 ? `-${formatUSD(r.discount)}` : 'Sin descuento'}</span></div>
             <div className="flex justify-between text-xl mt-2 pt-2 border-t border-gray-200"><span className="font-bold">TOTAL:</span><span className="font-bold text-green-700">{formatUSD(r.total)}</span></div>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Guardar</button>
-            <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2"><Share2 className="w-4 h-4" /> Enviar</button>
+          <div className="mt-4 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
+            <p className="text-xs font-bold text-[#166534] mb-2">Enviar ticket al cliente</p>
+            <div className="flex gap-2">
+              <input value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" className="flex-1 min-w-0 input-field rounded-lg p-2 text-sm" placeholder="WhatsApp del cliente" />
+              <button type="button" onClick={() => sendReceiptWhatsApp(waPhone)} className="px-3 rounded-lg bg-[#25D366] text-white font-bold text-sm flex items-center gap-1.5 flex-shrink-0"><MessageCircle className="w-4 h-4" /> WhatsApp</button>
+            </div>
+            <p className="text-[10px] text-[#756c7e] mt-1">Si lo dejas vacío, WhatsApp te deja elegir el contacto.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Guardar imagen</button>
+            <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2"><Share2 className="w-4 h-4" /> Compartir imagen</button>
           </div>
           <button type="button" onClick={() => closeModal('sale-receipt-modal')} className="w-full mt-2 py-3 rounded-xl btn-ghost font-bold">Cerrar</button>
         </article>

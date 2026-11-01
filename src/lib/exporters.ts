@@ -96,8 +96,8 @@ export async function exportCartToPDF() {
 // RESPALDOS
 // ==========================================
 export function createBackup() {
-  const { catalogs, records, sales, contactInfo } = getState();
-  const backup = { app: APP_NAME, version: '3.0', date: new Date().toISOString(), catalogs, records, sales, contactInfo };
+  const { catalogs, records, sales, contactInfo, customers, movements } = getState();
+  const backup = { app: APP_NAME, version: '3.5', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
   downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `respaldo_catalogo_${Date.now()}.json`);
   toast('Respaldo creado ✓');
   SoundEffects.play('success');
@@ -109,7 +109,7 @@ export async function restoreBackup(file: File) {
     if (!backup.catalogs || !backup.records) { toast('Archivo no válido'); return false; }
     if (!confirm('¿Restaurar? Se reemplazarán tus datos.')) return false;
     if (backup.contactInfo) { setState({ contactInfo: backup.contactInfo }); localStorage.setItem(CONTACT_KEY, JSON.stringify(backup.contactInfo)); }
-    await DB.replaceAll({ catalogs: backup.catalogs, records: backup.records, sales: backup.sales || [] });
+    await DB.replaceAll({ catalogs: backup.catalogs, records: backup.records, sales: backup.sales || [], customers: backup.customers, movements: backup.movements });
     toast('Respaldo restaurado ✓');
     SoundEffects.play('success');
     return true;

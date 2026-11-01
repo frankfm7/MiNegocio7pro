@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  AlertCircle, AlertTriangle, BarChart3, BookOpen, Cloud, Download, FileUp, HelpCircle, Key, LogOut, Moon, MoreVertical,
+  AlertCircle, AlertTriangle, BarChart3, BookOpen, Wallet, Contact, Globe, Tag, Cloud, Download, FileUp, HelpCircle, Key, LogOut, Moon, MoreVertical,
   Package, Phone, QrCode, RefreshCw, Scan, ScanLine, ShieldCheck, ShoppingCart, Smartphone, Store, Sun, TrendingUp, Tv2, User, Users,
   Volume2, VolumeX, X,
 } from 'lucide-react';
@@ -8,7 +8,7 @@ import { openAccount, openModal, setState, useStore, type ModalId } from '../sto
 import { navigate, openAdminModal, openBarcodeScanner, openTeam, showWelcome, toggleDarkMode, toggleSound } from '../actions';
 import { roleLabel, signOut } from '../lib/session';
 import { refreshData } from '../lib/db';
-import { getLowStockProducts, getOutOfStockProducts } from '../lib/selectors';
+import { customerBalance, getLowStockProducts, getOutOfStockProducts } from '../lib/selectors';
 import { installApp } from './InstallPrompt';
 import { APP_VERSION } from '../lib/constants';
 import Brand from './Brand';
@@ -35,6 +35,10 @@ export default function Sidebar() {
   const store = useStore(s => s.activeStore);
   const authUser = useStore(s => s.authUser);
   const records = useStore(s => s.records);
+  const customers = useStore(s => s.customers);
+  const movements = useStore(s => s.movements);
+  const lowDefault = useStore(s => s.lowStockDefault);
+  const debtors = customers.filter(c => customerBalance(movements, c.id) > 0).length;
   const cartQty = useStore(s => s.cart.reduce((a, x) => a + x.qty, 0));
   const isOnline = useStore(s => s.isOnline);
   const isSyncing = useStore(s => s.isSyncing);
@@ -131,14 +135,18 @@ export default function Sidebar() {
           <Item active={isActive('catalogs')} onClick={() => go('catalogs')}><BookOpen className={icon} /> Catálogos</Item>
           <Item active={isActive('products', true)} onClick={() => go('products')}><Package className={icon} /> Todos los productos</Item>
           <Item active={isActive('daily-sales')} onClick={() => go('daily-sales')}><TrendingUp className={icon} /> Ventas del día</Item>
+          <Item active={isActive('cash-close')} onClick={() => go('cash-close')}><Wallet className={icon} /> Cierre de caja</Item>
+          <Item active={isActive('customers')} onClick={() => go('customers')}><Contact className={icon} /> Clientes y fiados <Badge count={debtors} color="bg-[#a43658]" /></Item>
           <Item active={isActive('out-of-stock')} onClick={() => go('out-of-stock')}><AlertTriangle className={icon} /> Agotados <Badge count={getOutOfStockProducts(records).length} color="bg-[#a43658]" /></Item>
-          <Item active={isActive('low-stock')} onClick={() => go('low-stock')}><AlertCircle className={icon} /> Stock bajo <Badge count={getLowStockProducts(records).length} color="bg-[#d97706]" /></Item>
+          <Item active={isActive('low-stock')} onClick={() => go('low-stock')}><AlertCircle className={icon} /> Stock bajo <Badge count={getLowStockProducts(records, lowDefault).length} color="bg-[#d97706]" /></Item>
           <Item onClick={() => { close(); openModal('cart-modal'); }}><ShoppingCart className={icon} /> Pedido actual <Badge count={cartQty} color="bg-[#c54571]" /></Item>
 
           <p className="text-[10px] uppercase tracking-[.15em] font-bold text-[#756c7e] px-3 py-2 mt-4">Herramientas</p>
           <Item onClick={() => later(() => openModal('qr-modal'))}><QrCode className={icon} /> QR de cobro</Item>
           <Item onClick={() => later(() => openModal('image-search-modal'))}><Scan className={icon} /> Buscar por imagen</Item>
           <Item onClick={() => later(() => openBarcodeScanner())}><ScanLine className={icon} /> Escanear código / QR</Item>
+          <Item className="admin-only" onClick={() => later(() => { setState({ labelProductId: null }); openModal('labels-modal'); })}><Tag className={icon} /> Etiquetas (QR + barras)</Item>
+          <Item className="admin-only" onClick={() => later(() => { if (cloud) openModal('public-shop-modal'); else openAccount('El catálogo público necesita tu tienda en la nube'); })}><Globe className={icon} /> Catálogo público</Item>
           <Item className="admin-only" onClick={() => admin('import-export-modal')}><FileUp className={icon} /> Importar / Exportar</Item>
           <Item className="admin-only" onClick={() => admin('backup-modal')}><ShieldCheck className={icon} /> Respaldo de datos</Item>
           <Item className="admin-only" onClick={() => later(openTeam)}><Users className={icon} /> Equipo e invitaciones</Item>

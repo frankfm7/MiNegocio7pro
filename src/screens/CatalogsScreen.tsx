@@ -1,11 +1,11 @@
-import { ArrowRight, Camera, Cloud, FileUp, Menu, Plus, ScanLine, Search, ShoppingCart, Sparkles, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Camera, Cloud, FileUp, Menu, Plus, ScanLine, Search, ShoppingCart, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { getState, openAccount, openModal, setState, toast, useStore } from '../store';
-import { openAdminModal, openBarcodeScanner, openCatalog, openCatalogForm } from '../actions';
+import { navigate, openAdminModal, openBarcodeScanner, openCatalog, openCatalogForm } from '../actions';
 import { InstallBanner } from '../components/InstallPrompt';
 import { DB } from '../lib/db';
 import { coverFor, fallbackCover } from '../lib/constants';
-import { searchProducts } from '../lib/selectors';
+import { getLowStockProducts, getOutOfStockProducts, searchProducts } from '../lib/selectors';
 import { captureFromCamera } from '../lib/camera';
 import ProductCard from '../components/ProductCard';
 import AccountButton from '../components/AccountButton';
@@ -13,9 +13,25 @@ import type { Catalog } from '../types';
 import { searchByImage } from '../lib/imageSearch';
 
 export function TopbarMenuButton() {
+  const alerts = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length + getOutOfStockProducts(s.records).length);
   return (
-    <button className="open-sidebar-btn menu-btn" aria-label="Abrir menú" onClick={() => setState({ sidebarOpen: true })}>
+    <button className="open-sidebar-btn menu-btn relative" aria-label="Abrir menú" onClick={() => setState({ sidebarOpen: true })}>
       <Menu className="w-5 h-5" />
+      {alerts > 0 && <span className="absolute -top-1 -right-1 bg-[#d97706] text-white text-[10px] rounded-full min-w-[18px] h-[18px] px-1 grid place-items-center font-bold">{alerts > 99 ? '99+' : alerts}</span>}
+    </button>
+  );
+}
+
+/** Aviso en la pantalla principal cuando hay productos por reponer */
+export function StockAlertBanner() {
+  const low = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length);
+  const out = useStore(s => getOutOfStockProducts(s.records).length);
+  if (!low && !out) return null;
+  return (
+    <button type="button" onClick={() => navigate(out && !low ? 'out-of-stock' : 'low-stock')} className="w-full mb-4 p-3 rounded-2xl bg-[#fffbeb] border border-[#fde68a] flex items-center gap-3 text-left">
+      <AlertTriangle className="w-5 h-5 text-[#d97706] flex-shrink-0" />
+      <p className="text-sm text-[#92400e] flex-1"><b>Por reponer:</b> {low > 0 && `${low} con stock bajo`}{low > 0 && out > 0 && ' · '}{out > 0 && `${out} agotado${out === 1 ? '' : 's'}`}</p>
+      <ArrowRight className="w-4 h-4 text-[#d97706]" />
     </button>
   );
 }
@@ -148,6 +164,7 @@ export default function CatalogsScreen() {
       </header>
       <div className="page-inner pt-4 sm:pt-6">
         <InstallBanner />
+        <StockAlertBanner />
         {dataReady && catalogs.length === 0 && !searching && <EmptyStart cloud={mode === 'cloud'} isAdmin={isAdmin} />}
         <div id="catalog-grid" className={`catalog-grid ${searching ? 'searching-active' : ''}`}>
           {sorted.map(cat => <CatalogTile key={cat.id} cat={cat} count={records.filter(p => p.catalog_id === cat.id).length} />)}

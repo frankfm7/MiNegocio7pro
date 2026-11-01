@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, AlertTriangle, CheckCircle, CreditCard, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp,
+  AlertCircle, AlertTriangle, CheckCircle, CreditCard, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
 } from 'lucide-react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
-import { useStore } from '../store';
-import { generateDailyCloseImage, openDetail } from '../actions';
+import { setState, toast, useStore } from '../store';
+import { generateDailyCloseImage, navigate, openDetail } from '../actions';
 import { cardImage, formatContent, formatUSD, formatUSDShort } from '../lib/format';
 import { fallback } from '../lib/constants';
-import { getLowStockProducts, getOutOfStockProducts, getTodaySales, sortByDateDesc } from '../lib/selectors';
+import { getLowStockProducts, getOutOfStockProducts, getTodaySales, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
+import Avatar from '../components/Avatar';
 import { exportOutOfStock, exportSalesCSV, exportSalesXLSX } from '../lib/exporters';
 import { TopbarMenuButton } from './CatalogsScreen';
 import type { Product, Sale } from '../types';
@@ -40,9 +41,11 @@ const sumBy = (list: Sale[], key: 'actual_price' | 'profit') => list.reduce((a, 
 // ==========================================
 export function DailySalesScreen() {
   const sales = useStore(s => s.sales);
+  const team = useStore(s => s.team);
   const today = useMemo(() => sortByDateDesc(getTodaySales(sales)), [sales]);
   const cash = sumBy(today.filter(s => s.payment_method === 'Efec.'), 'actual_price');
   const qr = sumBy(today.filter(s => s.payment_method === 'QR'), 'actual_price');
+  const fiado = sumBy(today.filter(s => s.payment_method === 'Fiado'), 'actual_price');
 
   return (
     <section id="daily-sales-screen" className="screen active">
@@ -53,20 +56,24 @@ export function DailySalesScreen() {
           <article className="stat-card rounded-2xl p-4"><DollarSign className="w-4 h-4 text-[#7c43ba] mb-2" /><p className="font-bold text-xl">{formatUSDShort(sumBy(today, 'actual_price'))}</p><p className="text-[11px] text-[#756c7e]">Ingresos</p></article>
           <article className="stat-card rounded-2xl p-4"><CreditCard className="w-4 h-4 text-[#3875a5] mb-2" /><p className="font-bold text-xl">{formatUSDShort(cash)}</p><p className="text-[11px] text-[#756c7e]">Efectivo</p></article>
           <article className="stat-card rounded-2xl p-4"><QrCode className="w-4 h-4 text-[#7c43ba] mb-2" /><p className="font-bold text-xl">{formatUSDShort(qr)}</p><p className="text-[11px] text-[#756c7e]">QR</p></article>
+          {fiado > 0 && <article className="stat-card rounded-2xl p-4 col-span-2 sm:col-span-4 border-l-4 border-l-[#a43658]"><p className="font-bold text-xl text-[#a43658]">{formatUSDShort(fiado)}</p><p className="text-[11px] text-[#756c7e]">Fiado hoy (por cobrar)</p></article>}
         </section>
         <section className="grid grid-cols-2 gap-3 mb-6 sensitive-data">
           <article className="stat-card rounded-2xl p-4 border-l-4 border-l-[#166534]"><TrendingUp className="w-4 h-4 text-[#166534] mb-2" /><p className="font-bold text-xl text-[#166534]">{formatUSDShort(sumBy(today, 'profit'))}</p><p className="text-[11px] text-[#756c7e]">Ganancia hoy</p></article>
         </section>
-        <button onClick={generateDailyCloseImage} className="w-full mb-4 py-3 rounded-xl bg-[#7c43ba] text-white font-bold flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Generar tabla de cierre</button>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button onClick={() => navigate('cash-close')} className="py-3 rounded-xl bg-[#23805d] text-white font-bold flex items-center justify-center gap-2"><Wallet className="w-4 h-4" /> Cierre de caja</button>
+          <button onClick={() => generateDailyCloseImage()} className="py-3 rounded-xl bg-[#7c43ba] text-white font-bold flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Tabla de cierre</button>
+        </div>
         <h2 className="font-bold text-lg mb-3 hero-title">Historial de hoy</h2>
         <div id="daily-sales-list" className="space-y-2">
           {today.map(s => (
             <div key={s.id} className="sale-row rounded-xl p-3 flex items-center gap-3 shadow-sm bg-white">
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm truncate">{s.product_name} {s.quantity > 1 && <span className="text-[10px] text-[#756c7e]">x{s.quantity}</span>}</p>
-                {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold">{s.seller_name}</p>}
+                {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} />{s.seller_name}</p>}
                 <div className="flex items-center gap-1 mt-1">
-                  {s.payment_method && <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.payment_method === 'QR' ? 'bg-[#f6f1f8] text-[#7c43ba]' : 'bg-[#f0fdf4] text-[#166534]'} font-bold`}>{s.payment_method}</span>}
+                  {s.payment_method && <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.payment_method === 'QR' ? 'bg-[#f6f1f8] text-[#7c43ba]' : s.payment_method === 'Fiado' ? 'bg-[#fff0f3] text-[#a43658]' : 'bg-[#f0fdf4] text-[#166534]'} font-bold`}>{s.payment_method}{s.customer_name ? ` · ${s.customer_name}` : ''}</span>}
                   <p className="text-xs text-[#756c7e]">{new Date(s.date).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
               </div>
@@ -107,19 +114,45 @@ function RowInfo({ r, line }: { r: Product; line: React.ReactNode }) {
 
 export function LowStockScreen() {
   const records = useStore(s => s.records);
-  const products = useMemo(() => getLowStockProducts(records), [records]);
+  const lowDefault = useStore(s => s.lowStockDefault);
+  const products = useMemo(() => getLowStockProducts(records, lowDefault), [records, lowDefault]);
+  const [limit, setLimit] = useState(String(lowDefault));
+  const [notif, setNotif] = useState(() => localStorage.getItem('mc7_notif') === 'true' && typeof Notification !== 'undefined' && Notification.permission === 'granted');
+  const saveLimit = () => {
+    const n = Math.max(0, Math.floor(Number(limit)));
+    if (isNaN(n)) return;
+    localStorage.setItem('mc7_low_default', String(n));
+    setState({ lowStockDefault: n });
+    toast(`Aviso general: ${n} unidades o menos ✓`);
+  };
+  const toggleNotif = async () => {
+    if (typeof Notification === 'undefined') { toast('Este navegador no permite notificaciones'); return; }
+    if (notif) { localStorage.setItem('mc7_notif', 'false'); setNotif(false); toast('Avisos del sistema desactivados'); return; }
+    const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    if (perm === 'granted') { localStorage.setItem('mc7_notif', 'true'); setNotif(true); toast('Avisos activados: te avisaremos al abrir la app 🔔'); }
+    else toast('Permiso de notificaciones denegado');
+  };
   return (
     <section id="low-stock-screen" className="screen active">
       <Header kicker="Atención" kickerColor="text-[#d97706]" title="Productos con stock bajo" />
       <div className="page-inner pt-6 sm:pt-8">
         <div className="p-4 rounded-2xl bg-gradient-to-br from-[#fffbeb] to-[#fff] border border-[#fde68a] mb-5 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-[#d97706] flex-shrink-0 mt-0.5" />
-          <div><p className="font-bold text-sm text-[#d97706]">Reposición recomendada</p><p className="text-xs text-[#756c7e] mt-1">Productos con 3 unidades o menos. Considera reponer pronto.</p></div>
+          <div><p className="font-bold text-sm text-[#d97706]">Reposición recomendada</p><p className="text-xs text-[#756c7e] mt-1">Productos con {lowDefault} unidades o menos (o con el mínimo propio de cada producto). Considera reponer pronto.</p></div>
+        </div>
+        <div className="p-4 rounded-2xl bg-white border border-[#ede7f0] mb-5">
+          <p className="font-bold text-sm mb-2">Mínimo general para avisar</p>
+          <div className="flex gap-2 items-center">
+            <input type="number" min={0} value={limit} onChange={e => setLimit(e.target.value)} className="w-24 input-field rounded-lg p-2 text-center font-bold" />
+            <span className="text-xs text-[#756c7e] flex-1">unidades. Cada producto puede tener su propio mínimo en “Editar producto”.</span>
+            <button type="button" onClick={saveLimit} className="btn-primary rounded-lg px-4 py-2 text-xs font-bold">Guardar</button>
+          </div>
+          <button type="button" onClick={toggleNotif} className="mt-3 text-xs font-bold text-[#7c43ba] hover:underline">{notif ? '🔔 Avisos del sistema activados (tocar para desactivar)' : '🔕 Activar avisos del sistema al abrir la app'}</button>
         </div>
         <div className="space-y-3">
           {products.map(r => (
             <StockRow key={r.id} r={r}>
-              <RowInfo r={r} line={<p className="text-xs text-[#d97706] font-bold mt-1">Stock: {r.stock} unidades</p>} />
+              <RowInfo r={r} line={<p className="text-xs text-[#d97706] font-bold mt-1">Stock: {r.stock} unidades · aviso en ≤ {lowStockLimit(r, lowDefault)}</p>} />
               <div className="text-right flex-shrink-0"><span className="inline-block px-2 py-1 rounded-full bg-[#fef3c7] text-[#92400e] text-xs font-bold">Stock bajo</span></div>
             </StockRow>
           ))}
@@ -187,6 +220,7 @@ function SalesChart({ sales }: { sales: Sale[] }) {
 
 export function ReportsScreen() {
   const allSales = useStore(s => s.sales);
+  const team = useStore(s => s.team);
   const sales = useMemo(() => sortByDateDesc(allSales), [allSales]);
   const profit = sumBy(sales, 'profit');
   return (
@@ -211,7 +245,7 @@ export function ReportsScreen() {
               <div key={s.id} className="sale-row rounded-xl p-3 flex items-center gap-3 shadow-sm">
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm truncate">{s.product_name}</p>
-                  {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold">Vendido por: {s.seller_name}</p>}
+                  {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} />Vendido por: {s.seller_name}</p>}
                   {s.payment_method && <p className="text-[10px] text-[#23805d] font-bold">{s.payment_method}</p>}
                   <p className="text-xs text-[#756c7e]">{date.toLocaleDateString('es', { day: '2-digit', month: 'short' })} {date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>

@@ -1,12 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import PublicShop from './PublicShop';
 import { setState } from './store';
 import './index.css';
 
+// Enlace del catálogo público (?tienda=nombre): página de solo lectura para clientes
+const shopSlug = new URLSearchParams(location.search).get('tienda');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {shopSlug ? <PublicShop slug={shopSlug} /> : <App />}
   </StrictMode>,
 );
 

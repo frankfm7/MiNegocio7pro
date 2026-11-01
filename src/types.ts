@@ -20,6 +20,8 @@ export interface Product {
   content_value?: string | null;
   /** Unidad del contenido: ml, L, g, kg, cm, ... */
   content_unit?: string | null;
+  /** Stock mínimo para avisar (vacío = mínimo general) */
+  min_stock?: number | null;
 }
 
 export interface Catalog {
@@ -46,7 +48,53 @@ export interface Sale {
   payment_method: string;
   seller_id?: string;
   seller_name: string;
+  seller_uid?: string;
   discount?: number;
+  customer_id?: string | null;
+  customer_name?: string | null;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  notes: string;
+  created_at: string;
+}
+
+/** Deuda (fiado) o pago (abono) de un cliente */
+export interface CustomerMovement {
+  id: string;
+  customer_id: string;
+  type: 'fiado' | 'abono';
+  amount: number;
+  method?: string;
+  note?: string;
+  sale_id?: string | null;
+  seller_name?: string;
+  date: string;
+}
+
+/** Cambio de precio de un producto */
+export interface PriceChange {
+  id: string | number;
+  product_id: string;
+  product_name: string;
+  field: 'sale_price' | 'min_price' | 'cost_price';
+  old_value: number | null;
+  new_value: number | null;
+  changed_by_name: string | null;
+  changed_at: string;
+}
+
+export interface TeamPerson { name: string; avatar?: string }
+
+export interface CloudBackup {
+  id: string;
+  created_at: string;
+  kind: string;
+  size_bytes: number | null;
+  counts: { catalogs?: number; products?: number; customers?: number; sales?: number } | null;
 }
 
 export interface User {
@@ -82,6 +130,8 @@ export interface ContactInfo {
   whatsapp: string;
   email: string;
   business: string;
+  /** Código de país para WhatsApp (ej. 591) */
+  countryCode?: string;
 }
 
 export interface CartLine {
@@ -99,6 +149,7 @@ export interface ReceiptData {
   date: string;
   seller: string;
   payment: string;
+  customer?: { name: string; phone: string } | null;
   items: QuickScanItem[];
   subtotal: number;
   discount: number;
@@ -108,7 +159,8 @@ export interface ReceiptData {
 export type PendingAction =
   | 'createProduct' | 'updateProduct' | 'deleteProduct'
   | 'createCatalog' | 'updateCatalog' | 'deleteCatalog'
-  | 'addSale' | 'createQR' | 'updateQR' | 'deleteQR';
+  | 'addSale' | 'createQR' | 'updateQR' | 'deleteQR'
+  | 'upsertCustomer' | 'deleteCustomer' | 'addMovement' | 'deleteMovement';
 
 export interface PendingChange {
   id: string;
@@ -118,7 +170,7 @@ export interface PendingChange {
   timestamp: string;
 }
 
-export type View = 'catalogs' | 'products' | 'daily-sales' | 'out-of-stock' | 'low-stock' | 'reports';
+export type View = 'catalogs' | 'products' | 'daily-sales' | 'out-of-stock' | 'low-stock' | 'reports' | 'cash-close' | 'customers';
 
 /** Tienda en la nube a la que pertenece el usuario */
 export interface StoreMembership {
@@ -139,6 +191,7 @@ export interface StoreMember {
   status: string;
   joined_at: string;
   last_seen: string | null;
+  avatar_url?: string | null;
 }
 
 export interface StoreInvite {

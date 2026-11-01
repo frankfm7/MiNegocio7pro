@@ -3,6 +3,7 @@ import { supabaseClient } from './supabase';
 import { getState, localUser, openModal, runAfterAccount, setState, toast } from '../store';
 import { DB, startAutoSync, startHeartbeat, stopAutoSync, stopHeartbeat, uploadLocalToStore } from './db';
 import { SoundEffects } from './sound';
+import { startAutoBackup, stopAutoBackup } from './cloudBackup';
 import { readJSON } from './format';
 import { AVATAR_KEY } from './constants';
 
@@ -53,18 +54,42 @@ function cacheAvatar(uid: string, url: string) {
 async function activate(mode: 'local' | 'cloud', m: StoreMembership | null) {
   stopAutoSync();
   stopHeartbeat();
+  stopAutoBackup();
   const s = getState();
   const user = mode === 'cloud' && m && s.authUser
     ? { id: s.authUser.id, name: m.name || s.authUser.name, username: '', email: s.authUser.email, phone: '', role: m.role, status: m.status }
     : localUser(s.contactInfo);
   setState({
     mode, activeStore: mode === 'cloud' ? m : null, currentUser: user, dataReady: false,
-    catalogs: [], records: [], sales: [], pendingChanges: [], cart: [], clientMode: false,
+    catalogs: [], records: [], sales: [], customers: [], movements: [], priceHistory: [], team: {}, pendingChanges: [], cart: [], clientMode: false,
     currentView: 'catalogs', currentCatalogId: null, query: '', globalQuery: '', modals: {}, formOpen: false,
   });
   localStorage.setItem(ACTIVE_KEY, JSON.stringify({ mode, storeId: m?.store_id || null }));
   await DB.init();
-  if (mode === 'cloud') { startAutoSync(); startHeartbeat(); }
+  if (mode === 'cloud') { startAutoSync(); startHeartbeat(); startAutoBackup(); void syncMyAvatar().then(loadTeam); }
+}
+
+/** Foto y nombre de cada miembro de la tienda activa (para mostrarlos en ventas y equipo) */
+export async function loadTeam() {
+  const sid = getState().activeStore?.store_id;
+  if (!supabaseClient || !sid || !getState().isOnline) return;
+  let res = await supabaseClient.from('store_members').select('user_id, name, avatar_url').eq('store_id', sid);
+  if (res.error) res = await supabaseClient.from('store_members').select('user_id, name').eq('store_id', sid) as typeof res; // SQL 5 aún sin ejecutar
+  if (res.error || getState().activeStore?.store_id !== sid) return;
+  const team: Record<string, { name: string; avatar?: string }> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (res.data as any[] || []).forEach(m => { team[m.user_id] = { name: m.name || '', avatar: m.avatar_url || undefined }; });
+  setState({ team });
+}
+
+/** Guarda en la tienda la foto de Google del usuario (una vez por foto) */
+export async function syncMyAvatar() {
+  const u = getState().authUser;
+  if (!supabaseClient || !u?.avatar || !/^https?:/i.test(u.avatar) || !getState().isOnline) return;
+  const key = 'mc7_avatar_synced';
+  if (localStorage.getItem(key) === u.id + '|' + u.avatar) return;
+  const { error } = await supabaseClient.rpc('set_my_avatar', { p_avatar: u.avatar });
+  if (!error) localStorage.setItem(key, u.id + '|' + u.avatar);
 }
 
 export async function switchToLocal() {

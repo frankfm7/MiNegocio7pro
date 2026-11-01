@@ -1,4 +1,4 @@
-import type { Catalog, PendingAction, PendingChange, Product, Sale } from '../types';
+import type { Catalog, Customer, CustomerMovement, PendingAction, PendingChange, PriceChange, Product, Sale } from '../types';
 import { supabaseClient } from './supabase';
 import { getState, setState, toast } from '../store';
 import { SoundEffects } from './sound';
@@ -19,7 +19,10 @@ export const datasetId = () => {
 const storeId = () => (getState().mode === 'cloud' ? getState().activeStore?.store_id || null : null);
 const canUseCloud = () => !!(supabaseClient && storeId() && getState().isOnline && getState().authUser);
 
-interface DataSet { catalogs: Catalog[]; records: Product[]; sales: Sale[] }
+interface DataSet {
+  catalogs: Catalog[]; records: Product[]; sales: Sale[];
+  customers?: Customer[]; movements?: CustomerMovement[]; priceHistory?: PriceChange[];
+}
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 /** Guarda (con un pequeño retraso para agrupar cambios) el conjunto activo en el dispositivo */
@@ -27,8 +30,8 @@ function saveLocal() {
   const id = datasetId();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { catalogs, records, sales } = getState();
-    idbSet(dataKey(id), { catalogs, records, sales } satisfies DataSet);
+    const { catalogs, records, sales, customers, movements, priceHistory } = getState();
+    idbSet(dataKey(id), { catalogs, records, sales, customers, movements, priceHistory } satisfies DataSet);
   }, 150);
 }
 
@@ -47,19 +50,22 @@ export function addToPendingChanges(action: PendingAction, data: any) {
 // ==========================================
 // AYUDAS PARA SUPABASE
 // ==========================================
-const CONTENT_FIELDS = ['content_value', 'content_unit'] as const;
-let contentColumnsMissing = false;
+// Columnas que se agregaron con migraciones nuevas. Si la base de datos todavía no las
+// tiene, la app sigue funcionando sin ellas (y avisa en la consola).
+const OPTIONAL_PRODUCT_FIELDS = ['content_value', 'content_unit', 'min_stock'] as const;
+const missingColumns = new Set<string>();
 
-/** Deja solo las columnas que existen en la tabla products */
 function productRow(p: Partial<Product>, sid: string) {
   const row: Record<string, unknown> = {
     id: p.id, name: p.name, brand: p.brand ?? '', type: p.type ?? '', category: p.category ?? '',
     cost_price: Number(p.cost_price) || 0, sale_price: Number(p.sale_price) || 0, min_price: Number(p.min_price) || 0,
     stock: Number(p.stock) || 0, sold: !!p.sold, catalog_id: p.catalog_id ?? '', image_url: p.image_url ?? '',
     description: p.description ?? '', barcode: p.barcode ?? '', offer_text: p.offer_text ?? '',
-    content_value: p.content_value ?? '', content_unit: p.content_unit ?? '', store_id: sid,
+    content_value: p.content_value ?? '', content_unit: p.content_unit ?? '',
+    min_stock: p.min_stock === undefined || p.min_stock === null || String(p.min_stock) === '' ? null : Number(p.min_stock),
+    store_id: sid,
   };
-  if (contentColumnsMissing) CONTENT_FIELDS.forEach(f => delete row[f]);
+  missingColumns.forEach(f => delete row[f]);
   return row;
 }
 
@@ -71,19 +77,30 @@ function saleRow(s: Sale, sid: string) {
   return {
     id: s.id, date: s.date, product_id: s.product_id, product_name: s.product_name, actual_price: s.actual_price,
     quantity: s.quantity, profit: s.profit, payment_method: s.payment_method, seller_name: s.seller_name, store_id: sid,
+    customer_id: s.customer_id ?? null, customer_name: s.customer_name ?? null,
   };
 }
 
 export async function upsertProducts(rows: Partial<Product>[], sid = storeId()) {
   if (!supabaseClient || !sid) return { error: new Error('Sin tienda') };
-  const { error } = await supabaseClient.from('products').upsert(rows.map(r => productRow(r, sid)));
-  if (error && !contentColumnsMissing && (error.code === 'PGRST204' || /content_(value|unit)/.test(error.message || ''))) {
-    contentColumnsMissing = true;
-    console.warn('⚠️ Falta ejecutar supabase/1-migracion-multi-tienda.sql (columnas de contenido)');
-    return supabaseClient.from('products').upsert(rows.map(r => productRow(r, sid)));
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { error } = await supabaseClient.from('products').upsert(rows.map(r => productRow(r, sid)));
+    if (!error) return { error: null };
+    // "Could not find the 'min_stock' column of 'products'": se omite esa columna y se reintenta
+    const col = /'(\w+)' column/.exec(error.message || '')?.[1];
+    const known = (OPTIONAL_PRODUCT_FIELDS as readonly string[]).includes(col || '');
+    if (!(error.code === 'PGRST204' || known) || !col || !known || missingColumns.has(col)) return { error };
+    missingColumns.add(col);
+    console.warn(`⚠️ Falta la columna products.${col}: ejecuta el SQL de supabase/ (1 y 5)`);
   }
-  return { error };
+  return { error: new Error('No se pudo guardar el producto') };
 }
+
+const customerRow = (c: Customer, sid: string) => ({ id: c.id, name: c.name, phone: c.phone || '', notes: c.notes || '', created_at: c.created_at, store_id: sid });
+const movementRow = (m: CustomerMovement, sid: string) => ({
+  id: m.id, customer_id: m.customer_id, type: m.type, amount: m.amount, method: m.method || null, note: m.note || null,
+  sale_id: m.sale_id || null, seller_name: m.seller_name || null, date: m.date, seller_uid: getState().authUser?.id ?? null, store_id: sid,
+});
 
 async function registerSaleRemote(sale: Sale, sid: string) {
   return supabaseClient!.rpc('register_sale', { p_sale: saleRow(sale, sid) });
@@ -119,6 +136,14 @@ async function runPending(change: PendingChange, sid: string) {
     case 'createQR': return c.from('qrs').upsert([{ ...change.data, store_id: sid }]);
     case 'updateQR': return c.from('qrs').update(change.data.updates).eq('id', change.data.id);
     case 'deleteQR': return c.from('qrs').delete().eq('id', change.data);
+    case 'upsertCustomer': return c.from('customers').upsert([customerRow(change.data, sid)]);
+    case 'deleteCustomer': {
+      const r = await c.from('customer_movements').delete().eq('customer_id', change.data).eq('store_id', sid);
+      if (r.error) return r;
+      return c.from('customers').delete().eq('id', change.data).eq('store_id', sid);
+    }
+    case 'addMovement': return c.from('customer_movements').upsert([movementRow(change.data, sid)]);
+    case 'deleteMovement': return c.from('customer_movements').delete().eq('id', change.data).eq('store_id', sid);
   }
 }
 
@@ -130,12 +155,22 @@ export async function syncPendingChanges() {
   const snapshot = s.pendingChanges;
   const remaining: PendingChange[] = [];
   let ok = 0;
+  let dropped = 0;
   for (const change of snapshot) {
     try {
       const res = await runPending(change, sid);
       if (res && res.error) throw res.error;
       ok++;
     } catch (e) {
+      // Tabla que aún no existe (falta ejecutar el SQL 5): no se reintenta eternamente
+      const err = e as { code?: string; message?: string };
+      if (/customer/.test(change.action.toLowerCase()) || change.action === 'addMovement' || change.action === 'deleteMovement') {
+        if (err.code === 'PGRST205' || err.code === '42P01' || /schema cache|does not exist/i.test(err.message || '')) {
+          console.warn('Falta ejecutar supabase/5-mejoras-v4.sql (clientes y fiados)');
+          dropped++;
+          continue;
+        }
+      }
       console.error('Error sincronizando cambio:', change.action, e);
       remaining.push(change);
     }
@@ -144,6 +179,7 @@ export async function syncPendingChanges() {
   const added = getState().pendingChanges.filter(c => !snapshot.some(o => o.id === c.id));
   await savePending([...remaining, ...added]);
   if (ok > 0) toast(`✅ ${ok} cambios sincronizados`);
+  if (dropped > 0) toast('⚠️ Clientes y fiados solo se guardaron en este dispositivo: falta ejecutar supabase/5-mejoras-v4.sql', 6000);
   if (remaining.length > 0) toast(`⚠️ ${remaining.length} cambios pendientes de sincronizar`);
   setState({ isSyncing: false });
 }
@@ -157,7 +193,16 @@ async function fetchRemote(sid: string): Promise<DataSet> {
   ]);
   const err = cats.error || prods.error || sales.error;
   if (err) throw err;
-  return { catalogs: (cats.data || []) as Catalog[], records: (prods.data || []) as Product[], sales: (sales.data || []) as Sale[] };
+  // Clientes y fiados: si aún no se ejecutó el SQL 5, la app sigue funcionando sin ellos
+  const [custs, movs] = await Promise.all([
+    c.from('customers').select('*').eq('store_id', sid),
+    c.from('customer_movements').select('*').eq('store_id', sid).order('date', { ascending: false }).limit(10000),
+  ]);
+  return {
+    catalogs: (cats.data || []) as Catalog[], records: (prods.data || []) as Product[], sales: (sales.data || []) as Sale[],
+    customers: custs.error ? undefined : (custs.data || []) as Customer[],
+    movements: movs.error ? undefined : (movs.data || []) as CustomerMovement[],
+  };
 }
 
 // ==========================================
@@ -174,6 +219,7 @@ export const DB = {
     if (datasetId() !== id) return; // se cambió de tienda mientras cargaba
     setState({
       catalogs: cached?.catalogs || [], records: cached?.records || [], sales: cached?.sales || [],
+      customers: cached?.customers || [], movements: cached?.movements || [], priceHistory: cached?.priceHistory || [],
       pendingChanges: getState().mode === 'cloud' ? pending : [], dataReady: true,
     });
     if (getState().mode === 'cloud') {
@@ -238,10 +284,21 @@ export const DB = {
     const records = getState().records;
     const idx = records.findIndex(x => x.id === data.id);
     if (idx === -1) return { isOk: false };
-    const updated = { ...records[idx], ...data };
+    const before = records[idx];
+    const updated = { ...before, ...data };
     const next = [...records];
     next[idx] = updated;
     setState({ records: next });
+    // En modo local el historial de precios se guarda aquí; en una tienda lo escribe la base de datos
+    if (getState().mode !== 'cloud') {
+      const changes: PriceChange[] = [];
+      (['sale_price', 'min_price', 'cost_price'] as const).forEach(field => {
+        if (Number(before[field] || 0) !== Number(updated[field] || 0)) {
+          changes.push({ id: newId(), product_id: updated.id, product_name: updated.name, field, old_value: Number(before[field] || 0), new_value: Number(updated[field] || 0), changed_by_name: getState().currentUser.name, changed_at: new Date().toISOString() });
+        }
+      });
+      if (changes.length) setState({ priceHistory: [...changes, ...getState().priceHistory].slice(0, 3000) });
+    }
     saveLocal();
     await remote('updateProduct', updated, sid => upsertProducts([updated], sid));
     return { isOk: true };
@@ -311,9 +368,53 @@ export const DB = {
     return sale;
   },
 
+  // ---------- Clientes y fiados ----------
+  async upsertCustomer(data: Partial<Customer> & { name: string }) {
+    const list = getState().customers;
+    const prev = data.id ? list.find(c => c.id === data.id) : undefined;
+    const customer: Customer = { id: data.id || 'cus_' + newId(), name: data.name.trim(), phone: (data.phone || '').trim(), notes: (data.notes || '').trim(), created_at: prev?.created_at || new Date().toISOString() };
+    setState({ customers: prev ? list.map(c => (c.id === customer.id ? customer : c)) : [...list, customer] });
+    saveLocal();
+    await remote('upsertCustomer', customer, sid => supabaseClient!.from('customers').upsert([customerRow(customer, sid)]));
+    return customer;
+  },
+
+  async deleteCustomer(id: string) {
+    setState({ customers: getState().customers.filter(c => c.id !== id), movements: getState().movements.filter(m => m.customer_id !== id) });
+    saveLocal();
+    await remote('deleteCustomer', id, async sid => {
+      const r = await supabaseClient!.from('customer_movements').delete().eq('customer_id', id).eq('store_id', sid);
+      if (r.error) return r;
+      return supabaseClient!.from('customers').delete().eq('id', id).eq('store_id', sid);
+    });
+  },
+
+  async addMovement(data: Omit<CustomerMovement, 'id' | 'date' | 'seller_name'> & { id?: string }) {
+    const m: CustomerMovement = { ...data, id: data.id || 'mov_' + newId(), date: new Date().toISOString(), seller_name: getState().currentUser.name };
+    setState({ movements: [m, ...getState().movements] });
+    saveLocal();
+    await remote('addMovement', m, sid => supabaseClient!.from('customer_movements').upsert([movementRow(m, sid)]));
+    return m;
+  },
+
+  async deleteMovement(id: string) {
+    setState({ movements: getState().movements.filter(m => m.id !== id) });
+    saveLocal();
+    await remote('deleteMovement', id, sid => supabaseClient!.from('customer_movements').delete().eq('id', id).eq('store_id', sid));
+  },
+
   async replaceAll(data: DataSet) {
     setState({ catalogs: data.catalogs, records: data.records, sales: data.sales });
     await this.bulkUpsert(data.catalogs, data.records);
+    if (data.customers || data.movements) {
+      setState({ customers: data.customers || [], movements: data.movements || [] });
+      saveLocal();
+      if (getState().mode === 'cloud') {
+        (data.customers || []).forEach(c => addToPendingChanges('upsertCustomer', c));
+        (data.movements || []).forEach(m => addToPendingChanges('addMovement', m));
+        await syncPendingChanges();
+      }
+    }
   },
 };
 
@@ -327,8 +428,17 @@ export async function refreshData(quiet = false) {
     const remoteData = await fetchRemote(sid);
     if (storeId() !== sid) return;
     // Mantener las ventas locales que aún no se subieron
-    const pendingSales = getState().pendingChanges.filter(p => p.action === 'addSale').map(p => p.data as Sale);
-    setState({ ...remoteData, sales: [...pendingSales, ...remoteData.sales] });
+    const pending = getState().pendingChanges;
+    const pendingSales = pending.filter(p => p.action === 'addSale').map(p => p.data as Sale);
+    const s0 = getState();
+    // Clientes y fiados aún sin subir se conservan; si la nube no tiene esas tablas se deja lo local
+    const pendingCustomers = pending.filter(p => p.action === 'upsertCustomer').map(p => p.data as Customer);
+    const pendingMovs = pending.filter(p => p.action === 'addMovement').map(p => p.data as CustomerMovement);
+    const customers = remoteData.customers
+      ? [...remoteData.customers.filter(c => !pendingCustomers.some(p => p.id === c.id)), ...pendingCustomers] : s0.customers;
+    const movements = remoteData.movements
+      ? [...pendingMovs.filter(m => !remoteData.movements!.some(r => r.id === m.id)), ...remoteData.movements] : s0.movements;
+    setState({ catalogs: remoteData.catalogs, records: remoteData.records, sales: [...pendingSales, ...remoteData.sales], customers, movements });
     saveLocal();
     if (!quiet) { toast('✅ Datos actualizados desde la nube'); SoundEffects.play('success'); }
   } catch (e) {

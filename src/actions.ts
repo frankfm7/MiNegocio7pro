@@ -3,9 +3,11 @@ import { closeModal, getState, openAccount, openModal, setState, toast, type Mod
 import { SoundEffects } from './lib/sound';
 import { DB, syncPendingChanges } from './lib/db';
 import { formatContent, formatUSD } from './lib/format';
-import { decodeProductQR } from './lib/qr';
+import { decodeProductQR, publicFromParams } from './lib/qr';
+import { openStore } from './lib/session';
+import { businessName, openWhatsApp } from './lib/whatsapp';
 import { esc, htmlToImage } from './lib/htmlImage';
-import { getTodaySales } from './lib/selectors';
+import { buildCashSummary, dateKeyOf, todayKey } from './lib/cashClose';
 import { APP_NAME, WELCOME_KEY } from './lib/constants';
 import { searchProducts } from './lib/search';
 
@@ -201,22 +203,45 @@ export function shareCatalogByLink(catalogId: string) {
 // ==========================================
 // VENTA INDIVIDUAL
 // ==========================================
+/** Valida el cliente cuando el pago es "Fiado". Devuelve el cliente o null (con aviso) */
+function fiadoCustomer(method: string) {
+  if (method !== 'Fiado') return undefined;
+  const { saleCustomerId, customers } = getState();
+  const c = customers.find(x => x.id === saleCustomerId);
+  if (!c) { toast('Elige a qué cliente se le fía'); SoundEffects.play('error'); return null; }
+  return c;
+}
+
 export async function confirmSale(qty: number, unitPrice: number) {
   const { saleProduct: r, selectedPaymentMethod, currentUser } = getState();
   if (!r) return false;
   if (isNaN(unitPrice) || unitPrice <= 0) { toast('Ingresa un precio válido'); SoundEffects.play('error'); return false; }
   if (r.stock < qty) { toast('No hay suficiente stock'); SoundEffects.play('error'); return false; }
+  const method = selectedPaymentMethod || 'Efec.';
+  const customer = fiadoCustomer(method);
+  if (customer === null) return false;
   const profit = (unitPrice - Number(r.cost_price)) * qty;
   try {
-    await DB.addSale({
+    const sale = await DB.addSale({
       product_id: r.id, product_name: r.name, brand: r.brand || '', catalog_id: r.catalog_id || '',
       cost_price: Number(r.cost_price), actual_price: unitPrice * qty, unit_price: unitPrice, profit, quantity: qty,
-      payment_method: selectedPaymentMethod || 'Efec.',
+      payment_method: method,
       seller_id: currentUser ? currentUser.id : 'unknown', seller_name: currentUser ? currentUser.name : 'Desconocido',
+      customer_id: customer?.id ?? null, customer_name: customer?.name ?? null,
     });
+    if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: unitPrice * qty, method: 'Fiado', sale_id: sale.id, note: `${qty}x ${r.name}` });
     closeModal('sale-modal');
     closeModal('detail-modal');
-    toast(`¡Venta registrada! ${qty}x ${r.name} - Ganancia: ${formatUSD(profit)} 🎉`, 3000);
+    setState({
+      saleCustomerId: '',
+      receiptData: {
+        date: new Date().toLocaleString('es'), seller: currentUser ? currentUser.name : 'Desconocido', payment: method,
+        customer: customer ? { name: customer.name, phone: customer.phone } : null,
+        items: [{ product: r, quantity: qty, price: unitPrice }], subtotal: unitPrice * qty, discount: 0, total: unitPrice * qty,
+      },
+    });
+    openModal('sale-receipt-modal');
+    toast(`¡Venta registrada! ${qty}x ${r.name}${customer ? ` · fiado a ${customer.name}` : ''} 🎉`, 3000);
     SoundEffects.play('success');
     return true;
   } catch (e) {
@@ -283,6 +308,29 @@ export function handleBarcodeScanned(code: string): boolean {
   return false;
 }
 
+/**
+ * Enlace de un QR (?p=<id>...): abre el producto dentro de la app.
+ * - Si está en tus datos, abre su ficha completa.
+ * - Si es de otra tienda de la que eres miembro, cambia a esa tienda y lo abre.
+ * - Si no tienes acceso, muestra la ficha pública que viene en el enlace.
+ */
+export async function openProductFromLink(q: URLSearchParams) {
+  const pub = publicFromParams(q);
+  if (!pub?.id) return;
+  setState({ welcomeVisible: false, currentView: 'catalogs', currentCatalogId: null });
+  const find = () => getState().records.find(r => r.id === pub.id);
+  let product = find();
+  const sid = q.get('t');
+  const s = getState();
+  if (!product && sid && s.activeStore?.store_id !== sid) {
+    const m = s.memberships.find(x => x.store_id === sid && x.status !== 'blocked');
+    if (m) { await openStore(m); product = find(); }
+  }
+  if (product) { openDetail(product); return; }
+  setState({ publicProduct: pub });
+  openModal('public-product-modal');
+}
+
 // ==========================================
 // LISTA DE VENTAS (ESCANEO RÁPIDO)
 // ==========================================
@@ -313,26 +361,34 @@ export async function finalizeQuickScan() {
   if (!quickScanItems.length) { toast('No hay productos para vender'); return; }
   const subtotal = quickScanItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const total = subtotal - quickScanDiscount;
-  if (!confirm(`¿Registrar venta por ${formatUSD(total)}?`)) return;
+  const method = selectedPaymentMethod || 'Efec.';
+  const customer = fiadoCustomer(method);
+  if (customer === null) return;
+  if (!confirm(`¿Registrar venta por ${formatUSD(total)}${customer ? ` (fiado a ${customer.name})` : ''}?`)) return;
 
   const receipt: ReceiptData = {
     date: new Date().toLocaleString('es'), seller: currentUser ? currentUser.name : 'Desconocido',
-    payment: selectedPaymentMethod || 'Efec.', items: [...quickScanItems], subtotal, discount: quickScanDiscount, total,
+    payment: method, customer: customer ? { name: customer.name, phone: customer.phone } : null,
+    items: [...quickScanItems], subtotal, discount: quickScanDiscount, total,
   };
   try {
+    let firstSaleId = '';
     for (const item of quickScanItems) {
-      await DB.addSale({
+      const sale = await DB.addSale({
         product_id: item.product.id, product_name: item.product.name, brand: item.product.brand || '',
         catalog_id: item.product.catalog_id || '', cost_price: Number(item.product.cost_price),
         actual_price: item.price * item.quantity, unit_price: item.price,
         profit: (item.price - Number(item.product.cost_price)) * item.quantity, quantity: item.quantity,
-        payment_method: selectedPaymentMethod || 'Efec.',
+        payment_method: method,
         seller_id: currentUser ? currentUser.id : 'unknown', seller_name: currentUser ? currentUser.name : 'Desconocido',
         discount: quickScanDiscount > 0 ? quickScanDiscount / quickScanItems.length : 0,
+        customer_id: customer?.id ?? null, customer_name: customer?.name ?? null,
       });
+      if (!firstSaleId) firstSaleId = sale.id;
     }
+    if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: total, method: 'Fiado', sale_id: firstSaleId, note: `${quickScanItems.length} producto(s)` });
     SoundEffects.play('success');
-    setState({ quickScanItems: [], quickScanDiscount: 0, receiptData: receipt });
+    setState({ quickScanItems: [], quickScanDiscount: 0, receiptData: receipt, saleCustomerId: '' });
     closeModal('quick-scan-modal');
     openModal('sale-receipt-modal');
     if (getState().isOnline) setTimeout(() => syncPendingChanges(), 500);
@@ -353,6 +409,25 @@ export function showImagePreview(dataUrl: string, filename: string) {
 const row = (label: string, value: string, color = '') =>
   `<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#666;">${label}</span><span style="font-weight:bold;${color ? `color:${color};` : ''}">${value}</span></div>`;
 
+/** Recibo en texto (para WhatsApp) */
+export function receiptText(r: ReceiptData) {
+  const lines = [`🧾 *${businessName()}*`, `Fecha: ${r.date}`, ...(r.customer ? [`Cliente: ${r.customer.name}`] : []), ''];
+  r.items.forEach(i => {
+    const c = formatContent(i.product);
+    lines.push(`• ${i.quantity} x ${i.product.name}${c ? ` (${c})` : ''} — ${formatUSD(i.price * i.quantity)}`);
+  });
+  lines.push('');
+  if (r.discount > 0) lines.push(`Descuento: -${formatUSD(r.discount)}`);
+  lines.push(`*TOTAL: ${formatUSD(r.total)}*`, `Pago: ${r.payment}${r.payment === 'Fiado' ? ' (queda como deuda)' : ''}`, '', '¡Gracias por su compra! 🙌');
+  return lines.join('\n');
+}
+
+export function sendReceiptWhatsApp(phone: string) {
+  const r = getState().receiptData;
+  if (!r) return;
+  openWhatsApp(phone || r.customer?.phone || '', receiptText(r));
+}
+
 export async function generateReceiptImage() {
   const r = getState().receiptData;
   if (!r) return;
@@ -364,7 +439,7 @@ export async function generateReceiptImage() {
         <div style="font-weight:bold;color:#7c43ba;">${formatUSD(i.price * i.quantity)}</div></div>`).join('');
     const html = `
       <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">🧾 RECIBO DE VENTA</h1><p style="color:#666;margin:5px 0;">¡Venta Exitosa!</p></div>
-      <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">${row('Fecha:', esc(r.date))}${row('Vendedor:', esc(r.seller))}${row('Método de pago:', esc(r.payment))}</div>
+      <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">${row('Fecha:', esc(r.date))}${row('Vendedor:', esc(r.seller))}${row('Método de pago:', esc(r.payment))}${r.customer ? row('Cliente:', esc(r.customer.name)) : ''}</div>
       <h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Productos vendidos:</h2>${items}
       <div style="margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;">${row('Subtotal:', formatUSD(r.subtotal))}${row('Descuento:', r.discount > 0 ? '-' + formatUSD(r.discount) : 'Sin descuento', '#d97706')}
         <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #7c43ba;"><span style="font-weight:bold;font-size:18px;">TOTAL:</span><span style="font-weight:bold;font-size:18px;color:#7c43ba;">${formatUSD(r.total)}</span></div></div>
@@ -376,30 +451,31 @@ export async function generateReceiptImage() {
   }
 }
 
-export async function generateDailyCloseImage() {
-  const { sales, currentUser } = getState();
-  const todaySales = getTodaySales(sales);
-  if (todaySales.length === 0) { toast('No hay ventas hoy'); return; }
-  const sum = (list: typeof todaySales, key: 'actual_price' | 'profit') => list.reduce((a, s) => a + Number(s[key] || 0), 0);
-  const total = sum(todaySales, 'actual_price');
-  const profit = sum(todaySales, 'profit');
-  const cash = sum(todaySales.filter(s => s.payment_method === 'Efec.'), 'actual_price');
-  const qr = sum(todaySales.filter(s => s.payment_method === 'QR'), 'actual_price');
-  const items = todaySales.map(s => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
-      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}</div></div>
+export async function generateDailyCloseImage(dateKey = todayKey()) {
+  const sum = buildCashSummary(dateKey);
+  const showProfit = getState().isAdmin();
+  const day = getState().sales.filter(s => dateKeyOf(new Date(s.date)) === dateKey);
+  if (day.length === 0 && sum.abonoCount === 0) { toast('No hay movimientos ese día'); return; }
+  const methods = sum.byMethod.map(m => row(`${m.method === 'Efec.' ? '💵' : m.method === 'QR' ? '📱' : m.method === 'Fiado' ? '📒' : '•'} ${m.method === 'Fiado' ? 'Fiado (por cobrar)' : esc(m.method)} (${m.count}):`, formatUSD(m.total), m.method === 'Fiado' ? '#a43658' : '#7c43ba')).join('');
+  const sellers = sum.bySeller.map(v => row(esc(v.name) + ` (${v.count}):`, formatUSD(v.total))).join('');
+  const items = day.map(s => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}${s.customer_name ? ' - ' + esc(s.customer_name) : ''} - ${esc(s.seller_name || '')}</div></div>
       <div style="font-weight:bold;color:#7c43ba;">${formatUSD(s.actual_price)}</div></div>`).join('');
   const html = `
-    <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">📊 CIERRE DE VENTAS</h1>
-      <p style="color:#666;margin:5px 0;">${new Date().toLocaleDateString('es', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
+    <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">📊 CIERRE DE CAJA</h1>
+      <p style="color:#444;margin:5px 0;font-weight:bold;">${esc(businessName())}</p><p style="color:#666;margin:5px 0;">${esc(sum.label)}</p></div>
     <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">
-      ${row('Vendedor:', esc(currentUser ? currentUser.name : 'Vendedor'))}${row('Total de ventas:', String(todaySales.length))}
-      ${row('💵 Efectivo:', formatUSD(cash), '#23805d')}${row('📱 QR:', formatUSD(qr), '#7c43ba')}${row('💰 Ganancia:', formatUSD(profit), '#166534')}
-      <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #7c43ba;"><span style="font-weight:bold;font-size:18px;">TOTAL:</span><span style="font-weight:bold;font-size:18px;color:#7c43ba;">${formatUSD(total)}</span></div></div>
+      ${row('Ventas:', String(sum.salesCount))}${methods}
+      ${sum.abonoCount ? row('💰 Abonos de fiados:', formatUSD(sum.abonoCash + sum.abonoQr), '#166534') : ''}
+      ${showProfit ? row('📈 Ganancia:', formatUSD(sum.profit), '#166534') : ''}
+      <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #7c43ba;"><span style="font-weight:bold;font-size:16px;">TOTAL COBRADO:</span><span style="font-weight:bold;font-size:16px;color:#7c43ba;">${formatUSD(sum.collected)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding-top:6px;"><span style="font-weight:bold;">Efectivo en caja:</span><span style="font-weight:bold;">${formatUSD(sum.cashExpected)}</span></div></div>
+    ${sellers ? `<h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Por vendedor:</h2><div style="background:#faf7fc;padding:12px;border-radius:12px;margin-bottom:16px;">${sellers}</div>` : ''}
     <h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Detalle de ventas:</h2>${items}
     <div style="text-align:center;margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;"><p style="color:#666;font-size:12px;">Generado el ${new Date().toLocaleString('es')}</p></div>`;
   try {
     toast('Generando imagen del cierre...', 2000);
-    showImagePreview(await htmlToImage(html), `cierre_ventas_${Date.now()}.png`);
+    showImagePreview(await htmlToImage(html), `cierre_caja_${dateKey}.png`);
   } catch (e) {
     console.error('Error al generar imagen:', e);
     toast('Error al generar la imagen del cierre');
