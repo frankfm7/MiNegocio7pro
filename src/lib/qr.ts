@@ -4,7 +4,7 @@ import type { PublicProductData } from '../store';
 import { supabaseClient } from './supabase';
 import { getState, toast } from '../store';
 import { addToPendingChanges } from './db';
-import { formatContent, formatUSD, formatUSDShort, newId } from './format';
+import { currency, formatContent, formatUSD, formatUSDShort, newId } from './format';
 import { idbGet, idbSet, qrsKey } from './storage';
 import { APP_NAME } from './constants';
 
@@ -136,7 +136,7 @@ export async function exportCatalogQRsPDF(catalogId: string | null) {
     const sub = [p.brand, formatContent(p)].filter(Boolean).join(' · ');
     if (sub) { doc.text(doc.splitTextToSize(sub, cellW - 8)[0], x + cellW / 2, ty + 2, { align: 'center' }); ty += 3.6; }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(124, 67, 186);
-    doc.text(`${formatUSDShort(p.sale_price)} USD`, x + cellW / 2, ty + 3, { align: 'center' });
+    doc.text(`${formatUSDShort(p.sale_price)} ${currency()}`, x + cellW / 2, ty + 3, { align: 'center' });
   }
   doc.save(`codigos_qr_${(cat?.name || 'todos').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
   toast(`✅ PDF con ${products.length} códigos QR listo para imprimir`);

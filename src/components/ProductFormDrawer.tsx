@@ -3,7 +3,7 @@ import { Camera, Download, Image as ImageIcon, Printer, ScanLine, X } from 'luci
 import { getState, setState, toast, useStore } from '../store';
 import { closeForm, openBarcodeScanner } from '../actions';
 import { DB } from '../lib/db';
-import { cardImage, formatUSD, newId } from '../lib/format';
+import { currency, cardImage, formatUSD, newId } from '../lib/format';
 import { generateProductQRImage, printProductQR } from '../lib/qr';
 import { downloadDataUrl } from '../lib/image';
 import { autoFrameProduct, compressImage } from '../lib/image';
@@ -13,7 +13,7 @@ import type { Product } from '../types';
 
 const empty = {
   name: '', brand: '', type: '', category: '', catalog_id: '', content_value: '', content_unit: 'ml', barcode: '', description: '',
-  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1', min_stock: '',
+  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1', min_stock: '', catalog_price: '', sku: '',
 };
 type FormState = typeof empty;
 
@@ -24,6 +24,7 @@ function fromProduct(r: Product): FormState {
     sale_price: String(r.sale_price ?? ''), min_price: String(r.min_price || 0), cost_price: String(r.cost_price ?? ''),
     offer_text: r.offer_text || '', stock: String(r.stock ?? 0),
     min_stock: r.min_stock === null || r.min_stock === undefined ? '' : String(r.min_stock),
+    catalog_price: r.catalog_price === null || r.catalog_price === undefined ? '' : String(r.catalog_price), sku: r.sku || '',
   };
 }
 
@@ -90,6 +91,7 @@ export default function ProductFormDrawer() {
       description: f.description.trim(), offer_text: f.offer_text.trim(),
       content_value: f.content_value.trim(), content_unit: f.content_value.trim() ? f.content_unit : '',
       min_stock: f.min_stock.trim() === '' ? null : Number(f.min_stock),
+      catalog_price: f.catalog_price.trim() === '' ? null : Number(f.catalog_price), sku: f.sku.trim(),
     };
     const result = editing ? await DB.updateRecord({ ...editing, ...data }) : await DB.createRecord({ ...data, id: draftId });
     if (result.isOk) { closeForm(); toast(editing ? 'Actualizado ✓' : 'Guardado ✓'); }
@@ -131,6 +133,8 @@ export default function ProductFormDrawer() {
               <p className="text-xs text-[#756c7e] mt-1">Litros, mililitros, gramos, kilos o medidas del producto</p>
             </div>
             <div>
+              <label className="block font-bold text-sm mb-1.5">Código de la empresa (opcional)</label>
+              <input value={f.sku} onChange={set('sku')} maxLength={30} className="w-full input-field rounded-xl p-3 mb-3" type="text" placeholder="Ej: 13014 (Ésika) o 5109-20014207 (Yanbal)" />
               <label className="block font-bold text-sm mb-1.5">Código de barras (opcional)</label>
               <div className="flex gap-2">
                 <input value={f.barcode} onChange={set('barcode')} maxLength={30} className="flex-1 input-field rounded-xl p-3" type="text" placeholder="Ej: 7501234567890" />
@@ -139,7 +143,12 @@ export default function ProductFormDrawer() {
             </div>
             <div><label className="block font-bold text-sm mb-1.5">Descripción</label><textarea value={f.description} onChange={set('description')} maxLength={300} rows={3} className="w-full input-field rounded-xl p-3" /></div>
             <div className="p-4 rounded-2xl bg-gradient-to-br from-[#f6f1f8] to-[#faf7fb] border border-[#ede7f0]">
-              <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397] mb-3">Precios (USD)</p>
+              <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397] mb-3">Precios ({currency()})</p>
+              <div className="mb-2">
+                <label className="block font-bold text-xs mb-1.5">Precio de catálogo (opcional)</label>
+                <input value={f.catalog_price} onChange={set('catalog_price')} min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" placeholder="El precio que figura en el catálogo de la marca" />
+                <p className="text-[11px] text-[#756c7e] mt-1">Se muestra tachado junto a tu precio para que el cliente vea cuánto ahorra.</p>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 <div><label className="block font-bold text-xs mb-1.5">Precio venta máx. *</label><input value={f.sale_price} onChange={set('sale_price')} required min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" /></div>
                 <div><label className="block font-bold text-xs mb-1.5">Precio venta mín. *</label><input value={f.min_price} onChange={set('min_price')} required min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" /></div>

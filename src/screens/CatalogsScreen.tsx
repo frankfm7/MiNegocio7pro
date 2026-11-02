@@ -50,22 +50,19 @@ function CatalogTile({ cat, count }: { cat: Catalog; count: number }) {
     toast(!cat.favorite ? '⭐ Añadido a favoritos' : 'Quitado de favoritos');
   };
   return (
-    <article className={`catalog-tile ${cat.favorite ? 'favorite' : ''}`} onClick={e => { if ((e.target as HTMLElement).closest('button')) return; openCatalog(cat.id); }}>
-      <img src={cat.cover && cat.cover !== fallbackCover ? cat.cover : coverFor(cat.color, cat.name)} loading="lazy" alt={cat.name} onError={e => { e.currentTarget.src = coverFor(cat.color, cat.name); }} />
-      <div className="p-5">
-        <div className="flex justify-between gap-3 items-start">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-[.13em] font-bold text-[#756c7e]">{cat.label || 'CATÁLOGO'}</p>
-            <h2 className="font-bold text-xl mt-1 break-words">{cat.name}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="favorite-btn w-8 h-8 rounded-full grid place-items-center hover:bg-gray-100 transition admin-only" title={cat.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'} onClick={toggleFavorite}>
-              <Star className={`w-4 h-4 ${cat.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
-            </button>
-            <span className="rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm" style={{ background: cat.color }}>{count}</span>
-          </div>
-        </div>
-        <button className="open-catalog mt-5 text-sm font-bold inline-flex items-center gap-1" style={{ color: cat.color }} type="button" onClick={e => { e.stopPropagation(); openCatalog(cat.id); }}>
+    <article className={`catalog-tile flex flex-col ${cat.favorite ? 'favorite' : ''}`} onClick={e => { if ((e.target as HTMLElement).closest('button')) return; openCatalog(cat.id); }}>
+      <div className="relative">
+        <img src={cat.cover && cat.cover !== fallbackCover ? cat.cover : coverFor(cat.color, cat.name)} loading="lazy" alt={cat.name} onError={e => { e.currentTarget.src = coverFor(cat.color, cat.name); }} />
+        {/* Favorito y cantidad sobre la portada: así el nombre usa todo el ancho y no se corta */}
+        <button className="favorite-btn absolute top-2 right-2 w-8 h-8 rounded-full grid place-items-center bg-white/90 shadow-sm hover:bg-white transition admin-only" title={cat.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'} onClick={toggleFavorite}>
+          <Star className={`w-4 h-4 ${cat.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
+        </button>
+        <span className="absolute bottom-2 right-2 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm" style={{ background: cat.color }}>{count} {count === 1 ? 'producto' : 'productos'}</span>
+      </div>
+      <div className="p-5 flex flex-col flex-1">
+        <p className="catalog-label text-[11px] uppercase tracking-[.13em] font-bold text-[#756c7e] truncate">{cat.label || 'CATÁLOGO'}</p>
+        <h2 className="catalog-name font-bold text-xl mt-1 leading-snug text-balance">{cat.name}</h2>
+        <button className="open-catalog mt-auto pt-3 text-sm font-bold inline-flex items-center gap-1 self-start" style={{ color: cat.color }} type="button" onClick={e => { e.stopPropagation(); openCatalog(cat.id); }}>
           Ver catálogo <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -133,7 +130,7 @@ export default function CatalogsScreen() {
             <TopbarMenuButton />
             <div className="min-w-0">
               <p className="uppercase tracking-[.16em] font-bold text-[11px] text-[#756c7e]">Explora</p>
-              <h1 className="hero-title mt-0.5 text-xl sm:text-2xl truncate">Mis Catálogos</h1>
+              <h1 className="hero-title mt-0.5 text-lg sm:text-2xl leading-tight whitespace-nowrap">Mis Catálogos</h1>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

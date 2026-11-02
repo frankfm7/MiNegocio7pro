@@ -106,6 +106,8 @@ interface State {
     status: string;
     results: { record: Product; similarity: number; reason: string }[] | null;
   };
+  /** Moneda elegida (sirve para volver a dibujar la app al cambiarla) */
+  appCurrency: string;
   importPreview: {
     source: string;
     items: DraftProduct[];
@@ -113,6 +115,17 @@ interface State {
     /** 'auto' = según el archivo, 'new' = catálogo nuevo, o el id de un catálogo existente */
     target: string;
     newCatalogName: string;
+    /** Datos de la factura / detalle de pedido leído de una foto */
+    invoice?: {
+      vendor: string;
+      /** Moneda de la factura (USD, Bs...) */
+      currency: string;
+      /** Tipo de cambio Bs por 1 USD (detectado o el último usado) */
+      rate: number;
+      /** Convertir los precios a la moneda de la app */
+      convert: boolean;
+      totals: string[];
+    };
   } | null;
 }
 
@@ -199,6 +212,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   qrProduct: null,
   imageSearch: { preview: null, status: '', results: null },
   importPreview: null,
+  appCurrency: (() => { try { return localStorage.getItem('mn7_currency') || 'USD'; } catch { return 'USD'; } })(),
 
   set: partial => set(partial),
   openModal: id => set(s => ({ modals: { ...s.modals, [id]: true } })),

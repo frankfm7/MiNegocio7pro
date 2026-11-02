@@ -4,7 +4,7 @@ import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import { DB } from '../../lib/db';
 import { customerBalance } from '../../lib/selectors';
-import { formatUSD } from '../../lib/format';
+import { currency, formatUSD } from '../../lib/format';
 import { businessName, openWhatsApp } from '../../lib/whatsapp';
 import { SoundEffects } from '../../lib/sound';
 
@@ -160,7 +160,7 @@ export function MovementModal() {
       <article className="modal-card w-full max-w-sm bg-white rounded-3xl p-6">
         <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">{abono ? 'Registrar abono' : 'Agregar deuda'}</h2><CloseButton onClick={() => closeModal('movement-modal')} /></div>
         <p className="text-sm text-[#756c7e] mb-3">{c.name} · {balance > 0 ? `debe ${formatUSD(balance)}` : 'sin deuda'}</p>
-        <label className="block text-xs font-bold mb-1">Monto (USD)</label>
+        <label className="block text-xs font-bold mb-1">Monto ({currency()})</label>
         <input autoFocus type="number" min={0} step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="w-full input-field rounded-xl p-3 text-lg font-bold mb-3" />
         {abono && (
           <div className="grid grid-cols-2 gap-2 mb-3">

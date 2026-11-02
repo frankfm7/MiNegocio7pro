@@ -1,7 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import type { Product } from '../types';
 import { generateProductQRImage } from './qr';
-import { formatContent, formatUSD } from './format';
+import { formatContent, formatUSDShort } from './format';
 
 export interface LabelPreset {
   id: string;
@@ -85,7 +85,7 @@ export async function buildLabelsPDF(products: Product[], opt: LabelOptions) {
     }
     if (opt.showPrice) {
       doc.setFont('helvetica', 'bold'); doc.setFontSize(p.h >= 30 ? nameSize + 3 : nameSize + 1.5); doc.setTextColor(124, 67, 186);
-      doc.text(formatUSD(r.sale_price).replace(' USD', ''), tx, ty + (p.h >= 30 ? 3.4 : 2.4));
+      doc.text(formatUSDShort(r.sale_price), tx, ty + (p.h >= 30 ? 3.4 : 2.4));
       ty += p.h >= 30 ? 5 : 3.6;
     }
     if (opt.showBarcode && p.h >= 28) {

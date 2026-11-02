@@ -137,6 +137,7 @@ function CurrentScreen() {
 }
 
 export default function App() {
+  const appCurrency = useStore(s => s.appCurrency);
   const isOnline = useStore(s => s.isOnline);
   const mode = useStore(s => s.mode);
   const updateReady = useStore(s => s.updateReady);
@@ -186,7 +187,7 @@ export default function App() {
         <AccountScreen />
         <WelcomeScreen />
         <Sidebar />
-        <main className="main-content">
+        <main className="main-content" key={appCurrency}>
           <CurrentScreen />
         </main>
       </div>

@@ -28,7 +28,7 @@ export default function PriceHistoryModal() {
     supabaseClient.from('price_history').select('*').eq('store_id', storeId).eq('product_id', p.id).order('changed_at', { ascending: false }).limit(100)
       .then(({ data, error }) => {
         if (!live) return;
-        if (error) { setRows([]); setNote('Falta ejecutar supabase/5-mejoras-v4.sql en Supabase para activar el historial.'); return; }
+        if (error) { setRows([]); setNote('Falta ejecutar supabase/5-mejoras.sql en Supabase para activar el historial.'); return; }
         setRows((data || []) as PriceChange[]);
       });
     return () => { live = false; };

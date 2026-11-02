@@ -1,8 +1,27 @@
 import type { Product } from '../types';
 import { fallback } from './constants';
 
+/** Monedas que se pueden elegir en "Datos del negocio" */
+export const CURRENCIES = [
+  { code: 'Bs', label: 'Bolivianos (Bs)' },
+  { code: 'USD', label: 'Dólares (USD)' },
+  { code: 'S/', label: 'Soles (S/)' },
+  { code: 'COP', label: 'Pesos colombianos (COP)' },
+  { code: 'MXN', label: 'Pesos mexicanos (MXN)' },
+  { code: 'ARS', label: 'Pesos argentinos (ARS)' },
+  { code: 'CLP', label: 'Pesos chilenos (CLP)' },
+  { code: 'Gs', label: 'Guaraníes (Gs)' },
+  { code: '€', label: 'Euros (€)' },
+];
+export const CURRENCY_KEY = 'mn7_currency';
+
+/** Moneda de la app (solo cambia la etiqueta, no convierte los precios guardados) */
+export function currency(): string {
+  try { return localStorage.getItem(CURRENCY_KEY) || 'USD'; } catch { return 'USD'; }
+}
+
 export function formatUSD(n: unknown): string {
-  return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD';
+  return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency();
 }
 export function formatUSDShort(n: unknown): string {
   return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

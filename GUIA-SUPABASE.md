@@ -28,13 +28,16 @@ Elige **UNA** de las dos rutas. Los pasos 3 a 7 son iguales en ambas.
 Ejecútalos **en este orden** (cada uno en una consulta nueva: *New query → pegar → Run*). Todos se pueden repetir sin riesgo.
 1. `supabase/1-migracion-multi-tienda.sql` → tablas, tiendas, invitaciones, funciones y seguridad.
    Debe terminar con "Success". Si sale un error, copia el mensaje y envíamelo.
-2. `supabase/5-mejoras-v4.sql` → **lo nuevo de la v3.5**: fotos del equipo, stock mínimo, clientes y fiados,
+2. `supabase/5-mejoras.sql` → fotos del equipo, stock mínimo, clientes y fiados,
    catálogo público, historial de precios y respaldos en la nube.
-3. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
+3. `supabase/6-precio-catalogo.sql` → **nuevo en la v1.0**: precio de catálogo (se muestra tachado junto a tu precio)
+   y código de la empresa (para reconocer productos al importar facturas y sumarles el stock).
+4. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
    (cambia `TU_CORREO@ejemplo.com` por el correo con el que creaste tu tienda).
-4. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 57 revisiones).
-   Si alguna dice FALTA, vuelve a ejecutar el 1 y luego el 5.
+5. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 59 revisiones).
+   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5 y luego el 6.
 
+> Si NO ejecutas el 6, el precio de catálogo y el código de empresa solo quedan en el dispositivo (no se suben a la nube).
 > Si NO ejecutas el 5, la app sigue funcionando como antes, pero clientes/fiados solo quedan en el dispositivo,
 > y no habrá catálogo público, historial de precios ni respaldos en la nube.
 
@@ -92,7 +95,7 @@ Supabase → **Database → Extensions** → activa `pg_cron`, y en el SQL Edito
 | "Falta ejecutar … 1-migracion-multi-tienda.sql" | Paso 3.1 sin ejecutar; vuelve a correrlo |
 | `4-verificar.sql` con "FALTA" | Vuelve a ejecutar `1-migracion-multi-tienda.sql` y verifica de nuevo |
 | El QR abre una dirección rara | Define `VITE_PUBLIC_URL` (paso 6.1) y reimprime los QR |
-| "Falta ejecutar … 5-mejoras-v4.sql" | Ejecuta el archivo 5 (paso 3.2) |
+| "Falta ejecutar … 5-mejoras.sql" | Ejecuta el archivo 5 (paso 3.2) |
 | El catálogo público dice "no encontrado" | No está activado, o el nombre del enlace no coincide; revísalo en *Catálogo público* |
 | El WhatsApp abre sin número | Falta el WhatsApp del cliente o el *código de país* en *Datos del negocio* |
 | Las fotos del equipo no aparecen | Cada persona debe iniciar sesión con Google al menos una vez después de ejecutar el SQL 5 |

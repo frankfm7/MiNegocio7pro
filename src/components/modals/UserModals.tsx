@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, Camera, Cloud, EyeOff, FileUp, Maximize2, QrCode, ScanLine, Search, ShieldCheck, Ruler, Ticket } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
+import { CURRENCIES, CURRENCY_KEY, currency } from '../../lib/format';
 import { closeModal, getState, localUser, setState, toast, useStore } from '../../store';
 import { changePassword, roleLabel, updateMyName } from '../../lib/session';
 import Avatar from '../Avatar';
@@ -117,13 +118,16 @@ export function HelpModal() {
 export function ContactsModal() {
   const open = useStore(s => !!s.modals['contacts-modal']);
   const [c, setC] = useState({ name: '', whatsapp: '', email: '', business: '', countryCode: '' });
+  const [cur, setCur] = useState(currency());
   useEffect(() => {
-    if (open) { const info = getState().contactInfo; setC({ name: info?.name || '', whatsapp: info?.whatsapp || '', email: info?.email || '', business: info?.business || '', countryCode: info?.countryCode || '' }); }
+    if (open) { setCur(currency()); const info = getState().contactInfo; setC({ name: info?.name || '', whatsapp: info?.whatsapp || '', email: info?.email || '', business: info?.business || '', countryCode: info?.countryCode || '' }); }
   }, [open]);
   const set = (k: keyof typeof c) => (e: React.ChangeEvent<HTMLInputElement>) => setC(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.setItem(CURRENCY_KEY, cur);
+    setState({ appCurrency: cur });
     const info = { name: c.name.trim(), whatsapp: c.whatsapp.trim(), email: c.email.trim(), business: c.business.trim(), countryCode: c.countryCode.replace(/\D/g, '') };
     setState({ contactInfo: info, ...(getState().mode === 'local' ? { currentUser: localUser(info) } : {}) });
     localStorage.setItem(CONTACT_KEY, JSON.stringify(info));
@@ -141,6 +145,13 @@ export function ContactsModal() {
           <div><label className="block font-bold text-sm mb-1.5">Código de país (para enviar WhatsApp)</label><input value={c.countryCode} onChange={set('countryCode')} inputMode="numeric" className="w-full input-field rounded-xl p-3" placeholder="Ej: 591 (Bolivia), 51 (Perú), 57 (Colombia)" /></div>
           <div><label className="block font-bold text-sm mb-1.5">Correo electrónico</label><input value={c.email} onChange={set('email')} type="email" className="w-full input-field rounded-xl p-3" placeholder="Ej: maria@email.com" /></div>
           <div><label className="block font-bold text-sm mb-1.5">Negocio / Empresa</label><input value={c.business} onChange={set('business')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: Tienda María" /></div>
+          <div>
+            <label className="block font-bold text-sm mb-1.5">Moneda de los precios</label>
+            <select value={cur} onChange={e => setCur(e.target.value)} className="w-full input-field rounded-xl p-3">
+              {CURRENCIES.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
+            </select>
+            <p className="text-[11px] text-[#756c7e] mt-1">Solo cambia la moneda que se muestra; no convierte los precios ya guardados.</p>
+          </div>
           <button type="submit" className="w-full py-3 rounded-xl btn-primary font-bold">Guardar datos</button>
         </form>
       </article>

@@ -7,7 +7,7 @@
 import type { Catalog, DraftProduct, Product } from '../types';
 import { getState, openModal, setState, toast } from '../store';
 import { SoundEffects } from './sound';
-import { csvEscape, formatContent, formatUSDShort, newId, parseCSVLine } from './format';
+import { currency, csvEscape, formatContent, formatUSDShort, newId, parseCSVLine } from './format';
 import { autoFrameProduct, compressImage, downloadBlob, readFileAsBase64 } from './image';
 import { DB } from './db';
 import { APP_NAME, fallback, fallbackCover } from './constants';
@@ -71,7 +71,9 @@ export async function exportExcel(catalogId: string | null = null) {
       { header: 'Categoría', key: 'category', width: 16 },
       { header: 'Contenido', key: 'content_value', width: 11 },
       { header: 'Unidad', key: 'content_unit', width: 9 },
+      { header: 'Código Empresa', key: 'sku', width: 16 },
       { header: 'Código Barras', key: 'barcode', width: 17 },
+      { header: 'Precio Catálogo', key: 'catalog_price', width: 14 },
       { header: 'Costo', key: 'cost_price', width: 10 },
       { header: 'Precio Venta Máx', key: 'sale_price', width: 15 },
       { header: 'Precio Venta Mín', key: 'min_price', width: 15 },
@@ -91,6 +93,7 @@ export async function exportExcel(catalogId: string | null = null) {
       const r = sc.records[i];
       const row = ws.addRow({
         name: r.name, brand: r.brand, type: r.type, category: r.category, content_value: r.content_value || '', content_unit: r.content_unit || '',
+        sku: r.sku || '', catalog_price: r.catalog_price ?? '',
         barcode: r.barcode || '', cost_price: Number(r.cost_price) || 0, sale_price: Number(r.sale_price) || 0, min_price: Number(r.min_price) || 0,
         stock: Number(r.stock) || 0, description: r.description || '', offer_text: r.offer_text || '', catalog: catName.get(r.catalog_id) || r.catalog_id, id: r.id,
       });
@@ -134,10 +137,10 @@ export function exportCSV(catalogId: string | null = null) {
   const sc = scope(catalogId);
   if (sc.records.length === 0) { toast('No hay productos para exportar'); return; }
   const catName = new Map(getState().catalogs.map(c => [c.id, c.name]));
-  const headers = ['nombre', 'marca', 'tipo', 'categoria', 'contenido', 'unidad', 'codigo_barras', 'costo', 'precio_venta_max', 'precio_venta_min', 'stock', 'descripcion', 'oferta', 'catalogo', 'imagen_url', 'id'];
+  const headers = ['nombre', 'marca', 'tipo', 'categoria', 'contenido', 'unidad', 'codigo_empresa', 'codigo_barras', 'precio_catalogo', 'costo', 'precio_venta_max', 'precio_venta_min', 'stock', 'descripcion', 'oferta', 'catalogo', 'imagen_url', 'id'];
   const lines = [headers.join(',')];
   sc.records.forEach(r => lines.push([
-    r.name, r.brand, r.type, r.category, r.content_value || '', r.content_unit || '', r.barcode || '', r.cost_price || 0, r.sale_price || 0,
+    r.name, r.brand, r.type, r.category, r.content_value || '', r.content_unit || '', r.sku || '', r.barcode || '', r.catalog_price ?? '', r.cost_price || 0, r.sale_price || 0,
     r.min_price || 0, r.stock || 0, r.description || '', r.offer_text || '', catName.get(r.catalog_id) || '',
     r.image_url && !r.image_url.startsWith('data:') ? r.image_url : '', r.id,
   ].map(csvEscape).join(',')));
@@ -227,7 +230,7 @@ export async function exportPDF(catalogId: string | null = null, withCosts = fal
         if (r.offer_text) { doc.setTextColor(146, 64, 14); doc.setFont('helvetica', 'bold'); doc.text(`Oferta: ${r.offer_text}`, tx, ty + 0.5); ty += 4; }
         doc.setTextColor(124, 67, 186); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
         const priceY = y + cardH - (withCosts ? 15 : 8);
-        doc.text(`${formatUSDShort(r.sale_price)} USD`, tx, priceY);
+        doc.text(`${formatUSDShort(r.sale_price)} ${currency()}`, tx, priceY);
         if (withCosts) {
           doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(90, 80, 100);
           doc.text(`Costo: ${formatUSDShort(r.cost_price)} · Mín: ${formatUSDShort(r.min_price)} · Stock: ${r.stock}`, tx, priceY + 4.5);
@@ -264,7 +267,9 @@ const FIELD_ALIASES: Record<string, string[]> = {
   category: ['categoria', 'category', 'rubro', 'familia', 'subcategoria'],
   content_value: ['contenido', 'presentacion', 'tamano', 'tamanio', 'volumen', 'peso', 'medida', 'size', 'capacidad', 'cantidadcontenido'],
   content_unit: ['unidad', 'unit', 'um', 'unidaddemedida'],
-  barcode: ['codigobarras', 'codigodebarras', 'codigo', 'barcode', 'ean', 'upc', 'sku', 'cod'],
+  barcode: ['codigobarras', 'codigodebarras', 'barcode', 'ean', 'upc'],
+  sku: ['codigoempresa', 'codigodelaempresa', 'codigoproveedor', 'codigoproducto', 'codigo', 'sku', 'cod', 'referencia', 'ref'],
+  catalog_price: ['preciocatalogo', 'preciodecatalogo', 'pvpcatalogo', 'valorizado', 'valorizadopreciocatalogo', 'precioregular', 'preciolista'],
   cost_price: ['costo', 'cost', 'preciocompra', 'preciodecompra', 'preciocosto'],
   sale_price: ['precioventamax', 'precioventa', 'preciodeventa', 'precio', 'price', 'pvp', 'precioventamaximo', 'preciounitario'],
   min_price: ['precioventamin', 'preciominimo', 'precioventaminimo', 'minimo', 'preciomin'],
@@ -323,6 +328,7 @@ function draftFrom(obj: Record<string, unknown>): DraftProduct | null {
     name, brand: String(v.brand ?? ''), type: String(v.type ?? ''), category: String(v.category ?? ''),
     content_value, content_unit: content_unit ? normUnit(content_unit) : '',
     barcode: String(v.barcode ?? '').replace(/\.0$/, ''), cost_price: parseNumber(v.cost_price), sale_price: sale,
+    sku: v.sku !== undefined ? String(v.sku).replace(/\.0$/, '') : '', catalog_price: v.catalog_price !== undefined ? parseNumber(v.catalog_price) : null,
     min_price: v.min_price !== undefined ? parseNumber(v.min_price) : sale,
     stock: v.stock !== undefined ? parseNumber(v.stock) : 1,
     description: String(v.description ?? ''), offer_text: String(v.offer_text ?? ''),
@@ -553,11 +559,123 @@ async function getOCR() {
   return ocrWorker;
 }
 
-/** Lee el texto de una foto (ej. una lista de precios o la etiqueta de un producto) */
-export async function readTextFromImage(src: Blob | string): Promise<string> {
+/**
+ * Lee el texto de una foto (ej. una lista de precios o la etiqueta de un producto).
+ * `table` = documento con columnas (facturas): lee fila por fila.
+ */
+export async function readTextFromImage(src: Blob | string | HTMLCanvasElement, table = false): Promise<string> {
   const worker = await getOCR();
+  await worker.setParameters({ tessedit_pageseg_mode: (table ? '6' : '3') as never, preserve_interword_spaces: table ? '1' : '0' });
   const { data } = await worker.recognize(src);
   return data.text || '';
+}
+
+// ---------- Facturas, recibos y detalles de pedido ----------
+const INVOICE_RATE_KEY = 'mn7_invoice_rate';
+
+/** Tipo de producto según el nombre (perfumería y cosmética) */
+function guessType(name: string): { type: string; category: string } {
+  const n = normalize(name);
+  if (/\b(edp|edt|edc|parfum|perfume|fragancia|colonia|eau|locion)\b/.test(n)) return { type: 'Perfume', category: 'Fragancias' };
+  if (/\b(deso|desodorante|roll ?on|rollon|antitranspirante)\b/.test(n)) return { type: 'Desodorante', category: 'Cuidado personal' };
+  if (/\b(spf|fps|block|protector|solar)\b/.test(n)) return { type: 'Protector solar', category: 'Cuidado de la piel' };
+  if (/\b(desmaq|limpiador|tonico|crema|serum|hidratante|antiedad|facial)\b/.test(n)) return { type: 'Cuidado facial', category: 'Cuidado de la piel' };
+  if (/\b(base|labial|delineador|mascara|rimel|sombra|rubor|polvo|corrector|esmalte|lapiz)\b/.test(n)) return { type: 'Maquillaje', category: 'Maquillaje' };
+  if (/\b(shampoo|champu|acondicionador|cabello|capilar)\b/.test(n)) return { type: 'Cabello', category: 'Cuidado personal' };
+  if (/\b(jabon|gel|corporal|body|talco)\b/.test(n)) return { type: 'Cuidado corporal', category: 'Cuidado personal' };
+  return { type: '', category: '' };
+}
+
+/** Producto existente: mismo código de empresa, mismo código de barras o mismo nombre */
+function findExisting(code: string, name: string): Product | undefined {
+  const { records } = getState();
+  const c = code.replace(/\s/g, '');
+  if (c) {
+    const byCode = records.find(r => (r.sku && r.sku.replace(/\s/g, '') === c) || (r.barcode && r.barcode.replace(/\s/g, '') === c));
+    if (byCode) return byCode;
+  }
+  const n = normalize(name);
+  return n.length >= 6 ? records.find(r => normalize(r.name) === n) : undefined;
+}
+
+/** Elige el catálogo donde guardar según la marca/tipo; '' = preguntar */
+function guessCatalog(items: DraftProduct[]): string {
+  const { catalogs, currentCatalogId } = getState();
+  if (currentCatalogId) return currentCatalogId;
+  const brands = items.map(i => normalize(i.brand || '')).filter(Boolean);
+  const words = ['perfum', 'cosmet', 'bellez', 'fragan', 'maquill', ...brands];
+  const hit = catalogs.find(c => words.some(w => w && normalize(c.name + ' ' + c.label).includes(w)));
+  return hit ? hit.id : '';
+}
+
+/**
+ * Fotos de una factura, recibo o detalle de pedido (una o varias páginas).
+ * Reconoce Belcorp (Ésika / L'Bel / Cyzone) y Yanbal; si no, busca líneas con nombre y precio.
+ */
+export async function importInvoiceImages(files: File[]) {
+  const list = files.filter(f => f.type.startsWith('image/'));
+  if (!list.length) return;
+  try {
+    const { prepareInvoiceImage, parseInvoiceText } = await import('./invoice');
+    let text = '';
+    for (let i = 0; i < list.length; i++) {
+      toast(`Leyendo ${list.length > 1 ? `foto ${i + 1} de ${list.length}` : 'la foto'}... (puede tardar unos segundos)`, 15000);
+      text += '\n' + await readTextFromImage(await prepareInvoiceImage(list[i]), true);
+    }
+    // Queda disponible para revisar en la consola si una factura no se lee bien
+    (window as unknown as { __mn7UltimoTexto?: string }).__mn7UltimoTexto = text;
+    const inv = parseInvoiceText(text);
+    let items: DraftProduct[] = [];
+    if (inv.items.length) {
+      // Juntar filas repetidas (mismo código y nombre)
+      const merged = new Map<string, typeof inv.items[number]>();
+      for (const it of inv.items) {
+        const key = (it.code || '') + '|' + normalize(it.name);
+        const prev = merged.get(key);
+        if (prev && it.code) prev.qty += it.qty; else merged.set(key + (prev ? newId() : ''), { ...it });
+      }
+      items = [...merged.values()].map(it => {
+        const sp = splitContent(it.name);
+        const ex = findExisting(it.code, it.name);
+        const { type, category } = guessType(it.name);
+        const notes = [it.check ? '⚠ Revisa cantidad y precios' : '', it.isMaterial ? 'Material / servicio' : '', it.isGift ? 'Obsequio' : ''].filter(Boolean).join(' · ');
+        return {
+          _key: newId(), _include: !it.isMaterial && !it.isGift, _matchId: ex?.id || null, _note: notes,
+          name: ex?.name || it.name, brand: it.brand || ex?.brand || '', type: ex?.type || type, category: ex?.category || category,
+          sku: it.code, barcode: ex?.barcode || '', content_value: ex?.content_value || sp?.value || '', content_unit: ex?.content_unit || sp?.unit || '',
+          stock: it.qty, catalog_price: it.catalogUnit || null, cost_price: it.costUnit,
+          sale_price: ex ? ex.sale_price : (it.catalogUnit || it.costUnit), min_price: ex ? ex.min_price : it.costUnit,
+          description: '', offer_text: '', image_url: '',
+        } as DraftProduct;
+      });
+    } else {
+      items = parseTextLines(text.split(/\r?\n/));
+    }
+    if (!items.length) { toast('No se encontraron productos en la foto. Prueba con más luz, sin sombras y la hoja recta.', 5000); return; }
+    const app = getState().appCurrency;
+    const saved = Number(localStorage.getItem(INVOICE_RATE_KEY)) || 0;
+    const rate = inv.rate || saved || 6.96;
+    const currencyOf = inv.currency || app;
+    setState({
+      importPreview: {
+        source: `${inv.vendor === 'Factura' ? 'Foto' : inv.vendor} · ${list.length} foto${list.length > 1 ? 's' : ''}`,
+        items, catalogs: [], target: guessCatalog(items), newCatalogName: inv.vendor === 'Yanbal' ? 'Yanbal' : inv.vendor === 'Belcorp' ? 'Perfumería' : 'Compras ' + new Date().toLocaleDateString('es'),
+        invoice: { vendor: inv.vendor, currency: currencyOf, rate, convert: currencyOf !== app, totals: inv.totals.slice(-4) },
+      },
+    });
+    openModal('import-preview-modal');
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo leer la foto: ' + (e as Error).message, 4000);
+  }
+}
+
+/** Factor para pasar los precios de la factura a la moneda de la app */
+export function invoiceFactor(inv: { currency: string; rate: number; convert: boolean } | undefined, app: string): number {
+  if (!inv || !inv.convert || inv.currency === app || !inv.rate) return 1;
+  if (inv.currency === 'USD') return inv.rate;      // $ → Bs (u otra moneda local)
+  if (app === 'USD') return 1 / inv.rate;           // Bs → $
+  return 1;
 }
 
 /** Foto de una lista de precios → productos */
@@ -582,7 +700,7 @@ export async function importAnyFile(file: File) {
     else if (name.endsWith('.csv') || name.endsWith('.txt')) await parseCSVFile(file);
     else if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.ods')) await parseExcelFile(file);
     else if (name.endsWith('.pdf')) await parsePDFFile(file);
-    else if (file.type.startsWith('image/')) await importPriceListImage(file);
+    else if (file.type.startsWith('image/')) await importInvoiceImages([file]);
     else toast('Formato no soportado');
   } catch (e) {
     console.error(e);
@@ -617,10 +735,34 @@ export async function commitImport() {
 
   let targetId = pv.target;
   if (targetId === 'new') targetId = createCat(pv.newCatalogName.trim() || 'Importados');
+  const k = invoiceFactor(pv.invoice, s.appCurrency);
+  const money = (n: unknown) => Math.round((Number(n) || 0) * k * 100) / 100;
+  if (pv.invoice?.convert && pv.invoice.rate) localStorage.setItem('mn7_invoice_rate', String(pv.invoice.rate));
+  let restocked = 0;
 
   for (const d of pv.items.filter(i => i._include && i.name?.trim())) {
-    const { _key, _catalogName, _include, ...rest } = d;
-    void _key; void _include;
+    const { _key, _catalogName, _include, _matchId, _note, ...rest } = d;
+    void _key; void _include; void _note;
+    if (pv.invoice) {
+      rest.cost_price = money(rest.cost_price);
+      rest.catalog_price = rest.catalog_price ? money(rest.catalog_price) : null;
+      rest.min_price = money(rest.min_price);
+      rest.sale_price = money(rest.sale_price);
+    }
+    // Factura: el producto ya existe → sumar stock y actualizar costo y precio de catálogo
+    const matchIdx = _matchId ? records.findIndex(r => r.id === _matchId) : -1;
+    if (matchIdx >= 0) {
+      const cur = records[matchIdx];
+      const upd: Product = {
+        ...cur, stock: Number(cur.stock || 0) + Number(rest.stock || 0), cost_price: rest.cost_price ?? cur.cost_price,
+        catalog_price: rest.catalog_price ?? cur.catalog_price, sale_price: Number(rest.sale_price) || cur.sale_price,
+        min_price: Number(rest.min_price) || cur.min_price, sku: rest.sku || cur.sku, brand: cur.brand || rest.brand || '',
+      };
+      records[matchIdx] = upd;
+      touched.push(upd);
+      restocked++;
+      continue;
+    }
     const srcCat = pv.catalogs.find(c => c.id === rest.catalog_id);
     const catalog_id = targetId === 'auto' ? findOrCreate(_catalogName, srcCat) : targetId;
     const existingIdx = rest.id ? records.findIndex(r => r.id === rest.id) : -1;
@@ -635,7 +777,7 @@ export async function commitImport() {
   }
   setState({ catalogs, records, importPreview: null });
   await DB.bulkUpsert(newCatalogs, touched);
-  toast(`✅ Importados ${touched.length} productos${newCatalogs.length ? ` y ${newCatalogs.length} catálogos` : ''}`);
+  toast(`✅ ${touched.length - restocked} productos nuevos${restocked ? `, ${restocked} con stock sumado` : ''}${newCatalogs.length ? ` y ${newCatalogs.length} catálogos` : ''}`, 3500);
   SoundEffects.play('success');
   return touched.length;
 }

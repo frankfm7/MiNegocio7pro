@@ -50,7 +50,7 @@ export default function PublicShopModal() {
         <div className="flex justify-between items-center mb-3"><h2 className="font-bold text-xl hero-title">Catálogo público</h2><CloseButton onClick={() => closeModal('public-shop-modal')} /></div>
         {!store && <p className="text-sm text-[#756c7e]">El catálogo público necesita una tienda en la nube. Inicia sesión y crea tu tienda.</p>}
         {store && state === 'loading' && <p className="text-sm text-[#756c7e] flex items-center gap-2"><Loader className="w-4 h-4 animate-spin" /> Cargando...</p>}
-        {store && state === 'missing' && <p className="text-sm text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-xl p-3">Falta ejecutar <b>supabase/5-mejoras-v4.sql</b> en Supabase para activar esta función.</p>}
+        {store && state === 'missing' && <p className="text-sm text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-xl p-3">Falta ejecutar <b>supabase/5-mejoras.sql</b> en Supabase para activar esta función.</p>}
         {store && state === 'ready' && (
           <div className="space-y-4">
             <p className="text-xs text-[#756c7e]">Tus clientes abren un enlace, ven tus productos con stock, arman su pedido y te lo envían por WhatsApp. <b>No ven costos</b> ni necesitan cuenta.</p>

@@ -54,7 +54,7 @@ function termScore(term: string, word: string): number {
   return 0;
 }
 
-interface Indexed { product: Product; fields: { words: string[]; text: string; weight: number }[]; barcode: string }
+interface Indexed { product: Product; fields: { words: string[]; text: string; weight: number }[]; barcode: string; sku: string }
 
 const FIELDS: [keyof Product | 'content', number][] = [
   ['name', 3], ['brand', 2.2], ['type', 1.4], ['category', 1.4], ['content', 1], ['offer_text', 0.6], ['description', 0.5],
@@ -67,6 +67,7 @@ function index(p: Product): Indexed {
     ix = {
       product: p,
       barcode: normalize(p.barcode),
+      sku: normalize(p.sku).replace(/\s/g, ''),
       fields: FIELDS.map(([f, weight]) => {
         const text = normalize(f === 'content' ? formatContent(p) : p[f as keyof Product]);
         return { text, words: text.split(' ').filter(Boolean), weight };
@@ -83,6 +84,7 @@ export function scoreProduct(p: Product, query: string, requireAll = true): numb
   if (!q) return 0;
   const ix = index(p);
   if (ix.barcode && (ix.barcode === q.replace(/\s/g, ''))) return 100;
+  if (ix.sku && ix.sku === q.replace(/\s/g, '')) return 100;
   const terms = tokens(q);
   if (terms.length === 0) return 0;
   let total = 0;
@@ -96,6 +98,7 @@ export function scoreProduct(p: Product, query: string, requireAll = true): numb
       }
     }
     if (ix.barcode && t.length >= 4 && ix.barcode.includes(t)) best = Math.max(best, 2.5);
+    if (ix.sku && t.length >= 4 && ix.sku.includes(t)) best = Math.max(best, 2.5);
     if (best > 0) matched++;
     total += best;
   }

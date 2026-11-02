@@ -5,7 +5,7 @@ import {
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 import { setState, toast, useStore } from '../store';
 import { generateDailyCloseImage, navigate, openDetail } from '../actions';
-import { cardImage, formatContent, formatUSD, formatUSDShort } from '../lib/format';
+import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../lib/format';
 import { fallback } from '../lib/constants';
 import { getLowStockProducts, getOutOfStockProducts, getTodaySales, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
 import Avatar from '../components/Avatar';
@@ -205,7 +205,7 @@ function SalesChart({ sales }: { sales: Sale[] }) {
     }
     const chart = new Chart(canvasRef.current, {
       type: 'bar',
-      data: { labels: days.map(d => d.label), datasets: [{ label: 'Ingresos (USD)', data: days.map(d => d.revenue), backgroundColor: 'rgba(124, 67, 186, 0.7)', borderColor: 'rgba(124, 67, 186, 1)', borderWidth: 2, borderRadius: 8, maxBarThickness: 50 }] },
+      data: { labels: days.map(d => d.label), datasets: [{ label: `Ingresos (${currency()})`, data: days.map(d => d.revenue), backgroundColor: 'rgba(124, 67, 186, 0.7)', borderColor: 'rgba(124, 67, 186, 1)', borderWidth: 2, borderRadius: 8, maxBarThickness: 50 }] },
       options: {
         responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Ingresos: ${formatUSD(ctx.raw)} (${days[ctx.dataIndex].count} ventas)` } } },

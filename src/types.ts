@@ -22,6 +22,10 @@ export interface Product {
   content_unit?: string | null;
   /** Stock mínimo para avisar (vacío = mínimo general) */
   min_stock?: number | null;
+  /** Precio que figura en el catálogo de la marca (se muestra tachado junto a tu precio) */
+  catalog_price?: number | null;
+  /** Código del producto en la empresa/proveedor (ej. 13014 de Ésika, 5109-20014207 de Yanbal) */
+  sku?: string | null;
 }
 
 export interface Catalog {
@@ -218,4 +222,8 @@ export interface DraftProduct extends Partial<Product> {
   _key: string;
   _catalogName?: string;
   _include: boolean;
+  /** Producto ya existente al que se le sumará el stock (importar factura) */
+  _matchId?: string | null;
+  /** Aviso para revisar (ej. precios que no cuadran en la factura) */
+  _note?: string;
 }

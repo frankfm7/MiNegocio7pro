@@ -4,7 +4,7 @@
 -- Pégalo en Supabase → SQL Editor → New query → Run. Solo LEE, no cambia nada.
 -- Debe mostrar "OK" en TODAS las filas. Si alguna dice "FALTA":
 --   * tablas / columnas / funciones / seguridad → vuelve a ejecutar
---     supabase/1-migracion-multi-tienda.sql y luego supabase/5-mejoras-v4.sql
+--     supabase/1-migracion-multi-tienda.sql, luego 5-mejoras.sql y 6-precio-catalogo.sql
 --     (se pueden repetir sin riesgo).
 -- =====================================================================
 select * from (
@@ -25,7 +25,8 @@ select * from (
     'products.content_value','products.content_unit','sales.seller_uid',
     'store_members.last_seen','store_members.status','store_invites.max_uses',
     'store_members.avatar_url','products.min_stock','sales.customer_id','sales.customer_name',
-    'stores.public_enabled','stores.public_slug','stores.public_whatsapp'
+    'stores.public_enabled','stores.public_slug','stores.public_whatsapp',
+    'products.catalog_price','products.sku'
   ]) c
 
   union all

@@ -88,17 +88,17 @@ export default function ProductsScreen() {
         </div>
       </header>
       <div className="page-inner pt-6 sm:pt-7">
-        <section className="flex items-end justify-between gap-3 mb-5 flex-wrap">
-          <div className="min-w-0 flex-1">
+        <section className="mb-5">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p id="active-catalog-label" className="text-[11px] uppercase tracking-[.15em] font-bold text-[#7b43ab]">{cat ? cat.label || 'CATÁLOGO' : 'INVENTARIO COMPLETO'}</p>
               <span className="client-mode-badge"><User className="w-3 h-3" /> Modo cliente</span>
             </div>
-            <h1 id="active-catalog-title" className="hero-title font-bold text-2xl sm:text-3xl mt-1 break-words">{cat ? cat.name : 'Todos los productos'}</h1>
+            <h1 id="active-catalog-title" className="hero-title font-bold text-2xl sm:text-3xl mt-1 leading-tight text-balance">{cat ? cat.name : 'Todos los productos'}</h1>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
             <button type="button" onClick={() => openForm()} className="admin-only rounded-full btn-primary px-3 py-1.5 text-xs font-bold whitespace-nowrap flex items-center gap-1" aria-label="Añadir producto"><Plus className="w-3.5 h-3.5" /> Añadir</button>
-            <span id="product-count" className="rounded-full bg-[#eee6f6] text-[#70429c] px-3 py-1.5 text-xs font-bold whitespace-nowrap">{items.length} {items.length === 1 ? 'producto' : 'productos'}</span>
+            <span id="product-count" className="rounded-full bg-[#eee6f6] text-[#70429c] px-3 py-1.5 text-xs font-bold whitespace-nowrap mr-auto">{items.length} {items.length === 1 ? 'producto' : 'productos'}</span>
             {cat && (
               <div className="catalog-inside-menu relative">
                 <button id="catalog-inside-menu-btn" type="button" onClick={e => { e.stopPropagation(); setMenuOpen(o => !o); }} className="w-9 h-9 rounded-full grid place-items-center hover:bg-violet-50 text-[#7c43ba] shadow-sm bg-white" title="Opciones del catálogo">

@@ -46,7 +46,7 @@ export async function saveShopSettings(s: ShopSettings) {
   if (!supabaseClient || !sid) throw new Error('Conéctate a una tienda en la nube');
   const { error } = await supabaseClient.rpc('set_public_shop', { p_store: sid, p_enabled: s.enabled, p_slug: s.slug, p_whatsapp: s.whatsapp });
   if (error) {
-    if (/function .*set_public_shop|Could not find the function/i.test(error.message)) throw new Error('Falta ejecutar supabase/5-mejoras-v4.sql en Supabase');
+    if (/function .*set_public_shop|Could not find the function/i.test(error.message)) throw new Error('Falta ejecutar supabase/5-mejoras.sql en Supabase');
     throw new Error(error.message);
   }
 }

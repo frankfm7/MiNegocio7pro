@@ -1,4 +1,4 @@
-# MiNegocio7pro · v3.5
+# MiNegocio7pro · v1.0
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -14,6 +14,8 @@ Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin inter
 3. **SQL Editor → New query**: pega y ejecuta `supabase/1-migracion-multi-tienda.sql`
    (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
    vienes de la app anterior con datos; en un proyecto nuevo se omite.
+   Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`
+   y por último `supabase/4-verificar.sql` (todo debe decir OK).
 4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
    (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
    (agrega además `http://localhost:5173` para probar en tu computadora).
@@ -72,7 +74,19 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4b. Novedades v3.5
+## 4a. Novedades v1.0
+
+- **Importar desde foto de factura, recibo o detalle de pedido** (Datos → Importar → *Foto de factura…*).
+  Reconoce Belcorp (Ésika, L'Bel, Cyzone; en dólares con su tipo de cambio) y Yanbal (en Bs), el código
+  de la empresa, cantidad, costo y precio de catálogo. Marca con ⚠ las filas dudosas, separa material
+  (revistas, flyers) y regalos, suma stock si el producto ya existe y pregunta en qué catálogo guardar.
+- **Precio de catálogo**: se ve tachado junto a tu precio ("Catálogo ~~120~~ · Tu precio 99 · Ahorras 21").
+- **Costo visible** en la tarjeta, en el detalle y al vender (solo administradores; se oculta en modo cliente).
+- **Moneda configurable** (Bs, USD, S/, …) en *Datos del negocio*.
+- **Tarjetas rediseñadas**: foto → nombre → detalles → precios → botones; los nombres ya no se cortan.
+- Requiere ejecutar `supabase/6-precio-catalogo.sql` para guardar precio de catálogo y código en la nube.
+
+## 4b. Novedades anteriores
 
 - **Fotos del equipo** (de la cuenta de Google) en equipo, ventas y cierre de caja.
 - **Aviso de stock bajo** con mínimo general y por producto, número en el menú, aviso al abrir y notificación opcional.
@@ -119,3 +133,18 @@ src/
 public/                    PWA (manifest, sw.js, íconos), modelo visual y OCR
 supabase/                  Scripts SQL
 ```
+
+## 7. Subir a tu repositorio nuevo de GitHub
+
+```bash
+cd MiNegocio7pro
+git init
+git add .
+git commit -m "MiNegocio7pro v1.0"
+git branch -M main
+git remote add origin https://github.com/TU_USUARIO/MiNegocio7pro.git
+git push -u origin main
+```
+Si la carpeta ya tenía git: `git remote set-url origin https://github.com/TU_USUARIO/MiNegocio7pro.git`
+y luego `git add . && git commit -m "v1.0" && git push`. En Vercel: *Add New → Project* → elige el
+repositorio → agrega las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_KEY` → *Deploy*.

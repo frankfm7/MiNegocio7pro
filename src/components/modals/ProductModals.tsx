@@ -6,7 +6,7 @@ import {
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openAccount, openModal, setState, toast, useStore } from '../../store';
 import { addCart, confirmSale, deleteProduct, duplicateProduct, openForm, openSaleModal } from '../../actions';
-import { cardImage, formatContent, formatUSD, formatUSDShort } from '../../lib/format';
+import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../../lib/format';
 import { APP_NAME, fallback } from '../../lib/constants';
 import { generateProductQRImage, printProductQR } from '../../lib/qr';
 import { SoundEffects } from '../../lib/sound';
@@ -63,8 +63,8 @@ export function DetailModal() {
         <div className="p-6">
           <div className="flex justify-between gap-4 items-start">
             <div className="min-w-0 flex-1">
-              <p id="detail-brand" className="text-xs font-bold text-[#7b43a8] uppercase tracking-[.12em]">{r.brand}</p>
-              <h2 id="detail-name" className="hero-title text-2xl sm:text-3xl font-bold mt-1 break-words">{r.name}</h2>
+              <h2 id="detail-name" className="hero-title text-2xl sm:text-3xl font-bold leading-tight text-balance">{r.name}</h2>
+              {r.brand && <p id="detail-brand" className="text-xs font-bold text-[#7b43a8] uppercase tracking-[.12em] mt-1.5">{r.brand}</p>}
               {content && (
                 <p id="detail-content" className="mt-2 mr-2 px-3 py-1 rounded-full bg-[#f0e7f6] text-[#70429c] text-sm font-bold inline-block">Contenido: {content}</p>
               )}
@@ -89,22 +89,26 @@ export function DetailModal() {
               </div>
             </div>
           </div>
-          <p id="detail-meta" className="text-sm text-[#756c7e] mt-2">{`${r.type} · ${r.category || ''} · ${r.stock} unidades disponibles`}</p>
+          <p id="detail-meta" className="text-sm text-[#756c7e] mt-2">{[r.type, r.category, `${r.stock} unidades disponibles`, r.sku ? `Cód. ${r.sku}` : ''].filter(Boolean).join(' · ')}</p>
           <p id="detail-description" className="text-sm leading-relaxed mt-4 text-[#4a3f55]">{r.description || 'Sin descripción.'}</p>
           <div className="mt-6 p-5 rounded-2xl bg-gradient-to-br from-[#f6f1f8] to-[#ede1f8] text-center shadow-inner">
+            {Number(r.catalog_price) > Number(r.sale_price) && (
+              <p className="text-sm text-[#756c7e] mb-2">Precio de catálogo <span className="line-through font-bold">{formatUSD(r.catalog_price)}</span>
+                <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#be416d] text-white text-xs font-bold">Ahorras {formatUSD(Number(r.catalog_price) - Number(r.sale_price))}</span></p>
+            )}
             <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397]">Precio de venta</p>
-            <p id="detail-sale-price" className="price-highlight mt-2">{formatUSDShort(r.sale_price)} <span className="currency-tag">USD</span></p>
+            <p id="detail-sale-price" className="price-highlight mt-2">{formatUSDShort(r.sale_price)} <span className="currency-tag">{currency()}</span></p>
             <p id="detail-min-price" className="text-xs text-[#756c7e] mt-1 member-only"><span className="text-xs text-[#756c7e]">Mínimo:</span> <span className="font-bold text-sm text-[#a43658]">{formatUSD(r.min_price || 0)}</span></p>
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:gap-3 mt-4 sensitive-data">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sensitive-data">
             <div className="rounded-2xl bg-white border border-[#ede7f0] p-3 text-center shadow-sm">
-              <p className="text-[10px] text-[#746d7d] uppercase tracking-wide">Costo</p>
-              <p id="detail-cost-price" className="font-bold mt-1 text-sm">{formatUSD(r.cost_price)}</p>
+              <p className="text-[10px] text-[#746d7d] uppercase tracking-wide font-bold">Costo</p>
+              <p id="detail-cost-price" className="font-bold mt-1 text-lg">{formatUSD(r.cost_price)}</p>
             </div>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0] p-3 text-center shadow-sm mt-3 sensitive-data">
-            <p className="text-[10px] text-[#166534] uppercase tracking-wide font-bold">Ganancia por unidad</p>
-            <p id="detail-profit" className="font-bold mt-1 text-lg text-[#166534]">{formatUSD(Number(r.sale_price) - Number(r.cost_price))}</p>
+            <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0] p-3 text-center shadow-sm">
+              <p className="text-[10px] text-[#166534] uppercase tracking-wide font-bold">Ganancia por unidad</p>
+              <p id="detail-profit" className="font-bold mt-1 text-lg text-[#166534]">{formatUSD(Number(r.sale_price) - Number(r.cost_price))}</p>
+            </div>
           </div>
           <div className="flex gap-2 mt-6">
             <button id="detail-sold" type="button" disabled={outOfStock} style={outOfStock ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
@@ -161,10 +165,16 @@ export function SaleModal() {
           <div className="p-4 rounded-2xl bg-[#f6f1f8] mb-4">
             <p className="text-xs text-[#756c7e] uppercase tracking-wide">Producto</p>
             <p className="font-bold text-lg mt-1 break-words">{r.name}{formatContent(r) ? ` · ${formatContent(r)}` : ''}</p>
+            {/* Referencia antes de vender: costo, precio mínimo y de catálogo */}
+            <div className="flex flex-wrap gap-1.5 mt-2 text-[11px] font-bold">
+              {Number(r.catalog_price) > 0 && <span className="px-2 py-0.5 rounded-full bg-white text-[#756c7e]">Catálogo {formatUSD(r.catalog_price)}</span>}
+              <span className="px-2 py-0.5 rounded-full bg-white text-[#201728] sensitive-data">Costo {formatUSD(r.cost_price)}</span>
+              {Number(r.min_price) > 0 && <span className="px-2 py-0.5 rounded-full bg-white text-[#a43658]">Mínimo {formatUSD(r.min_price)}</span>}
+            </div>
           </div>
           <div className="bg-[#f0fdf4] p-4 rounded-2xl mb-4 text-center border border-[#bbf7d0]">
             <p className="text-xs text-[#166534] font-bold uppercase">Total a cobrar</p>
-            <p className="text-4xl font-bold text-[#166534] mt-1">${formatUSDShort(total)}</p>
+            <p className="text-4xl font-bold text-[#166534] mt-1">{formatUSDShort(total)} <span className="text-lg">{currency()}</span></p>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>

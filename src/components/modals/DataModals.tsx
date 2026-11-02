@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  AlertCircle, Cloud, Download, FileImage, FileJson, FileSpreadsheet, FileText, FileType, Images, Info, Loader, QrCode, ScanText, ShieldCheck, Upload,
+  AlertCircle, ArrowRightLeft, Cloud, Download, PackageCheck, Receipt, FileImage, FileJson, FileSpreadsheet, FileText, FileType, Images, Info, Loader, QrCode, ScanText, ShieldCheck, Upload,
 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, setState, toast, useStore } from '../../store';
 import { backupNow, isAutoBackupOn, listCloudBackups, restoreCloudBackup, setAutoBackup } from '../../lib/cloudBackup';
 import type { CloudBackup } from '../../types';
 import { createBackup, restoreBackup } from '../../lib/exporters';
-import { commitImport, exportCSV, exportExcel, exportJSON, exportPDF, importAnyFile, importPhotosAsProducts, importPriceListImage } from '../../lib/io';
+import { commitImport, exportCSV, exportExcel, exportJSON, exportPDF, importAnyFile, importInvoiceImages, importPhotosAsProducts, importPriceListImage, invoiceFactor } from '../../lib/io';
 import { exportCatalogQRsPDF } from '../../lib/qr';
 import { cardImage, formatUSDShort } from '../../lib/format';
 
@@ -70,6 +70,7 @@ export function ImportExportModal() {
         <div className="space-y-2">
           <FileRow icon={<Upload className="w-4 h-4" />} color="#7c43ba" title="Archivo" text="Excel (con fotos), PDF, CSV o JSON" accept=".xlsx,.xls,.ods,.csv,.txt,.json,.pdf" onFiles={runFiles(f => importAnyFile(f[0]))} />
           <FileRow icon={<Images className="w-4 h-4" />} color="#23805d" title="Fotos de productos" text="Varias fotos → un producto por foto" accept="image/*" multiple onFiles={runFiles(f => importPhotosAsProducts(f))} />
+          <FileRow icon={<Receipt className="w-4 h-4" />} color="#be416d" title="Foto de factura, recibo o detalle de pedido" text="Ésika, L'Bel, Cyzone, Yanbal y otros · suma stock y precios de catálogo · varias fotos = varias páginas" accept="image/*" multiple onFiles={runFiles(f => importInvoiceImages(f))} />
           <FileRow icon={<ScanText className="w-4 h-4" />} color="#d97706" title="Foto de una lista de precios" text="Lee el texto de la imagen (nombre y precio)" accept="image/*" onFiles={runFiles(f => importPriceListImage(f[0]))} />
         </div>
         <p className="text-[11px] text-[#756c7e] mt-3">Antes de guardar verás la lista para revisar nombres, precios y el catálogo de destino.</p>
@@ -81,66 +82,131 @@ export function ImportExportModal() {
 export function ImportPreviewModal() {
   const pv = useStore(s => s.importPreview);
   const catalogs = useStore(s => s.catalogs);
+  const records = useStore(s => s.records);
+  const app = useStore(s => s.appCurrency);
   const [saving, setSaving] = useState(false);
   if (!pv) return <Modal id="import-preview-modal" closeOnBackdrop={false}>{null}</Modal>;
 
   const update = (key: string, patch: Record<string, unknown>) =>
     setState({ importPreview: { ...pv, items: pv.items.map(i => (i._key === key ? { ...i, ...patch } : i)) } });
-  const included = pv.items.filter(i => i._include).length;
-  const withImages = pv.items.filter(i => i._include && i.image_url).length;
+  const setInvoice = (patch: Partial<NonNullable<typeof pv.invoice>>) => pv.invoice && setState({ importPreview: { ...pv, invoice: { ...pv.invoice, ...patch } } });
+  const included = pv.items.filter(i => i._include);
+  const withImages = included.filter(i => i.image_url).length;
+  const restock = included.filter(i => i._matchId).length;
+  const needsTarget = included.some(i => !i._matchId);
   const hasAuto = pv.items.some(i => i._catalogName) || pv.catalogs.length > 0;
+  const inv = pv.invoice;
+  const k = invoiceFactor(inv, app);
+  const cur = inv ? inv.currency : app;
+  const missingTarget = needsTarget && !pv.target;
   const cancel = () => { setState({ importPreview: null }); closeModal('import-preview-modal'); };
-  const save = async () => { setSaving(true); await commitImport(); setSaving(false); closeModal('import-preview-modal'); };
+  const save = async () => {
+    if (missingTarget) { toast('Elige a qué catálogo agregar los productos nuevos'); return; }
+    setSaving(true); await commitImport(); setSaving(false); closeModal('import-preview-modal');
+  };
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? '' : String(v));
+  const conv = (v: unknown) => (k !== 1 && Number(v) ? ` → ${formatUSDShort(Number(v) * k)} ${app}` : '');
 
   return (
     <Modal id="import-preview-modal" className="z-[70] bg-[#1e1427]/70" closeOnBackdrop={false}>
-      <article className="modal-card w-full max-w-2xl bg-white rounded-3xl max-h-[94vh] flex flex-col">
-        <div className="p-5 border-b border-[#ede7f0] flex justify-between items-start gap-3">
+      <article className="modal-card w-full min-w-0 max-w-[min(48rem,calc(100vw-2rem))] bg-white rounded-3xl max-h-[94vh] flex flex-col overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#ede7f0] flex justify-between items-start gap-3">
           <div className="min-w-0">
-            <h2 className="font-bold text-xl hero-title">Revisar importación</h2>
-            <p className="text-xs text-[#756c7e] mt-1 truncate">{pv.source} · {included} de {pv.items.length} productos · {withImages} con foto</p>
+            <h2 className="font-bold text-xl hero-title">{inv ? 'Revisar factura / pedido' : 'Revisar importación'}</h2>
+            <p className="text-xs text-[#756c7e] mt-1">{pv.source} · {included.length} de {pv.items.length} productos{restock ? ` · ${restock} ya existen (se suma el stock)` : ''}{withImages ? ` · ${withImages} con foto` : ''}</p>
           </div>
           <CloseButton onClick={cancel} />
         </div>
-        <div className="p-5 border-b border-[#ede7f0] grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold mb-1">Guardar en</label>
-            <select value={pv.target} onChange={e => setState({ importPreview: { ...pv, target: e.target.value } })} className="w-full input-field rounded-xl p-2.5 text-sm">
-              {hasAuto && <option value="auto">Según el archivo (crea catálogos si faltan)</option>}
-              {catalogs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value="new">➕ Catálogo nuevo…</option>
-            </select>
-          </div>
-          {pv.target === 'new' && (
-            <div>
-              <label className="block text-xs font-bold mb-1">Nombre del catálogo nuevo</label>
-              <input value={pv.newCatalogName} onChange={e => setState({ importPreview: { ...pv, newCatalogName: e.target.value } })} className="w-full input-field rounded-xl p-2.5 text-sm" />
+
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {inv && (
+            <div className="mx-4 sm:mx-5 mt-4 p-3 rounded-2xl bg-[#f6f1f8] grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] items-center min-w-0">
+              <div className="text-sm min-w-0">
+                <p className="font-bold flex items-center gap-1.5"><Receipt className="w-4 h-4 text-[#be416d]" /> {inv.vendor === 'Factura' ? 'Documento' : inv.vendor} · precios en <b>{inv.currency}</b></p>
+                {inv.totals.length > 0 && <p className="text-[11px] text-[#756c7e] mt-0.5 truncate">{inv.totals.join(' · ')}</p>}
+              </div>
+              {inv.currency !== app && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <label className="flex items-center gap-1.5 font-bold"><input type="checkbox" checked={inv.convert} onChange={e => setInvoice({ convert: e.target.checked })} className="accent-[#7c43ba]" /> Convertir a {app}</label>
+                  <span className="flex items-center gap-1"><ArrowRightLeft className="w-3.5 h-3.5" /> 1 USD =</span>
+                  <input type="number" step="0.01" min={0} value={inv.rate} onChange={e => setInvoice({ rate: Number(e.target.value) })} className="input-field rounded-lg px-2 py-1 w-20 text-sm" aria-label="Tipo de cambio" />
+                  <span>Bs</span>
+                </div>
+              )}
+              {inv.currency !== app && app === 'USD' && inv.currency === 'Bs' && (
+                <p className="text-[11px] text-[#92400e] sm:col-span-2">Tu app está en USD. Si vendes en bolivianos, cambia la moneda en <b>Menú → Datos del negocio</b>.</p>
+              )}
             </div>
           )}
-        </div>
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-2">
-          {pv.items.map(i => (
-            <div key={i._key} className={`flex items-center gap-2 sm:gap-3 p-2 rounded-2xl border ${i._include ? 'border-[#ede7f0] bg-white' : 'border-dashed border-[#e8dfec] opacity-50'}`}>
-              <input type="checkbox" checked={i._include} onChange={e => update(i._key, { _include: e.target.checked })} className="w-4 h-4 accent-[#7c43ba] flex-shrink-0" aria-label="Incluir" />
-              <div className="w-12 h-12 rounded-xl product-photo-frame flex-shrink-0 grid place-items-center overflow-hidden">
-                {i.image_url ? <img src={cardImage(i as { image_url: string })} alt="" className="w-full h-full object-contain" /> : <FileImage className="w-5 h-5 text-[#d4c5e0]" />}
-              </div>
-              <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[1fr_90px] gap-1.5">
-                <input value={i.name || ''} onChange={e => update(i._key, { name: e.target.value })} className="input-field rounded-lg px-2 py-1.5 text-sm font-bold min-w-0" placeholder="Nombre" />
-                <div className="flex items-center gap-1">
-                  <input type="number" step="0.01" min={0} value={i.sale_price ?? 0} onChange={e => update(i._key, { sale_price: Number(e.target.value), min_price: i.min_price === i.sale_price ? Number(e.target.value) : i.min_price })} className="input-field rounded-lg px-2 py-1.5 text-sm w-full" aria-label="Precio" />
-                </div>
-                <p className="text-[11px] text-[#756c7e] truncate sm:col-span-2">
-                  {[i.brand, i.content_value ? `${i.content_value} ${i.content_unit || ''}` : '', i._catalogName && pv.target === 'auto' ? `→ ${i._catalogName}` : '', `Stock ${i.stock ?? 1}`, `${formatUSDShort(i.sale_price)} USD`].filter(Boolean).join(' · ')}
-                </p>
-              </div>
+
+          <div className="p-4 sm:p-5 grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold mb-1">{inv ? 'Productos nuevos: ¿a qué catálogo los agrego?' : 'Guardar en'}</label>
+              <select value={pv.target} onChange={e => setState({ importPreview: { ...pv, target: e.target.value } })} className={`w-full input-field rounded-xl p-2.5 text-sm ${missingTarget ? '!border-[#d97706] ring-2 ring-[#fde68a]' : ''}`}>
+                {!pv.target && <option value="">— Elige un catálogo —</option>}
+                {hasAuto && <option value="auto">Según el archivo (crea catálogos si faltan)</option>}
+                {catalogs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="new">➕ Catálogo nuevo…</option>
+              </select>
+              {missingTarget && <p className="text-[11px] text-[#92400e] mt-1">No encontré un catálogo parecido. Elige uno o crea uno nuevo.</p>}
             </div>
-          ))}
+            {pv.target === 'new' && (
+              <div>
+                <label className="block text-xs font-bold mb-1">Nombre del catálogo nuevo</label>
+                <input value={pv.newCatalogName} onChange={e => setState({ importPreview: { ...pv, newCatalogName: e.target.value } })} className="w-full input-field rounded-xl p-2.5 text-sm" />
+              </div>
+            )}
+          </div>
+
+          <div className="px-3 sm:px-5 pb-4 space-y-2">
+            {pv.items.map(i => {
+              const match = i._matchId ? records.find(r => r.id === i._matchId) : null;
+              return (
+                <div key={i._key} className={`p-2.5 rounded-2xl border ${i._include ? 'border-[#ede7f0] bg-white' : 'border-dashed border-[#e8dfec] opacity-55'}`}>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input type="checkbox" checked={i._include} onChange={e => update(i._key, { _include: e.target.checked })} className="w-4 h-4 accent-[#7c43ba] flex-shrink-0" aria-label="Incluir" />
+                    <div className="w-11 h-11 rounded-xl product-photo-frame flex-shrink-0 grid place-items-center overflow-hidden">
+                      {match?.image_url || i.image_url ? <img src={cardImage({ image_url: (match?.image_url || i.image_url) as string })} alt="" className="w-full h-full object-contain" /> : <FileImage className="w-5 h-5 text-[#d4c5e0]" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <input value={i.name || ''} onChange={e => update(i._key, { name: e.target.value })} className="w-full input-field rounded-lg px-2 py-1.5 text-sm font-bold min-w-0" placeholder="Nombre" />
+                      <p className="text-[11px] text-[#756c7e] mt-0.5 truncate">
+                        {[i.sku ? `Cód. ${i.sku}` : '', i.brand, i.content_value ? `${i.content_value} ${i.content_unit || ''}` : '', i._catalogName && pv.target === 'auto' ? `→ ${i._catalogName}` : ''].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+                  {(match || i._note) && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5 ml-6">
+                      {match && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#166534] flex items-center gap-1"><PackageCheck className="w-3 h-3" /> Ya existe: {match.stock} u. + {i.stock} = {Number(match.stock) + Number(i.stock || 0)} u.</span>}
+                      {i._note && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${i._note.includes('⚠') ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f3eef6] text-[#756c7e]'}`}>{i._note}</span>}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2 ml-6">
+                    <label className="text-[10px] font-bold text-[#756c7e]">Cantidad
+                      <input type="number" min={0} value={num(i.stock)} onChange={e => update(i._key, { stock: Number(e.target.value) })} className="w-full input-field rounded-lg px-2 py-1 text-sm text-[#201728]" />
+                    </label>
+                    <label className="text-[10px] font-bold text-[#756c7e]">Costo ({cur})
+                      <input type="number" step="0.01" min={0} value={num(i.cost_price)} onChange={e => update(i._key, { cost_price: Number(e.target.value) })} className="w-full input-field rounded-lg px-2 py-1 text-sm text-[#201728]" />
+                      {conv(i.cost_price) && <span className="block font-normal">{conv(i.cost_price)}</span>}
+                    </label>
+                    <label className="text-[10px] font-bold text-[#756c7e]">Precio catálogo ({cur})
+                      <input type="number" step="0.01" min={0} value={num(i.catalog_price)} onChange={e => update(i._key, { catalog_price: e.target.value === '' ? null : Number(e.target.value) })} className="w-full input-field rounded-lg px-2 py-1 text-sm text-[#201728]" />
+                      {conv(i.catalog_price) && <span className="block font-normal">{conv(i.catalog_price)}</span>}
+                    </label>
+                    <label className="text-[10px] font-bold text-[#7c43ba]">Tu precio ({cur})
+                      <input type="number" step="0.01" min={0} value={num(i.sale_price)} onChange={e => update(i._key, { sale_price: Number(e.target.value), min_price: Math.min(Number(i.min_price) || 0, Number(e.target.value)) })} className="w-full input-field rounded-lg px-2 py-1 text-sm font-bold text-[#201728]" />
+                      {conv(i.sale_price) && <span className="block font-normal">{conv(i.sale_price)}</span>}
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <div className="p-4 border-t border-[#ede7f0] flex gap-2">
           <button type="button" onClick={cancel} className="flex-1 py-3 rounded-xl btn-ghost font-bold">Cancelar</button>
-          <button type="button" disabled={saving || included === 0} onClick={save} className="flex-1 py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2">
-            {saving ? <><Loader className="w-4 h-4 animate-spin" /> Guardando...</> : <>Importar {included}</>}
+          <button type="button" disabled={saving || included.length === 0} onClick={save} className={`flex-1 py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2 ${missingTarget ? 'opacity-60' : ''}`}>
+            {saving ? <><Loader className="w-4 h-4 animate-spin" /> Guardando...</> : <>Guardar {included.length}</>}
           </button>
         </div>
       </article>

@@ -52,7 +52,7 @@ export function addToPendingChanges(action: PendingAction, data: any) {
 // ==========================================
 // Columnas que se agregaron con migraciones nuevas. Si la base de datos todavía no las
 // tiene, la app sigue funcionando sin ellas (y avisa en la consola).
-const OPTIONAL_PRODUCT_FIELDS = ['content_value', 'content_unit', 'min_stock'] as const;
+const OPTIONAL_PRODUCT_FIELDS = ['content_value', 'content_unit', 'min_stock', 'catalog_price', 'sku'] as const;
 const missingColumns = new Set<string>();
 
 function productRow(p: Partial<Product>, sid: string) {
@@ -63,6 +63,8 @@ function productRow(p: Partial<Product>, sid: string) {
     description: p.description ?? '', barcode: p.barcode ?? '', offer_text: p.offer_text ?? '',
     content_value: p.content_value ?? '', content_unit: p.content_unit ?? '',
     min_stock: p.min_stock === undefined || p.min_stock === null || String(p.min_stock) === '' ? null : Number(p.min_stock),
+    catalog_price: p.catalog_price === undefined || p.catalog_price === null || String(p.catalog_price) === '' ? null : Number(p.catalog_price),
+    sku: p.sku ?? '',
     store_id: sid,
   };
   missingColumns.forEach(f => delete row[f]);
@@ -91,7 +93,7 @@ export async function upsertProducts(rows: Partial<Product>[], sid = storeId()) 
     const known = (OPTIONAL_PRODUCT_FIELDS as readonly string[]).includes(col || '');
     if (!(error.code === 'PGRST204' || known) || !col || !known || missingColumns.has(col)) return { error };
     missingColumns.add(col);
-    console.warn(`⚠️ Falta la columna products.${col}: ejecuta el SQL de supabase/ (1 y 5)`);
+    console.warn(`⚠️ Falta la columna products.${col}: ejecuta el SQL de supabase/ (1, 5 y 6)`);
   }
   return { error: new Error('No se pudo guardar el producto') };
 }
@@ -166,7 +168,7 @@ export async function syncPendingChanges() {
       const err = e as { code?: string; message?: string };
       if (/customer/.test(change.action.toLowerCase()) || change.action === 'addMovement' || change.action === 'deleteMovement') {
         if (err.code === 'PGRST205' || err.code === '42P01' || /schema cache|does not exist/i.test(err.message || '')) {
-          console.warn('Falta ejecutar supabase/5-mejoras-v4.sql (clientes y fiados)');
+          console.warn('Falta ejecutar supabase/5-mejoras.sql (clientes y fiados)');
           dropped++;
           continue;
         }
@@ -179,7 +181,7 @@ export async function syncPendingChanges() {
   const added = getState().pendingChanges.filter(c => !snapshot.some(o => o.id === c.id));
   await savePending([...remaining, ...added]);
   if (ok > 0) toast(`✅ ${ok} cambios sincronizados`);
-  if (dropped > 0) toast('⚠️ Clientes y fiados solo se guardaron en este dispositivo: falta ejecutar supabase/5-mejoras-v4.sql', 6000);
+  if (dropped > 0) toast('⚠️ Clientes y fiados solo se guardaron en este dispositivo: falta ejecutar supabase/5-mejoras.sql', 6000);
   if (remaining.length > 0) toast(`⚠️ ${remaining.length} cambios pendientes de sincronizar`);
   setState({ isSyncing: false });
 }
