@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CheckCircle, Download, Receipt as ReceiptIcon, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
+import { BookOpen, Camera, CheckCircle, Download, PlusCircle, Receipt as ReceiptIcon, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import {
-  addToQuickScan, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
+  addMoreToReceipt, addToQuickScan, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, hideQuickScan, navigate, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
 } from '../../actions';
-import { cardImage, formatContent, formatUSD } from '../../lib/format';
+import { cardImage, currency, formatContent, formatUSD } from '../../lib/format';
 import { searchByImage } from '../../lib/imageSearch';
 import { captureFromCamera } from '../../lib/camera';
 import { downloadDataUrl } from '../../lib/image';
@@ -171,6 +171,7 @@ export function ImageSearchModal() {
 export function QuickScanModal() {
   const items = useStore(s => s.quickScanItems);
   const discount = useStore(s => s.quickScanDiscount);
+  const carry = useStore(s => s.receiptCarry);
   const [discountValue, setDiscountValue] = useState('');
   const [discountType, setDiscountType] = useState<'fixed' | 'percent'>('fixed');
 
@@ -196,19 +197,26 @@ export function QuickScanModal() {
   };
 
   return (
-    <Modal id="quick-scan-modal" onClose={stopQuickScanMode}>
-      <article className="modal-card w-full max-w-2xl bg-white rounded-3xl max-h-[95vh] flex flex-col">
+    <Modal id="quick-scan-modal" onClose={hideQuickScan}>
+      <article className="modal-card w-full max-w-2xl bg-white rounded-3xl max-h-[92vh] flex flex-col overflow-hidden">
         <div className="flex justify-between items-center p-4 border-b border-gray-200 flex-shrink-0">
-          <div><h2 className="font-bold text-xl hero-title text-[#7c43ba]">Lista de Ventas</h2><p className="text-xs text-[#756c7e]">{totalItems} {totalItems === 1 ? 'producto' : 'productos'}</p></div>
-          <CloseButton onClick={stopQuickScanMode} />
+          <div className="min-w-0"><h2 className="font-bold text-xl hero-title text-[#7c43ba]">{carry ? 'Agregar a la venta' : 'Venta en curso'}</h2><p className="text-xs text-[#756c7e]">{totalItems} {totalItems === 1 ? 'producto nuevo' : 'productos nuevos'}{carry ? ` · ya cobrado ${formatUSD(carry.total)}` : ''}</p></div>
+          <CloseButton onClick={hideQuickScan} />
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => openBarcodeScanner('quick-scan')} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><ScanLine className="w-5 h-5" /> Escanear</button>
-            <button type="button" onClick={() => openModal('quick-scan-manual-modal')} className="py-3 rounded-xl btn-ghost font-bold flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Agregar</button>
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" onClick={() => openBarcodeScanner('quick-scan')} className="py-3 rounded-xl btn-primary font-bold text-sm flex flex-col items-center justify-center gap-0.5"><ScanLine className="w-5 h-5" /> Escanear</button>
+            <button type="button" onClick={() => openModal('quick-scan-manual-modal')} className="py-3 rounded-xl btn-ghost font-bold text-sm flex flex-col items-center justify-center gap-0.5"><Plus className="w-5 h-5" /> Buscar</button>
+            <button type="button" onClick={() => { hideQuickScan(); navigate(getState().currentCatalogId ? 'products' : 'catalogs', getState().currentCatalogId); }} className="py-3 rounded-xl btn-ghost font-bold text-sm flex flex-col items-center justify-center gap-0.5"><BookOpen className="w-5 h-5" /> Catálogo</button>
           </div>
+          {carry && (
+            <div className="p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
+              <p className="text-xs font-bold text-[#166534] mb-1">Ya cobrado ({carry.payment}) · {formatUSD(carry.total)}</p>
+              {carry.items.map((it, k) => <p key={k} className="text-[11px] text-[#4a3f55] truncate">✓ {it.quantity} x {it.product.name} — {formatUSD(it.price * it.quantity)}</p>)}
+            </div>
+          )}
           {items.length === 0 && (
-            <div className="text-center py-8"><div className="text-6xl mb-3">🛒</div><p className="font-bold text-gray-700">Tu lista está vacía</p><p className="text-sm text-gray-500 mt-1">Escanea productos o agrégalos manualmente</p></div>
+            <div className="text-center py-6"><div className="text-5xl mb-2">🛒</div><p className="font-bold text-gray-700">{carry ? 'Agrega los productos nuevos' : 'Tu lista está vacía'}</p><p className="text-sm text-gray-500 mt-1">Escanea, busca o elige en el catálogo con "Vender → Agregar a la venta"</p></div>
           )}
           <div className="space-y-2">
             {items.map((item, index) => (
@@ -232,12 +240,12 @@ export function QuickScanModal() {
           <div className="border-t border-gray-200 pt-3">
             <label className="block text-xs font-bold mb-2">Descuento</label>
             <div className="flex gap-2">
-              <input type="number" min={0} step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="flex-1 input-field rounded-lg p-2 text-sm" placeholder="0.00" />
-              <select value={discountType} onChange={e => setDiscountType(e.target.value as 'fixed' | 'percent')} className="input-field rounded-lg p-2 text-sm">
-                <option value="fixed">$ Fijo</option>
+              <input type="number" min={0} step="0.01" value={discountValue} onChange={e => setDiscountValue(e.target.value)} className="flex-1 min-w-0 w-0 input-field rounded-lg p-2 text-sm" placeholder="0.00" />
+              <select value={discountType} onChange={e => setDiscountType(e.target.value as 'fixed' | 'percent')} className="input-field rounded-lg p-2 text-sm w-[6.5rem] flex-shrink-0">
+                <option value="fixed">{currency()} fijo</option>
                 <option value="percent">% Porcentaje</option>
               </select>
-              <button type="button" onClick={applyDiscount} className="btn-ghost rounded-lg px-3 py-2 text-xs font-bold">Aplicar</button>
+              <button type="button" onClick={applyDiscount} className="btn-ghost rounded-lg px-3 py-2 text-xs font-bold flex-shrink-0">Aplicar</button>
             </div>
           </div>
         </div>
@@ -245,8 +253,8 @@ export function QuickScanModal() {
           <div className="flex justify-between text-sm mb-1"><span className="text-[#756c7e]">Descuento:</span><span className="font-bold text-[#d97706]">{discount > 0 ? `-${formatUSD(discount)}` : 'Sin descuento'}</span></div>
           <div className="flex justify-between text-2xl mb-3"><span className="font-bold">TOTAL:</span><span className="font-bold text-[#7c43ba] hero-title">{formatUSD(subtotal - discount)}</span></div>
           <div className="flex gap-2">
-            <button type="button" onClick={stopQuickScanMode} className="flex-1 py-3 rounded-xl btn-ghost font-bold">Cancelar</button>
-            <button type="button" onClick={finalizeQuickScan} className="flex-1 py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5" /> Finalizar</button>
+            <button type="button" onClick={() => stopQuickScanMode()} className="flex-1 py-3 rounded-xl btn-ghost font-bold">Descartar</button>
+            <button id="finalize-sale" type="button" onClick={finalizeQuickScan} className="flex-[1.4] py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2"><CheckCircle className="w-5 h-5" /> Finalizar venta</button>
           </div>
         </div>
       </article>
@@ -351,7 +359,12 @@ export function SaleReceiptModal() {
             <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Guardar imagen</button>
             <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-success font-bold flex items-center justify-center gap-2"><Share2 className="w-4 h-4" /> Compartir imagen</button>
           </div>
-          <button type="button" onClick={() => closeModal('sale-receipt-modal')} className="w-full mt-2 py-3 rounded-xl btn-ghost font-bold">Cerrar</button>
+          {!r.reprint && (
+            <button id="receipt-add-more" type="button" onClick={addMoreToReceipt} className="w-full mt-2 py-3 rounded-xl border-2 border-dashed border-[#7c43ba] text-[#7c43ba] font-bold flex items-center justify-center gap-2 hover:bg-[#f6f1f8]">
+              <PlusCircle className="w-5 h-5" /> Agregar más productos a esta venta
+            </button>
+          )}
+          <button type="button" onClick={() => closeModal('sale-receipt-modal')} className="w-full mt-2 py-3 rounded-xl btn-ghost font-bold">Cerrar (terminar venta)</button>
         </article>
       )}
     </Modal>

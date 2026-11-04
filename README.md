@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.4
+# MiNegocio7pro · v1.5
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -74,7 +74,20 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.4
+## 4a. Novedades v1.5
+
+- **Venta en curso (varios productos, un solo recibo)**: en *Registrar venta* el botón **Agregar a la venta** guarda el
+  producto y vuelve al catálogo. Aparece el botón flotante verde **Finalizar venta** (con el total) hasta que se finalice o
+  se descarte con la ✕. Con una venta en curso, el botón verde dice **Agregar y finalizar**.
+- **Agregar más productos a una venta ya cobrada**: en el recibo "¡Venta exitosa!" → *Agregar más productos a esta venta*.
+  Al finalizar sale **un solo recibo** con lo ya cobrado más lo nuevo.
+- **Ventanas que se cortaban a la derecha** (ej. *Lista de ventas* en celulares angostos): corregido para todas las ventanas.
+  Tocar fuera cierra la lista de ventas sin perder los productos.
+- **Detalle del producto**: el botón *Ver en grande* se cambió por **Modo cliente** (la foto se agranda tocándola).
+  El botón desaparece mientras el modo cliente está activo.
+- **Foto en grande**: se cierra con **doble toque** (o con la ✕); un toque suelto ya no la cierra.
+
+## 4a·0. Novedades v1.4
 
 - **Selección múltiple de ventas**: se activa **manteniendo presionada** una venta (½ segundo). Con la selección abierta,
   un toque o una pulsación larga agrega o quita ventas; **cuando no queda ninguna seleccionada se cierra sola**.

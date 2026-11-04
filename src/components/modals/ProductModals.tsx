@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import JsBarcode from 'jsbarcode';
 import {
-  Check, CheckCircle, Copy, Download, History, Info, Loader, Maximize2, Minus, MoreVertical, PackagePlus, Plus, Printer, QrCode, Share2, Tag, Trash2, X, XCircle,
+  Check, CheckCircle, Copy, ShoppingCart, Download, History, Info, Loader, EyeOff, Minus, MoreVertical, PackagePlus, Plus, Printer, QrCode, Share2, Tag, Trash2, X, XCircle,
 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openAccount, openModal, setState, toast, useStore } from '../../store';
-import { addCart, confirmSale, deleteProduct, duplicateProduct, openForm, openSaleModal } from '../../actions';
+import { addCart, addToCurrentSale, startQuickScanMode, toggleClientMode, confirmSale, deleteProduct, duplicateProduct, openForm, openSaleModal } from '../../actions';
 import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../../lib/format';
 import { APP_NAME, fallback } from '../../lib/constants';
 import { generateProductQRImage, printProductQR } from '../../lib/qr';
@@ -69,9 +69,12 @@ export function DetailModal() {
             onClick={() => setState({ imageLightbox: { src: img, alt: r.name } })}
             title="Toca para ver la imagen en grande"
           />
-          <button type="button" onClick={() => setState({ imageLightbox: { src: img, alt: r.name } })} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/50 text-white text-xs font-bold backdrop-blur flex items-center gap-1.5 hover:bg-black/60" aria-label="Ver imagen en grande">
-            <Maximize2 className="w-4 h-4" /> Ver en grande
-          </button>
+          {/* Pasar rápido a modo cliente para mostrarle el producto al comprador (la foto se agranda tocándola) */}
+          {!clientMode && (
+            <button id="detail-client-mode" type="button" onClick={() => toggleClientMode()} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/55 text-white text-xs font-bold backdrop-blur flex items-center gap-1.5 hover:bg-black/65" aria-label="Activar modo cliente">
+              <EyeOff className="w-4 h-4" /> Modo cliente
+            </button>
+          )}
           <button id="close-detail" type="button" onClick={() => closeModal('detail-modal')} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 backdrop-blur grid place-items-center hover:bg-white shadow-lg" aria-label="Cerrar"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-6">
@@ -160,6 +163,7 @@ export function SaleModal() {
   const [price, setPrice] = useState('');
   const [processing, setProcessing] = useState(false);
   const priceRef = useRef<HTMLInputElement>(null);
+  const inProgress = useStore(s => s.quickScanItems.reduce((a, i) => a + i.quantity, 0) + (s.receiptCarry ? s.receiptCarry.items.length : 0));
 
   useEffect(() => {
     if (open && r) {
@@ -222,11 +226,17 @@ export function SaleModal() {
           <div className="mb-4 p-3 rounded-xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0]">
             <div className="flex justify-between items-center"><span className="text-sm font-bold text-[#166534]">Ganancia total:</span><span className={`font-bold text-lg ${profit >= 0 ? 'text-[#166534]' : 'text-[#a43658]'}`}>{formatUSD(profit)}</span></div>
           </div>
-          <div className="flex gap-2 sticky bottom-0 bg-white pt-2">
-            <button type="button" onClick={() => closeModal('sale-modal')} className="flex-1 rounded-xl py-3 btn-ghost font-bold">Cancelar</button>
-            <button id="confirm-sale" type="button" disabled={processing} onClick={confirm} className="flex-1 rounded-xl py-3 btn-success font-bold flex items-center justify-center gap-1.5">
-              {processing ? <><Loader className="w-4 h-4 animate-spin" /> Procesando...</> : <><Check className="w-4 h-4" /> Confirmar</>}
-            </button>
+          <div className="sticky bottom-0 bg-white pt-2">
+            {inProgress > 0 && <p className="text-[11px] text-center text-[#7c43ba] font-bold mb-2">🛒 Tienes una venta en curso con {inProgress} {inProgress === 1 ? 'producto' : 'productos'}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              <button id="add-to-sale" type="button" onClick={() => addToCurrentSale(r, qty, Number(price))} className={`rounded-xl py-3 font-bold flex items-center justify-center gap-1.5 text-sm ${inProgress > 0 ? 'btn-primary' : 'btn-ghost'}`}>
+                <ShoppingCart className="w-4 h-4" /> Agregar a la venta
+              </button>
+              <button id="confirm-sale" type="button" disabled={processing} onClick={() => (inProgress > 0 ? (addToCurrentSale(r, qty, Number(price)) && startQuickScanMode()) : confirm())} className="rounded-xl py-3 btn-success font-bold flex items-center justify-center gap-1.5 text-sm">
+                {processing ? <><Loader className="w-4 h-4 animate-spin" /> Procesando...</> : <><Check className="w-4 h-4" /> {inProgress > 0 ? 'Agregar y finalizar' : 'Confirmar'}</>}
+              </button>
+            </div>
+            <button type="button" onClick={() => closeModal('sale-modal')} className="w-full mt-2 py-2 rounded-xl text-sm font-bold text-[#756c7e] hover:bg-[#f6f1f8]">Cancelar</button>
           </div>
         </div>
       </article>

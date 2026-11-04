@@ -33,11 +33,16 @@
 }
 .modal.open {
   display: grid !important;
+  /* la tarjeta nunca puede ser más ancha que la pantalla (antes el contenido la estiraba) */
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
 }
 .modal .modal-card {
+  min-width: 0;
+  max-width: min(var(--card-max, 100%), 100%);
   transform: translateY(20px) scale(.97);
   transition: transform 0.3s cubic-bezier(.4,0,.2,1);
   box-shadow: 0 25px 60px rgba(32,20,41,.25);
@@ -1009,3 +1014,6 @@ body.client-mode #detail-min-price { display: none !important; }
 .welcome-tap-hint-inline { font-size: 11px; opacity: .6; animation: pulse 2s ease-in-out infinite; }
 .welcome-credit { font-size: 12px; letter-spacing: .08em; opacity: .85; }
 .welcome-credit b { font-family: Poppins, sans-serif; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+/* Botón flotante de la venta en curso (encima de la barra de abajo) */
+.sale-progress { bottom: calc(76px + env(safe-area-inset-bottom)); animation: rise .3s ease both; }
+@media (min-width:1024px) { .sale-progress { bottom: 24px; } }

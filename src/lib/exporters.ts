@@ -97,7 +97,7 @@ export async function exportCartToPDF() {
 // ==========================================
 export function createBackup() {
   const { catalogs, records, sales, contactInfo, customers, movements } = getState();
-  const backup = { app: APP_NAME, version: '1.4', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
+  const backup = { app: APP_NAME, version: '1.5', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
   downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `respaldo_catalogo_${Date.now()}.json`);
   toast('Respaldo creado ✓');
   SoundEffects.play('success');

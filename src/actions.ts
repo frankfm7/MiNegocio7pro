@@ -335,15 +335,53 @@ export async function openProductFromLink(q: URLSearchParams) {
 // LISTA DE VENTAS (ESCANEO RÁPIDO)
 // ==========================================
 export function startQuickScanMode() {
-  setState({ quickScanMode: true, quickScanItems: [], quickScanDiscount: 0 });
+  // Si ya hay una venta en curso, se retoma (no se borra)
+  const s = getState();
+  if (!s.quickScanItems.length && !s.receiptCarry) setState({ quickScanDiscount: 0 });
+  setState({ quickScanMode: true });
   openModal('quick-scan-modal');
-  toast('Modo lista de ventas activado');
 }
 
-export function stopQuickScanMode() {
-  setState({ quickScanMode: false, quickScanItems: [], quickScanDiscount: 0, barcodeScanTarget: null });
+/** Cierra la lista sin borrar la venta en curso (queda el botón flotante "Finalizar venta") */
+export function hideQuickScan() {
   closeModal('quick-scan-modal');
-  toast('Modo escaneo rápido desactivado');
+  setState({ barcodeScanTarget: null });
+}
+
+/** Descarta la venta en curso (pregunta si hay productos) */
+export function stopQuickScanMode(ask = true) {
+  const s = getState();
+  if (ask && (s.quickScanItems.length || s.receiptCarry) && !confirm('¿Descartar la venta en curso? Los productos que agregaste se quitarán de la lista (lo ya cobrado no cambia).')) return;
+  setState({ quickScanMode: false, quickScanItems: [], quickScanDiscount: 0, barcodeScanTarget: null, receiptCarry: null });
+  closeModal('quick-scan-modal');
+}
+
+/** Desde "Registrar venta": agrega el producto a la venta en curso y vuelve al catálogo */
+export function addToCurrentSale(product: Product, quantity: number, price: number) {
+  if (isNaN(price) || price <= 0) { toast('Ingresa un precio válido'); SoundEffects.play('error'); return false; }
+  const items = getState().quickScanItems.map(i => ({ ...i }));
+  const inList = items.filter(i => i.product.id === product.id).reduce((a, i) => a + i.quantity, 0);
+  if (Number(product.stock) < inList + quantity) { toast('No hay suficiente stock'); SoundEffects.play('error'); return false; }
+  const same = items.find(i => i.product.id === product.id && i.price === price);
+  if (same) same.quantity += quantity; else items.push({ product, quantity, price });
+  setState({ quickScanItems: items, quickScanMode: true });
+  closeModal('sale-modal');
+  closeModal('detail-modal');
+  SoundEffects.play('success');
+  toast(`🛒 Agregado a la venta: ${quantity} x ${product.name}`, 2200);
+  return true;
+}
+
+/** Desde el recibo: seguir vendiendo al mismo cliente; al finalizar sale un solo recibo con todo */
+export function addMoreToReceipt() {
+  const r = getState().receiptData;
+  if (!r) return;
+  setState({ receiptCarry: r, quickScanItems: [], quickScanDiscount: 0, quickScanMode: true });
+  closeModal('sale-receipt-modal');
+  // Volver al catálogo donde estaba (o a la lista de catálogos)
+  const view = getState().currentView;
+  if (view !== 'products' && view !== 'catalogs') navigate(getState().currentCatalogId ? 'products' : 'catalogs', getState().currentCatalogId);
+  toast('Elige el producto → Vender → Agregar a la venta', 3000);
 }
 
 export function addToQuickScan(product: Product, quantity = 1) {
@@ -357,7 +395,13 @@ export function addToQuickScan(product: Product, quantity = 1) {
 }
 
 export async function finalizeQuickScan() {
-  const { quickScanItems, quickScanDiscount, currentUser, selectedPaymentMethod } = getState();
+  const { quickScanItems, quickScanDiscount, currentUser, selectedPaymentMethod, receiptCarry } = getState();
+  if (!quickScanItems.length && receiptCarry) {
+    // No se agregó nada: se vuelve al recibo anterior
+    setState({ receiptData: receiptCarry, receiptCarry: null, quickScanMode: false });
+    closeModal('quick-scan-modal'); openModal('sale-receipt-modal');
+    return;
+  }
   if (!quickScanItems.length) { toast('No hay productos para vender'); return; }
   const subtotal = quickScanItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const total = subtotal - quickScanDiscount;
@@ -366,11 +410,23 @@ export async function finalizeQuickScan() {
   if (customer === null) return;
   if (!confirm(`¿Registrar venta por ${formatUSD(total)}${customer ? ` (fiado a ${customer.name})` : ''}?`)) return;
 
-  const receipt: ReceiptData = {
+  const newReceipt: ReceiptData = {
     date: new Date().toLocaleString('es'), seller: currentUser ? currentUser.name : 'Desconocido',
     payment: method, customer: customer ? { name: customer.name, phone: customer.phone } : null,
     items: [...quickScanItems], subtotal, discount: quickScanDiscount, total,
   };
+  // Si se estaban agregando productos a un recibo ya cobrado, sale UN solo recibo con todo
+  const receipt: ReceiptData = receiptCarry ? {
+    ...newReceipt,
+    date: receiptCarry.date,
+    payment: receiptCarry.payment === method ? method : `${receiptCarry.payment} + ${method}`,
+    customer: newReceipt.customer || receiptCarry.customer || null,
+    items: [...receiptCarry.items, ...quickScanItems],
+    subtotal: receiptCarry.subtotal + subtotal,
+    discount: receiptCarry.discount + quickScanDiscount,
+    total: receiptCarry.total + total,
+    reprint: false,
+  } : newReceipt;
   try {
     let firstSaleId = '';
     for (const item of quickScanItems) {
@@ -388,7 +444,7 @@ export async function finalizeQuickScan() {
     }
     if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: total, method: 'Fiado', sale_id: firstSaleId, note: `${quickScanItems.length} producto(s)` });
     SoundEffects.play('success');
-    setState({ quickScanItems: [], quickScanDiscount: 0, receiptData: receipt, saleCustomerId: '' });
+    setState({ quickScanItems: [], quickScanDiscount: 0, receiptData: receipt, saleCustomerId: '', receiptCarry: null, quickScanMode: false });
     closeModal('quick-scan-modal');
     openModal('sale-receipt-modal');
     if (getState().isOnline) setTimeout(() => syncPendingChanges(), 500);

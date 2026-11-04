@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
 import ImageEditor from './components/ImageEditor';
+import SaleInProgressBar from './components/SaleInProgressBar';
 import ProductFormDrawer from './components/ProductFormDrawer';
 import { ProductImageLightbox, QrLightbox } from './components/ImageLightboxes';
 import CatalogsScreen from './screens/CatalogsScreen';
@@ -234,6 +235,7 @@ export default function App() {
 
       <QrLightbox />
       <ProductImageLightbox />
+      <SaleInProgressBar />
       <ImageEditor />
       <Toast />
     </>

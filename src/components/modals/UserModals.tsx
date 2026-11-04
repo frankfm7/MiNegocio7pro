@@ -111,18 +111,22 @@ const GUIDE: Section[] = [
     '**Fondo**: original, blanco, negro u otro color. Activa **Quitar el fondo de la foto** (mejor si la foto se tomó sobre una pared o mesa lisa) y ajusta la *Sensibilidad*. Corrige con el pincel **Borrar** / **Recuperar** y **Deshacer**. Opcional: sombra suave.',
     '**Luz y color**: Auto-mejorar, brillo, contraste, color y nitidez.',
     'Cada foto empieza normal: lo que ajustas en una no se aplica a la siguiente.',
-    'En el catálogo, si la foto tiene fondo liso, la tarjeta usa ese mismo color para que se vea de borde a borde. Toca la foto en el detalle para verla en grande.',
+    'En el catálogo, si la foto tiene fondo liso, la tarjeta usa ese mismo color para que se vea de borde a borde.',
+    'En el detalle, **toca la foto** para verla en grande; para cerrarla, **toca dos veces** (o la ✕).',
   ] },
-  { icon: Receipt, title: 'Vender un producto', steps: [
+  { icon: Receipt, title: 'Vender: uno o varios productos', steps: [
     'Abre el producto → **Vender**. Elige la cantidad y el precio (sale el precio de venta; puedes cambiarlo).',
-    'Elige cómo te pagan: **Efectivo**, **QR** o **Fiado**. Si es fiado, elige o crea el cliente: la deuda queda anotada en *Clientes y fiados*.',
-    'Toca **Confirmar**: se descuenta el stock y aparece el **recibo**. Desde ahí lo envías por **WhatsApp** (escribe el número o deja vacío para elegir el contacto) o lo guardas o compartes como **imagen**.',
-    'Antes de vender ves el costo y el precio de catálogo (el costo se oculta en modo cliente).',
+    '**Confirmar** vende solo ese producto: se descuenta el stock y aparece el **recibo** ("¡Venta exitosa!").',
+    '**Agregar a la venta** lo pone en la **venta en curso** y vuelves al catálogo para seguir eligiendo. Abajo aparece el botón verde **Finalizar venta** con el total; se queda hasta que finalices o la descartes con la ✕.',
+    'Con una venta en curso, el botón verde dice **Agregar y finalizar**: agrega ese producto y abre la venta para cobrar.',
+    'En **Finalizar venta** eliges el pago (**Efectivo**, **QR** o **Fiado**), puedes aplicar un **descuento** y tocas **Finalizar venta**: sale **un solo recibo** con todos los productos.',
+    '¿El cliente quiere algo más después de pagar? En el recibo toca **Agregar más productos a esta venta**: vuelves al catálogo, agregas lo nuevo y al finalizar sale **un solo recibo** con lo ya cobrado más lo nuevo.',
+    'Desde el recibo lo envías por **WhatsApp** o lo guardas/compartes como **imagen**. **Cerrar (terminar venta)** termina la atención.',
+    'Si es **Fiado**, elige o crea el cliente: la deuda queda en *Clientes y fiados*.',
   ] },
-  { icon: ShoppingCart, title: 'Venta rápida de varios productos (Vender)', steps: [
-    'Toca **Vender** en la barra de abajo. Escanea los códigos de barras o QR de cada producto, o toca **Agregar** para buscarlos a mano.',
-    'Ajusta cantidades, aplica un **Descuento** si quieres y elige el método de pago.',
-    'Toca **Finalizar**: se registran todas las ventas, se descuenta el stock y sale el recibo con todos los productos, el descuento y el total, listo para WhatsApp o imagen.',
+  { icon: ShoppingCart, title: 'Venta rápida con escáner (Vender)', steps: [
+    'Toca **Vender** en la barra de abajo: se abre la venta en curso. **Escanear** lee códigos de barras o QR, **Buscar** agrega a mano y **Catálogo** te lleva a elegir productos.',
+    'Si cierras la ventana (✕ o tocando afuera) la venta NO se pierde: queda el botón **Finalizar venta**. **Descartar** la borra.',
   ] },
   { icon: MessageCircle, title: 'Pedidos por WhatsApp (carrito)', steps: [
     'En cada producto toca **+ Pedido** (o **+ Carrito** en el detalle) para armar un pedido.',
@@ -157,7 +161,8 @@ const GUIDE: Section[] = [
     'En *Agotados* puedes exportar la lista de reposición.',
   ] },
   { icon: EyeOff, title: 'Modo cliente y precio mínimo secreto', steps: [
-    'Activa el **Modo cliente** (ícono del ojo arriba) antes de mostrar el celular a un comprador: se ocultan costos, ganancias, ventas y el precio mínimo.',
+    'Activa el **Modo cliente** antes de mostrar el celular a un comprador: se ocultan costos, ganancias, ventas y el precio mínimo.',
+    'Atajo rápido: en el detalle de un producto toca **Modo cliente** (sobre la foto). El botón desaparece mientras el modo está activo; para volver al modo normal sal del detalle y usa el ícono del ojo de arriba.',
     'Fuera del modo cliente, el detalle muestra el precio mínimo debajo del precio de venta, como siempre.',
     'En modo cliente, para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita con el **Mínimo**. Ciérrala tocando fuera o en Cerrar.',
   ] },

@@ -91,6 +91,8 @@ interface State {
   quickScanItems: QuickScanItem[];
   quickScanDiscount: number;
   receiptData: ReceiptData | null;
+  /** Recibo ya cobrado al que se le están agregando más productos ("Agregar más productos") */
+  receiptCarry: ReceiptData | null;
   previewImage: { dataUrl: string; filename: string } | null;
   barcodeScanTarget: 'form' | 'quick-scan' | null;
   scannedBarcodeForForm: string | null;
@@ -202,6 +204,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   quickScanItems: [],
   quickScanDiscount: 0,
   receiptData: null,
+  receiptCarry: null,
   previewImage: null,
   barcodeScanTarget: null,
   scannedBarcodeForForm: null,
