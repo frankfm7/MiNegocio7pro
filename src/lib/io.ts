@@ -723,6 +723,20 @@ function editDistance(a: string, b: string): number {
   return dp[b.length];
 }
 
+/** Producto parecido (para sugerirlo cuando no hay coincidencia segura) */
+export function suggestExisting(code: string, name: string): { product: Product; score: number } | null {
+  const { records } = getState();
+  let best: Product | null = null, bs = 0;
+  const digits = productCode(code).replace(/\D/g, '');
+  for (const r of records) {
+    let sc = nameSimilarity(name, r.name);
+    if (r.common_name) sc = Math.max(sc, nameSimilarity(name, r.common_name) * 0.9);
+    if (digits && r.sku && codeNear(digits, productCode(r.sku).replace(/\D/g, ''))) sc += 0.25;
+    if (sc > bs) { bs = sc; best = r; }
+  }
+  return best && bs >= 0.45 ? { product: best, score: bs } : null;
+}
+
 /** Mismo código salvo un dígito (el lector confundió 5/6, 8/3...) */
 const codeNear = (a: string, b: string) => a.length === b.length && a.length >= 4 && [...a].filter((c, i) => c !== b[i]).length <= 1;
 
@@ -732,7 +746,7 @@ const codeNear = (a: string, b: string) => a.length === b.length && a.length >= 
  *  2) código casi igual (un dígito distinto) y nombre parecido;
  *  3) nombre muy parecido (aunque el lector haya cambiado alguna letra).
  */
-function findExisting(code: string, name: string, brand = ''): Product | undefined {
+export function findExisting(code: string, name: string, brand = ''): Product | undefined {
   const { records } = getState();
   const c = code.replace(/\s/g, '');
   const digits = productCode(c).replace(/\D/g, '');
@@ -935,8 +949,8 @@ export async function commitImport() {
   let restocked = 0;
 
   for (const d of pv.items.filter(i => i._include && i.name?.trim())) {
-    const { _key, _catalogName, _include, _matchId, _note, _readName, _baseCost, _baseCatalog, ...rest } = d;
-    void _key; void _include; void _note; void _readName; void _baseCost; void _baseCatalog;
+    const { _key, _catalogName, _include, _matchId, _note, _readName, _baseCost, _baseCatalog, _minEdited, ...rest } = d;
+    void _key; void _include; void _note; void _readName; void _baseCost; void _baseCatalog; void _minEdited;
     if (pv.invoice) {
       rest.cost_price = money(rest.cost_price);
       rest.catalog_price = rest.catalog_price ? money(rest.catalog_price) : null;
@@ -951,7 +965,9 @@ export async function commitImport() {
         ...cur, stock: Number(cur.stock || 0) + Number(rest.stock || 0), cost_price: rest.cost_price ?? cur.cost_price,
         // Tu precio de venta y tu mínimo se mantienen (ya están en la moneda de la app)
         catalog_price: rest.catalog_price ?? cur.catalog_price, sale_price: cur.sale_price,
-        min_price: cur.min_price, sku: cur.sku || rest.sku, brand: cur.brand || rest.brand || '',
+        // Costo mínimo: el que se escribió en la revisión, o el que ya tenía
+        min_price: d._minEdited && Number(rest.min_price) > 0 ? Number(rest.min_price) : cur.min_price,
+        sku: rest.sku || cur.sku, brand: cur.brand || rest.brand || '',
         // El nombre y la foto del producto existente no se tocan; solo se completa lo que falte
         name: cur.name, common_name: cur.common_name || rest.common_name || null,
         content_value: cur.content_value || rest.content_value || '', content_unit: cur.content_value ? cur.content_unit : (rest.content_unit || ''),

@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.8
+# MiNegocio7pro · v1.9
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -74,7 +74,24 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.8
+## 4a. Novedades v1.9
+
+1. **Recibo por WhatsApp**: campo para el número del cliente + *Enviar por WhatsApp* (abre `wa.me/NUMERO?text=...` con el
+   detalle). Si no tiene código de país se usa el configurado o el de la moneda (Bs → 591). Opciones: compartir imagen +
+   texto (Web Share), elegir contacto o copiar el texto.
+2. **Costos y precios** (formulario de producto y revisión de facturas): *Costo de factura*, *Costo mínimo de venta*
+   (valor o % sobre la factura) y *Precio de venta máx.* (valor o % sobre el mínimo o la factura; es el del catálogo).
+   Aviso en rojo si el precio de venta queda debajo del mínimo. Costo en dólares × **tipo de cambio** (siempre visible).
+   Se quitaron el "% de costo" genérico y el "descuento de empresa". Sin columnas nuevas: usa cost_price / min_price / sale_price.
+3. **Facturas**: código de producto editable; al cambiar código o nombre se busca solo en el catálogo; indicador verde
+   "✓ Producto reconocido en catálogo" (solo se actualizan unidades y costos) y sugerencia "¿Es «...»?".
+4. **Catálogo**: sin botón "Ver"; el detalle se cierra tocando fuera o en la zona de detalles (no en botones/foto/precio).
+5. **Tarjetas**: muestran precio de venta y mínimo (sin costo ni ganancia); el detalle muestra el desglose completo.
+6. **Nota de venta** (reemplaza el botón "Pedido" de las tarjetas): pulsación larga para elegir productos, barra
+   *Nota de venta*, cantidades, descuento por producto o global (% o monto), totales en vivo, **nunca por debajo del costo
+   mínimo**, *Guardar borrador* o *Procesar venta* (recibo numerado con el descuento).
+
+## 4a·0. Novedades v1.8
 
 - **Datos de la tienda** (nombre, dirección, teléfono, celular, NIT, código): ahora arriba de todo en menú ☰ →
   **Datos de la tienda (recibo)**; el recibo avisa si faltan.

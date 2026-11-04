@@ -14,7 +14,8 @@ export default function SaleInProgressBar() {
   const discount = useStore(s => s.quickScanDiscount);
   const hidden = useStore(s => !!(s.modals['quick-scan-modal'] || s.modals['sale-receipt-modal'] || s.modals['sale-modal']));
   const welcome = useStore(s => s.welcomeVisible);
-  if ((!items.length && !carry) || hidden || welcome) return null;
+  const selecting = useStore(s => s.notaSel.length > 0);
+  if ((!items.length && !carry) || hidden || welcome || selecting) return null;
   const count = items.reduce((a, i) => a + i.quantity, 0);
   const total = items.reduce((a, i) => a + i.price * i.quantity, 0) - discount + (carry ? carry.total : 0);
   return (

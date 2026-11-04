@@ -278,6 +278,8 @@ export interface DraftProduct extends Partial<Product> {
   /** Valores originales de la factura (para aplicar porcentajes sin acumular) */
   _baseCost?: number;
   _baseCatalog?: number;
+  /** El costo mínimo se editó en la revisión (si no, un producto existente conserva el suyo) */
+  _minEdited?: boolean;
   /** Aviso para revisar (ej. precios que no cuadran en la factura) */
   _note?: string;
 }

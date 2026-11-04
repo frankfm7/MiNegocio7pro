@@ -9,6 +9,7 @@ import { businessName, openWhatsApp } from './lib/whatsapp';
 import { esc, htmlToImage } from './lib/htmlImage';
 import { downloadDataUrl } from './lib/image';
 import { issueDocument, saveReceiptCopy } from './lib/documents';
+import { violatesFloor, type NotaResult } from './lib/nota';
 import { buildCashSummary, dateKeyOf, todayKey } from './lib/cashClose';
 import { APP_NAME, WELCOME_KEY } from './lib/constants';
 import { searchProducts } from './lib/search';
@@ -795,4 +796,37 @@ export async function deleteSalesWithConfirm(list: Sale[]) {
   toast(`🗑️ ${r.deleted} ${r.deleted === 1 ? 'venta eliminada' : 'ventas eliminadas'}${restore ? ` · ${units} u. devueltas al stock` : ''}`);
   SoundEffects.play('success');
   return true;
+}
+
+// ==========================================
+// NOTA DE VENTA → VENTA
+// ==========================================
+/**
+ * Registra la venta de una Nota de venta con los precios finales (ya con descuentos).
+ * Usa el mismo proceso que "Finalizar venta" (stock, pago, fiado, recibo numerado) sin tocar
+ * una venta en curso que hubiera. Devuelve true si se vendió.
+ */
+export async function processNota(res: NotaResult): Promise<boolean> {
+  const bad = violatesFloor(res);
+  if (bad) { toast(`❌ ${bad.name} quedaría por debajo de su costo mínimo. Revisa los descuentos.`, 5000); return false; }
+  const { records, quickScanItems: prevItems, quickScanDiscount: prevDisc, receiptCarry: prevCarry, receiptData: prevReceipt } = getState();
+  const items = res.rows.filter(r => r.qty > 0).map(r => {
+    const product = records.find(p => p.id === r.id);
+    return product ? { product, quantity: r.qty, price: r.unit } : null;
+  }).filter(Boolean) as { product: Product; quantity: number; price: number }[];
+  if (!items.length) { toast('La nota no tiene productos'); return false; }
+  for (const it of items) if (Number(it.product.stock) < it.quantity) { toast(`No hay suficiente stock de ${it.product.name}`); return false; }
+  setState({ quickScanItems: items, quickScanDiscount: 0, receiptCarry: null });
+  await finalizeQuickScan();
+  const after = getState().receiptData;
+  const sold = after !== prevReceipt && getState().quickScanItems.length === 0;
+  // Se devuelve la venta en curso que hubiera (si no se vendió, también)
+  setState({ quickScanItems: sold ? prevItems : prevItems, quickScanDiscount: prevDisc, receiptCarry: prevCarry });
+  if (sold && after) {
+    // En el recibo se ve el precio de catálogo y el descuento de la nota
+    const withDisc = { ...after, subtotal: res.subtotal, discount: res.discount, total: res.total };
+    setState({ receiptData: withDisc });
+    saveReceiptCopy(withDisc);
+  }
+  return sold;
 }

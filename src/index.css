@@ -1017,3 +1017,6 @@ body.client-mode #detail-min-price { display: none !important; }
 /* Botón flotante de la venta en curso (encima de la barra de abajo) */
 .sale-progress { bottom: calc(76px + env(safe-area-inset-bottom)); animation: rise .3s ease both; }
 @media (min-width:1024px) { .sale-progress { bottom: 24px; } }
+/* Barra de la Nota de venta (encima de la barra de abajo) */
+.nota-bar { bottom: calc(76px + env(safe-area-inset-bottom)); animation: rise .3s ease both; }
+@media (min-width:1024px) { .nota-bar { bottom: 24px; } }

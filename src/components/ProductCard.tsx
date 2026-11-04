@@ -1,8 +1,10 @@
-import { Eye, Plus } from 'lucide-react';
+import { useRef } from 'react';
+import { Check } from 'lucide-react';
+import { getState, setState, useStore } from '../store';
 import type { Product } from '../types';
 import { cardImage, formatContent, formatUSD } from '../lib/format';
 import { fallback } from '../lib/constants';
-import { addCart, openDetail } from '../actions';
+import { openDetail } from '../actions';
 import { useImageBg } from '../lib/imageBg';
 import { guessCommonName } from '../lib/commonName';
 
@@ -21,13 +23,33 @@ export default function ProductCard({ r }: { r: Product }) {
   const details = [r.brand, content].filter(Boolean).join(' · ');
   const photoBg = useImageBg(r.image_url);
   const common = r.common_name || guessCommonName(r.name, r.type);
+  // Selección para la Nota de venta: pulsación larga activa; con la selección abierta, un toque agrega o quita
+  const selected = useStore(s => s.notaSel.includes(r.id));
+  const selecting = useStore(s => s.notaSel.length > 0);
+  const press = useRef<{ x: number; y: number; t: ReturnType<typeof setTimeout>; fired: boolean } | null>(null);
+  const toggle = () => { const cur = getState().notaSel; setState({ notaSel: cur.includes(r.id) ? cur.filter(x => x !== r.id) : [...cur, r.id] }); };
+  const onDown = (e: React.PointerEvent) => {
+    if (press.current) clearTimeout(press.current.t);
+    const p = { x: e.clientX, y: e.clientY, fired: false, t: setTimeout(() => { p.fired = true; toggle(); try { navigator.vibrate?.(35); } catch { /* sin vibración */ } }, 480) };
+    press.current = p;
+  };
+  const cancel = () => { if (press.current && !press.current.fired) clearTimeout(press.current.t); };
+  const onMove = (e: React.PointerEvent) => { const p = press.current; if (p && !p.fired && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) { clearTimeout(p.t); press.current = null; } };
+  const onClick = () => {
+    const p = press.current; press.current = null;
+    if (p?.fired) return;
+    if (selecting) toggle(); else openDetail(r);
+  };
   return (
-    <article className={`product-card flex flex-col ${stateCls}`} data-id={r.id} onClick={() => openDetail(r)}>
+    <article className={`product-card flex flex-col ${stateCls} ${selected ? 'ring-4 ring-[#7c43ba] ring-offset-2' : ''}`} data-id={r.id} aria-pressed={selecting ? selected : undefined}
+      onPointerDown={onDown} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel} onPointerMove={onMove}
+      onClick={onClick} onContextMenu={e => e.preventDefault()} style={{ WebkitTouchCallout: 'none' }}>
       <div className="relative">
         <img className={`product-image ${photoBg ? 'solid-bg' : ''}`} style={photoBg ? { background: photoBg } : undefined} src={cardImage(r)} alt={r.name} loading="lazy" onError={e => { e.currentTarget.src = fallback; }} />
         <span className={`card-stock absolute top-2 right-2 text-[10px] rounded-full px-2 py-0.5 font-bold shadow-sm ${stock < 1 ? 'bg-[#a43658] text-white' : stock <= 3 ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-white/95 text-[#5f3291]'}`}>
           {stock < 1 ? 'Agotado' : `${r.stock} u.`}
         </span>
+        {selecting && <span className={`card-check absolute bottom-2 left-2 w-7 h-7 rounded-full grid place-items-center shadow ${selected ? 'bg-[#7c43ba] text-white' : 'bg-white/90 border-2 border-[#cbbdd6]'}`}>{selected && <Check className="w-4 h-4" />}</span>}
         {showCatalog && savePct >= 1 && <span className="absolute top-2 left-2 text-[10px] rounded-full px-2 py-0.5 font-bold bg-[#be416d] text-white shadow-sm">-{savePct}%</span>}
       </div>
       <div className="p-3 sm:p-4 flex flex-col flex-1">
@@ -40,15 +62,7 @@ export default function ProductCard({ r }: { r: Product }) {
         <div className="mt-auto pt-3">
           {showCatalog && <p className="text-[11px] text-[#9b8fa5]">Catálogo <span className="line-through">{formatUSD(catalog)}</span></p>}
           <p className="card-price text-lg font-bold text-[#6d389f] hero-title leading-tight">{formatUSD(sale)}</p>
-          <p className="sensitive-data text-[11px] text-[#756c7e] mt-0.5">Costo <b className="text-[#201728]">{formatUSD(r.cost_price)}</b> · <span className="text-[#166534] font-bold">+{formatUSD(sale - Number(r.cost_price || 0))}</span></p>
-          <div className="grid grid-cols-[1fr_auto] gap-2 mt-2.5">
-            <button type="button" className="h-9 rounded-xl btn-ghost text-xs font-bold flex items-center justify-center gap-1" onClick={e => { e.stopPropagation(); openDetail(r); }}>
-              <Eye className="w-3.5 h-3.5" /> Ver
-            </button>
-            <button type="button" className="quick-cart h-9 px-3 rounded-xl btn-primary text-xs font-bold flex items-center justify-center gap-1" aria-label="Añadir al pedido" onClick={e => { e.stopPropagation(); addCart(r); }}>
-              <Plus className="w-4 h-4" /> Pedido
-            </button>
-          </div>
+          {Number(r.min_price) > 0 && <p className="card-min sensitive-data text-[11px] text-[#756c7e] mt-0.5">Mínimo <b className="text-[#a43658]">{formatUSD(r.min_price)}</b></p>}
         </div>
       </div>
     </article>

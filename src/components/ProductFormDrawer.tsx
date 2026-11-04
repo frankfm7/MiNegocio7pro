@@ -10,6 +10,10 @@ import { autoFrameProduct, compressImage } from '../lib/image';
 import { captureFromCamera } from '../lib/camera';
 import { editProductImage } from './ImageEditor';
 import { guessCommonName } from '../lib/commonName';
+import NumField from './NumField';
+import PriceFields from './PriceFields';
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
 import { CONTENT_UNITS, fallback } from '../lib/constants';
 import type { Product } from '../types';
 
@@ -75,6 +79,11 @@ export default function ProductFormDrawer() {
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
   const profit = (Number(f.sale_price) || 0) - (Number(f.cost_price) || 0);
+  const [usdCost, setUsdCost] = useState<number | null>(null);
+  const [rate, setRate] = useState<number | null>(() => Number(localStorage.getItem('mn7_invoice_rate')) || 6.96);
+  useEffect(() => { if (open) setUsdCost(null); }, [open]);
+  // Costo en dólares × tipo de cambio = costo de factura
+  useEffect(() => { if (usdCost != null && rate) setF(prev => ({ ...prev, cost_price: String(r2(usdCost * rate)) })); }, [usdCost, rate]);
 
   const applyImage = async (file: Blob, msg: string, frame = autoFrame) => {
     try {
@@ -100,10 +109,12 @@ export default function ProductFormDrawer() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!f.catalog_id) { toast('Selecciona un catálogo'); return; }
+    if (f.sale_price === '' || f.cost_price === '') { toast('Escribe el costo de factura y el precio de venta'); return; }
+    if (f.min_price !== '' && Number(f.sale_price) < Number(f.min_price) && !confirm('El precio de venta está por debajo del costo mínimo de venta. ¿Guardar igual?')) return;
     setSaving(true);
     const data = {
       type: f.type, name: f.name.trim(), category: f.category.trim(), brand: f.brand.trim(), barcode: f.barcode.trim(),
-      catalog_id: f.catalog_id, cost_price: Number(f.cost_price), sale_price: Number(f.sale_price), min_price: Number(f.min_price),
+      catalog_id: f.catalog_id, cost_price: Number(f.cost_price), sale_price: Number(f.sale_price), min_price: Number(f.min_price) || 0,
       stock: Number(f.stock), sold: editing ? editing.sold : false, image_url: pendingImage !== null ? pendingImage : (editing ? editing.image_url : ''),
       description: f.description.trim(), offer_text: f.offer_text.trim(),
       content_value: f.content_value.trim(), content_unit: f.content_value.trim() ? f.content_unit : '',
@@ -169,16 +180,34 @@ export default function ProductFormDrawer() {
             </div>
             <div><label className="block font-bold text-sm mb-1.5">Descripción</label><textarea value={f.description} onChange={set('description')} maxLength={300} rows={3} className="w-full input-field rounded-xl p-3" /></div>
             <div className="p-4 rounded-2xl bg-gradient-to-br from-[#f6f1f8] to-[#faf7fb] border border-[#ede7f0]">
-              <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397] mb-3">Precios ({currency()})</p>
-              <div className="mb-2">
-                <label className="block font-bold text-xs mb-1.5">Precio de catálogo (opcional)</label>
-                <input value={f.catalog_price} onChange={set('catalog_price')} min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" placeholder="El precio que figura en el catálogo de la marca" />
+              <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397] mb-3">Costos y precios ({currency()})</p>
+              {currency() !== 'USD' && (
+                <div id="usd-cost" className="mb-3 p-2.5 rounded-xl bg-white/70 border border-[#ede7f0]">
+                  <p className="font-bold text-xs mb-1.5">Costo en dólares (opcional) · tipo de cambio</p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span>$</span>
+                    <NumField value={usdCost} onValue={n => setUsdCost(n)} label="Costo en dólares" className="w-20 input-field rounded-lg px-2 py-1.5 text-sm" />
+                    <span>× 1 USD =</span>
+                    <NumField value={rate} onValue={n => { setRate(n); if (n) { try { localStorage.setItem('mn7_invoice_rate', String(n)); } catch { /* sin espacio */ } } }} label="Tipo de cambio del dólar" className="w-20 input-field rounded-lg px-2 py-1.5 text-sm" />
+                    <span>{currency()}</span>
+                  </div>
+                  <p className="text-[10px] text-[#756c7e] mt-1">Si la factura viene en dólares, escribe el costo en $ y se convierte al costo de factura.</p>
+                </div>
+              )}
+              <PriceFields
+                value={{ cost: f.cost_price === '' ? null : Number(f.cost_price), min: f.min_price === '' ? null : Number(f.min_price), sale: f.sale_price === '' ? null : Number(f.sale_price) }}
+                onChange={pt => setF(prev => ({
+                  ...prev,
+                  ...(pt.cost !== undefined ? { cost_price: pt.cost == null ? '' : String(pt.cost) } : {}),
+                  ...(pt.min !== undefined ? { min_price: pt.min == null ? '' : String(pt.min) } : {}),
+                  ...(pt.sale !== undefined ? { sale_price: pt.sale == null ? '' : String(pt.sale) } : {}),
+                }))}
+                currency={currency()}
+              />
+              <div className="mt-3">
+                <label className="block font-bold text-xs mb-1.5">Precio de revista de la empresa (opcional)</label>
+                <input value={f.catalog_price} onChange={set('catalog_price')} min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" placeholder="El precio que figura en la revista de la marca" />
                 <p className="text-[11px] text-[#756c7e] mt-1">Se muestra tachado junto a tu precio para que el cliente vea cuánto ahorra.</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className="block font-bold text-xs mb-1.5">Precio venta máx. *</label><input value={f.sale_price} onChange={set('sale_price')} required min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" /></div>
-                <div><label className="block font-bold text-xs mb-1.5">Precio venta mín. *</label><input value={f.min_price} onChange={set('min_price')} required min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" /></div>
-                <div><label className="block font-bold text-xs mb-1.5">Costo *</label><input value={f.cost_price} onChange={set('cost_price')} required min={0} step="0.01" className="w-full input-field rounded-xl p-2" type="number" /></div>
               </div>
               <div className="mt-3 p-2 rounded-lg bg-white/60 text-center"><span className="text-xs text-[#756c7e]">Ganancia por unidad: </span><span className={`font-bold ${profit >= 0 ? 'text-[#166534]' : 'text-[#a43658]'}`}>{formatUSD(profit)}</span></div>
             </div>

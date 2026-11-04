@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, ChevronDown, Cloud, Contact, EyeOff, FileUp, FolderPlus, Globe, Image as ImageIcon, MessageCircle, QrCode, Receipt, Rocket, ShieldCheck, ShoppingCart, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, ChevronDown, FileText, Cloud, Contact, EyeOff, FileUp, FolderPlus, Globe, Image as ImageIcon, MessageCircle, QrCode, Receipt, Rocket, ShieldCheck, ShoppingCart, TrendingUp, Users } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { CURRENCIES, CURRENCY_KEY, currency } from '../../lib/format';
 import { closeModal, getState, localUser, setState, toast, useStore } from '../../store';
@@ -102,7 +102,9 @@ const GUIDE: Section[] = [
   { icon: FolderPlus, title: 'Catálogos y productos', steps: [
     'Crea un catálogo con **Añadir catálogo** en la pantalla principal (ej. "Perfumes", "Maquillaje"). Toca la ⭐ para dejarlo como favorito.',
     'Dentro del catálogo toca **Añadir** para crear un producto: nombre, marca, tipo, contenido (ml, g, L...), stock y precios.',
-    'Precios: **Costo** (lo que pagaste), **Precio de venta**, **Precio mínimo** (hasta cuánto puedes rebajar) y **Precio de catálogo** (opcional: se muestra tachado para que el cliente vea que le das mejor precio).',
+    'Costos y precios: **Costo de factura** (lo que te venden), **Costo mínimo de venta** (escribe el valor o un % sobre la factura: 10 + 5% = 10.50) y **Precio de venta máx.** (valor o % sobre el mínimo o la factura; es el que se ve en el catálogo). Si el precio de venta queda debajo del mínimo, la app avisa en rojo.',
+    'Si la factura viene en dólares, escribe el **costo en $** y el **tipo de cambio**: se convierte solo al costo de factura. El **precio de revista de la empresa** (opcional) se muestra tachado para que el cliente vea cuánto ahorra.',
+    'En el catálogo cada tarjeta muestra el **precio de venta** y el **mínimo**; al abrir el producto ves el desglose: costo de adquisición, costo mínimo, precio de catálogo y ganancia estimada. Toca fuera o en la zona de detalles para cerrarlo.',
     '**Código de la empresa** (opcional): el código de Ésika, L\'Bel, Cyzone, Yanbal... Sirve para reconocer el producto al importar facturas y sumarle el stock.',
     '**Nombre común** (ej. "Protector solar" para "Total Block", "Perfume de mujer" para "Ccori Rose"): se ve debajo del nombre y sirve para buscar. Si lo dejas vacío, la app lo sugiere sola según el nombre.',
     'Para editar: abre el producto → **Editar**. Para borrar, duplicar o ver el historial de precios usa el botón ⋮ del detalle.',
@@ -134,7 +136,7 @@ const GUIDE: Section[] = [
     'Si el cliente lo pide, en el recibo abre **Datos que pide el cliente** y escribe **N° de factura, código de autorización, N° de pedido o NIT/CI del cliente**: salen en la imagen y en el WhatsApp.',
     'Sin internet el recibo sale con un número **provisional**; al volver la conexión se le asigna el número definitivo en orden.',
     'Desde Ventas o Informes (mantener presionada → **Recibo**): si las ventas elegidas son de un mismo recibo se abre ese recibo (**copia**, mismo número); si no tienen recibo se emite uno nuevo. **Una venta nunca sale en dos recibos**: si eliges ventas de recibos distintos la app te avisa.',
-    '**Enviar recibo por WhatsApp (imagen)**: se abre el menú para compartir del celular; elige WhatsApp y el contacto. También puedes enviarlo como texto a un número.',
+    '**Enviar por WhatsApp**: escribe el número del cliente en el recibo y toca *Enviar por WhatsApp*: se abre su chat con el detalle de la venta ya escrito (si no tiene código de país se usa el de tu país). También puedes *Compartir imagen + texto*, elegir el contacto o copiar el texto.',
     '**Cierres de caja** (y su tabla/imagen) se numeran **ANA-C-000001** al enviarlos, copiarlos o generar la imagen; un mismo día conserva siempre su número. Los **informes** de Excel/CSV se numeran **ANA-I-000001**.',
     'Menú ☰ → **Recibos y cierres**: lista de todos los recibos, cierres e informes emitidos (de todo el equipo), con buscador. Puedes **verlos**, **reenviarlos** como imagen o volver a **descargar** un informe.',
   ] },
@@ -142,8 +144,14 @@ const GUIDE: Section[] = [
     'Toca **Vender** en la barra de abajo: se abre la venta en curso. **Escanear** lee códigos de barras o QR, **Buscar** agrega a mano y **Catálogo** te lleva a elegir productos.',
     'Si cierras la ventana (✕ o tocando afuera) la venta NO se pierde: queda el botón **Finalizar venta**. **Descartar** la borra.',
   ] },
+  { icon: FileText, title: 'Nota de venta (varios productos con descuento)', steps: [
+    'En el catálogo **mantén presionado** un producto: queda marcado y aparece la barra **Nota de venta**. Toca otros productos para agregarlos o quitarlos.',
+    'En la nota ajusta las **cantidades** y aplica descuentos **por producto** (% o monto) o **globales** (a todos). Los totales (subtotal, descuento, total final) se ven al instante.',
+    '**Regla de oro**: ningún descuento puede dejar un producto por debajo de su **costo mínimo de venta**. Si pides más, la app lo limita al mínimo y te avisa en rojo.',
+    '**Guardar borrador** deja la nota guardada para seguir después (Borradores guardados). **Procesar venta** registra la venta con esos precios, descuenta el stock y saca el recibo numerado con el descuento.',
+  ] },
   { icon: MessageCircle, title: 'Pedidos por WhatsApp (carrito)', steps: [
-    'En cada producto toca **+ Pedido** (o **+ Carrito** en el detalle) para armar un pedido.',
+    'En el detalle de un producto toca **+ Carrito** para armar un pedido.',
     'El ícono del carrito (arriba) muestra el pedido actual: cambia cantidades y toca **Enviar por WhatsApp**.',
     'Ideal para tomar pedidos de clientes y venderlos después.',
   ] },

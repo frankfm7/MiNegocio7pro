@@ -4,7 +4,7 @@ import { BookOpen, Camera, CheckCircle, Download, PlusCircle, Receipt as Receipt
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import {
-  addMoreToReceipt, addToQuickScan, sendReceiptImage, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, hideQuickScan, navigate, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
+  addMoreToReceipt, addToQuickScan, receiptText, sendReceiptImage, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, hideQuickScan, navigate, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
 } from '../../actions';
 import { cardImage, currency, formatContent, formatUSD } from '../../lib/format';
 import { searchByImage } from '../../lib/imageSearch';
@@ -310,6 +310,7 @@ export function SaleReceiptModal() {
   const storeCfg = useStore(s => s.receiptSettings);
   const isAdmin = useStore(s => s.isAdmin());
   const [waPhone, setWaPhone] = useState('');
+  const phoneRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setWaPhone(r?.customer?.phone || ''); }, [r]);
   return (
     <Modal id="sale-receipt-modal" className="z-[70] bg-[#1e1427]/60">
@@ -373,16 +374,16 @@ export function SaleReceiptModal() {
             <p className="text-[10px] text-[#756c7e] mt-2">Salen en la imagen y en el WhatsApp del recibo.</p>
           </details>
           <div className="mt-1 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
-            <p className="text-xs font-bold text-[#166534] mb-2">Enviar el recibo al cliente</p>
-            <button id="send-receipt-image" type="button" onClick={() => sendReceiptImage(waPhone)} className="w-full py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"><MessageCircle className="w-5 h-5" /> Enviar recibo por WhatsApp (imagen)</button>
-            <p className="text-[10px] text-[#756c7e] mt-1.5">Se abre el menú para compartir: elige WhatsApp y el contacto. La imagen lleva el logo, el número y los datos de la tienda.</p>
-            <details className="mt-2">
-              <summary className="text-[11px] font-bold text-[#166534] cursor-pointer">Enviar como texto a un número</summary>
-              <div className="flex gap-2 mt-2">
-                <input value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" className="flex-1 min-w-0 input-field rounded-lg p-2 text-sm" placeholder="WhatsApp del cliente" />
-                <button type="button" onClick={() => sendReceiptWhatsApp(waPhone)} className="px-3 rounded-lg bg-white border border-[#bbf7d0] text-[#166534] font-bold text-xs flex-shrink-0">Enviar texto</button>
-              </div>
-            </details>
+            <p className="text-xs font-bold text-[#166534] mb-2">Enviar el recibo al cliente por WhatsApp</p>
+            <label className="block text-[11px] font-bold text-[#4a3f55] mb-1" htmlFor="receipt-wa-phone">Número de WhatsApp del cliente</label>
+            <input id="receipt-wa-phone" ref={phoneRef} value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" className="w-full input-field rounded-lg p-2.5 text-base" placeholder="Ej: 70012345 o +591 70012345" />
+            <button id="send-receipt-wa" type="button" onClick={() => { if (!waPhone.replace(/\D/g, '')) { toast('Escribe el número de WhatsApp del cliente'); phoneRef.current?.focus(); return; } sendReceiptWhatsApp(waPhone); }} className="w-full mt-2 py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"><MessageCircle className="w-5 h-5" /> Enviar por WhatsApp</button>
+            <p className="text-[10px] text-[#756c7e] mt-1">Abre el chat de ese número con el detalle de la venta ya escrito. Si no tiene código de país se usa el de «Datos de la tienda».</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] font-bold">
+              <button id="send-receipt-image" type="button" onClick={() => sendReceiptImage(waPhone)} className="text-[#166534] underline">Compartir imagen + texto</button>
+              <button type="button" onClick={() => sendReceiptWhatsApp('')} className="text-[#756c7e] underline">Elegir el contacto en WhatsApp</button>
+              <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(receiptText(r)); toast('Texto del recibo copiado ✓'); } catch { toast('No se pudo copiar'); } }} className="text-[#756c7e] underline">Copiar texto</button>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
             <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Guardar imagen</button>
