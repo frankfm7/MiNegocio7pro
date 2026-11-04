@@ -4,14 +4,14 @@
 -- Pégalo en Supabase → SQL Editor → New query → Run. Solo LEE, no cambia nada.
 -- Debe mostrar "OK" en TODAS las filas. Si alguna dice "FALTA":
 --   * tablas / columnas / funciones / seguridad → vuelve a ejecutar
---     supabase/1-migracion-multi-tienda.sql, luego 5-mejoras.sql, 6-precio-catalogo.sql y 7-nombre-comun.sql
+--     supabase/1-migracion-multi-tienda.sql, luego 5-mejoras.sql, 6-precio-catalogo.sql, 7-nombre-comun.sql y 8-recibos-numerados.sql
 --     (se pueden repetir sin riesgo).
 -- =====================================================================
 select * from (
   -- Tablas
   select 1 as orden, 'Tabla ' || t as revision,
          case when to_regclass('public.' || t) is not null then 'OK' else 'FALTA' end as estado
-  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups']) t
+  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts']) t
 
   union all
   -- Columnas que usa la app
@@ -26,7 +26,8 @@ select * from (
     'store_members.last_seen','store_members.status','store_invites.max_uses',
     'store_members.avatar_url','products.min_stock','sales.customer_id','sales.customer_name',
     'stores.public_enabled','stores.public_slug','stores.public_whatsapp',
-    'products.catalog_price','products.sku','products.common_name'
+    'products.catalog_price','products.sku','products.common_name',
+    'stores.receipt_prefix','stores.receipt_seq','stores.receipt_info','sales.receipt_no'
   ]) c
 
   union all
@@ -34,7 +35,7 @@ select * from (
   select 3, 'Seguridad (RLS) en ' || t,
          case when coalesce((select rowsecurity from pg_tables where schemaname = 'public' and tablename = t), false)
               then 'OK' else 'FALTA' end
-  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups']) t
+  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts']) t
 
   union all
   -- Funciones que llama la app
@@ -45,7 +46,8 @@ select * from (
     'register_sale(jsonb)','touch_member(uuid)','update_my_member_name(uuid,text)',
     'my_store_role(uuid)','is_store_member(uuid)','is_store_manager(uuid)',
     'set_my_avatar(text)','set_public_shop(uuid,boolean,text,text)','get_public_shop(text)','get_public_images(text,text[])',
-    'backup_store(uuid,text)','restore_store_backup(uuid)','log_price_change()'
+    'backup_store(uuid,text)','restore_store_backup(uuid)','log_price_change()',
+    'issue_receipt(uuid,text[],numeric,text)','attach_receipt_sales(uuid,text,text[],numeric)','set_receipt_settings(uuid,text,bigint,jsonb)'
   ]) f
 
   union all

@@ -33,11 +33,14 @@ Ejecútalos **en este orden** (cada uno en una consulta nueva: *New query → pe
 3. `supabase/6-precio-catalogo.sql` → **nuevo en la v1.0**: precio de catálogo (se muestra tachado junto a tu precio)
    y código de la empresa (para reconocer productos al importar facturas y sumarles el stock).
 4. `supabase/7-nombre-comun.sql` → **nuevo en la v1.4**: nombre común del producto (ej. "Protector solar"), que se ve bajo el nombre y ayuda a buscar.
-5. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
+5. `supabase/8-recibos-numerados.sql` → **nuevo en la v1.6**: recibos de venta numerados en orden por tienda
+   (nunca se repiten aunque vendan varios a la vez), código de la tienda y datos del recibo (teléfono, dirección, NIT).
+6. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
    (cambia `TU_CORREO@ejemplo.com` por el correo con el que creaste tu tienda).
-6. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 60 revisiones).
-   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6 y el 7.
+7. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 69 revisiones).
+   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6, el 7 y el 8.
 
+> Si NO ejecutas el 8, los recibos de la tienda salen con número provisional y la app te avisa.
 > Si NO ejecutas el 7, el nombre común solo queda en el dispositivo (en la nube se muestra el sugerido).
 > Si NO ejecutas el 6, el precio de catálogo y el código de empresa solo quedan en el dispositivo (no se suben a la nube).
 > Si NO ejecutas el 5, la app sigue funcionando como antes, pero clientes/fiados solo quedan en el dispositivo,

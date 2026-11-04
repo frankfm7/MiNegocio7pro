@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.5
+# MiNegocio7pro · v1.6
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -15,7 +15,7 @@ Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin inter
    (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
    vienes de la app anterior con datos; en un proyecto nuevo se omite.
    Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`,
-   luego `supabase/7-nombre-comun.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
+   luego `supabase/7-nombre-comun.sql`, `supabase/8-recibos-numerados.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
 4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
    (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
    (agrega además `http://localhost:5173` para probar en tu computadora).
@@ -74,7 +74,20 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.5
+## 4a. Novedades v1.6 · Recibos numerados
+
+- **Número correlativo en cada recibo** con el código de la tienda (ej. `ANA-000123`). En una tienda lo da la base de
+  datos en un solo paso: aunque vendan varios del equipo a la vez, **nunca se repite ni se salta**. Queda registro de
+  cada recibo (`store_receipts`) y cada venta guarda su número. "Agregar más productos" mantiene el mismo número.
+- **Datos del negocio → Recibo de venta**: nombre en el recibo, código de la tienda, empezar desde N° (solo adelantar),
+  teléfono, celular, dirección y NIT, con opción de mostrar u ocultar cada uno. En la tienda lo cambian solo los administradores.
+- **Diseño del recibo**: logo de la app, datos de la tienda, número grande y el nombre del negocio repetido en diagonal
+  como marca de agua semitransparente.
+- **Datos que pide el cliente** (opcional, en el recibo): N° de factura, código de autorización, N° de pedido, NIT/CI del cliente.
+- Sin internet el recibo sale con número provisional y recibe el definitivo al sincronizar.
+- Requiere ejecutar `supabase/8-recibos-numerados.sql` (y luego `4-verificar.sql`: 69 revisiones OK).
+
+## 4a·0. Novedades v1.5
 
 - **Venta en curso (varios productos, un solo recibo)**: en *Registrar venta* el botón **Agregar a la venta** guarda el
   producto y vuelve al catálogo. Aparece el botón flotante verde **Finalizar venta** (con el total) hasta que se finalice o

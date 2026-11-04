@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import type {
   AuthUser, CartLine, Catalog, ContactInfo, Customer, CustomerMovement, DraftProduct, PendingChange, PriceChange, Product,
-  QuickScanItem, ReceiptData, Sale, StoreMembership, TeamPerson, User, View,
-} from './types';
+  QuickScanItem, ReceiptData, Sale, StoreMembership, TeamPerson, User, View, ReceiptSettings } from './types';
 import { CONTACT_KEY, WELCOME_KEY } from './lib/constants';
 import { readJSON } from './lib/format';
 
@@ -93,6 +92,8 @@ interface State {
   receiptData: ReceiptData | null;
   /** Recibo ya cobrado al que se le están agregando más productos ("Agregar más productos") */
   receiptCarry: ReceiptData | null;
+  /** Código y datos de la tienda para los recibos */
+  receiptSettings: ReceiptSettings;
   previewImage: { dataUrl: string; filename: string } | null;
   barcodeScanTarget: 'form' | 'quick-scan' | null;
   scannedBarcodeForForm: string | null;
@@ -205,6 +206,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   quickScanDiscount: 0,
   receiptData: null,
   receiptCarry: null,
+  receiptSettings: readJSON<ReceiptSettings>('mn7_receipt_cfg_local', { prefix: '' }),
   previewImage: null,
   barcodeScanTarget: null,
   scannedBarcodeForForm: null,

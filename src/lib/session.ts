@@ -1,6 +1,7 @@
 import type { AuthUser, Role, StoreInvite, StoreMember, StoreMembership } from '../types';
 import { supabaseClient } from './supabase';
 import { getState, localUser, openModal, runAfterAccount, setState, toast } from '../store';
+import { loadReceiptSettings } from './receipts';
 import { DB, startAutoSync, startHeartbeat, stopAutoSync, stopHeartbeat, uploadLocalToStore } from './db';
 import { SoundEffects } from './sound';
 import { startAutoBackup, stopAutoBackup } from './cloudBackup';
@@ -66,6 +67,7 @@ async function activate(mode: 'local' | 'cloud', m: StoreMembership | null) {
   });
   localStorage.setItem(ACTIVE_KEY, JSON.stringify({ mode, storeId: m?.store_id || null }));
   await DB.init();
+  void loadReceiptSettings();
   if (mode === 'cloud') { startAutoSync(); startHeartbeat(); startAutoBackup(); void syncMyAvatar().then(loadTeam); }
 }
 

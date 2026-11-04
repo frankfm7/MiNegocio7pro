@@ -325,6 +325,13 @@ export function SaleReceiptModal() {
               <p className="text-sm text-gray-600 mt-1">La venta ha sido registrada correctamente</p>
             </div>
           )}
+          {r.number && (
+            <div id="receipt-number" className="text-center mb-3">
+              <p className="text-[11px] uppercase tracking-[.2em] font-bold text-[#7c43ba]">Recibo de venta</p>
+              <p className="text-2xl font-black tracking-wide text-[#201728]">N° {r.number}</p>
+              {r.provisional && <p className="text-[11px] text-[#d97706] font-bold">Número provisional: se asigna el definitivo al conectarse</p>}
+            </div>
+          )}
           <div className="bg-gray-50 rounded-xl p-4 mb-4">
             <div className="flex justify-between items-center mb-2"><span className="text-sm text-gray-600">Fecha:</span><span className="text-sm font-bold">{r.date}</span></div>
             <div className="flex justify-between items-center mb-2"><span className="text-sm text-gray-600">Vendedor:</span><span className="text-sm font-bold">{r.seller}</span></div>
@@ -347,7 +354,18 @@ export function SaleReceiptModal() {
             <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Descuento:</span><span className="font-bold text-orange-600">{r.discount > 0 ? `-${formatUSD(r.discount)}` : 'Sin descuento'}</span></div>
             <div className="flex justify-between text-xl mt-2 pt-2 border-t border-gray-200"><span className="font-bold">TOTAL:</span><span className="font-bold text-green-700">{formatUSD(r.total)}</span></div>
           </div>
-          <div className="mt-4 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
+          <details className="mb-3 rounded-xl border border-[#ede7f0] p-3 group" open={!!(r.extra && Object.values(r.extra).some(Boolean))}>
+            <summary className="text-xs font-bold text-[#7c43ba] cursor-pointer select-none">+ Datos que pide el cliente (opcional): factura, autorización, pedido, NIT</summary>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              {([['invoice', 'N° de factura'], ['auth', 'Cód. de autorización'], ['order', 'N° de pedido'], ['customerNit', 'NIT / CI del cliente']] as const).map(([k, label]) => (
+                <label key={k} className="text-[10px] font-bold text-[#756c7e]">{label}
+                  <input value={r.extra?.[k] || ''} onChange={e => setState({ receiptData: { ...r, extra: { ...(r.extra || {}), [k]: e.target.value } } })} className="w-full input-field rounded-lg px-2 py-1.5 text-sm text-[#201728] font-normal" />
+                </label>
+              ))}
+            </div>
+            <p className="text-[10px] text-[#756c7e] mt-2">Salen en la imagen y en el WhatsApp del recibo.</p>
+          </details>
+          <div className="mt-1 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
             <p className="text-xs font-bold text-[#166534] mb-2">Enviar ticket al cliente</p>
             <div className="flex gap-2">
               <input value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" className="flex-1 min-w-0 input-field rounded-lg p-2 text-sm" placeholder="WhatsApp del cliente" />

@@ -3,6 +3,8 @@ import { supabaseClient } from './supabase';
 import { getState, setState, toast } from '../store';
 import { SoundEffects } from './sound';
 import { newId } from './format';
+import { suggestedPrefix } from './receipts';
+import { businessName } from './whatsapp';
 import { dataKey, idbGet, idbSet, pendingKey } from './storage';
 
 // ==========================================
@@ -119,6 +121,78 @@ async function deleteSalesRemote(ids: string[], restock: Product[], sid: string)
   return r;
 }
 
+// ---------- Recibos numerados ----------
+const RECEIPT_MAP_KEY = 'mn7_receipt_map';
+const LOCAL_SEQ_KEY = 'mn7_receipt_seq_local';
+/** Números provisionales (sin conexión) → número definitivo */
+function receiptMap(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(RECEIPT_MAP_KEY) || '{}'); } catch { return {}; }
+}
+/** Cambia un número provisional por el definitivo en las ventas y en el recibo abierto */
+function replaceReceiptNo(temp: string, code: string) {
+  const map = receiptMap(); map[temp] = code;
+  try { localStorage.setItem(RECEIPT_MAP_KEY, JSON.stringify(map)); } catch { /* sin espacio */ }
+  const s = getState();
+  setState({ sales: s.sales.map(x => (x.receipt_no === temp ? { ...x, receipt_no: code } : x)) });
+  if (s.receiptData?.number === temp) setState({ receiptData: { ...s.receiptData, number: code, provisional: false } });
+  if (s.receiptCarry?.number === temp) setState({ receiptCarry: { ...s.receiptCarry, number: code, provisional: false } });
+  saveLocal();
+  toast(`🧾 Recibo numerado: ${code}`);
+}
+function setSalesReceipt(ids: string[], code: string) {
+  setState({ sales: getState().sales.map(x => (ids.includes(x.id) ? { ...x, receipt_no: code } : x)) });
+  saveLocal();
+}
+export const formatReceiptNo = (prefix: string, seq: number) => `${(prefix || 'R').toUpperCase()}-${String(seq).padStart(6, '0')}`;
+
+/**
+ * Número correlativo para un recibo nuevo.
+ *  - Tienda en la nube: lo da la base de datos (nunca se repite aunque vendan varios a la vez).
+ *  - Sin conexión: número provisional; el definitivo se pide al sincronizar.
+ *  - Sin cuenta: contador de este dispositivo.
+ */
+export async function issueReceipt(saleIds: string[], total: number): Promise<{ number: string; provisional: boolean }> {
+  const s = getState();
+  const name = s.currentUser?.name || '';
+  if (s.mode !== 'cloud') {
+    const seq = (Number(localStorage.getItem(LOCAL_SEQ_KEY)) || 0) + 1;
+    localStorage.setItem(LOCAL_SEQ_KEY, String(seq));
+    const number = formatReceiptNo(s.receiptSettings.prefix || suggestedPrefix(businessName()), seq);
+    setState({ receiptSettings: { ...s.receiptSettings, next: seq + 1 } });
+    setSalesReceipt(saleIds, number);
+    return { number, provisional: false };
+  }
+  const sid = storeId();
+  if (sid && canUseCloud()) {
+    const { data, error } = await supabaseClient!.rpc('issue_receipt', { p_store: sid, p_sale_ids: saleIds, p_total: total, p_name: name });
+    if (!error && data) {
+      const number = (data as { code: string }).code;
+      setSalesReceipt(saleIds, number);
+      return { number, provisional: false };
+    }
+    console.error('issue_receipt', error);
+    if (/issue_receipt|schema cache|does not exist/i.test(error?.message || '')) toast('⚠️ Para numerar recibos ejecuta supabase/8-recibos-numerados.sql', 6000);
+  }
+  const temp = 'PROV-' + Date.now().toString(36).toUpperCase();
+  addToPendingChanges('issueReceipt', { temp, saleIds, total, name });
+  setSalesReceipt(saleIds, temp);
+  return { number: temp, provisional: true };
+}
+
+/** Agrega ventas a un recibo ya emitido (mismo número) */
+export async function attachReceipt(code: string, saleIds: string[], addTotal: number) {
+  setSalesReceipt(saleIds, code);
+  if (getState().mode !== 'cloud') return;
+  const real = receiptMap()[code] || code;
+  const sid = storeId();
+  if (sid && canUseCloud() && !real.startsWith('PROV-')) {
+    const { error } = await supabaseClient!.rpc('attach_receipt_sales', { p_store: sid, p_code: real, p_sale_ids: saleIds, p_add_total: addTotal });
+    if (!error) return;
+    console.error('attach_receipt_sales', error);
+  }
+  addToPendingChanges('attachReceipt', { code, saleIds, total: addTotal });
+}
+
 /** Ejecuta una operación en la nube; si falla, la deja pendiente para sincronizar luego */
 async function remote(action: PendingAction, data: unknown, run: (sid: string) => PromiseLike<{ error: unknown }>) {
   if (getState().mode !== 'cloud') return;
@@ -147,6 +221,16 @@ async function runPending(change: PendingChange, sid: string) {
     }
     case 'addSale': return registerSaleRemote(change.data, sid);
     case 'deleteSales': return deleteSalesRemote(change.data.ids, change.data.restock || [], sid);
+    case 'issueReceipt': {
+      const r = await c.rpc('issue_receipt', { p_store: sid, p_sale_ids: change.data.saleIds, p_total: change.data.total, p_name: change.data.name });
+      if (!r.error && r.data) replaceReceiptNo(change.data.temp, (r.data as { code: string }).code);
+      return r;
+    }
+    case 'attachReceipt': {
+      const code = receiptMap()[change.data.code] || change.data.code;
+      if (code.startsWith('PROV-')) return { error: { message: 'Recibo provisional aún sin número' } };
+      return c.rpc('attach_receipt_sales', { p_store: sid, p_code: code, p_sale_ids: change.data.saleIds, p_add_total: change.data.total });
+    }
     case 'createQR': return c.from('qrs').upsert([{ ...change.data, store_id: sid }]);
     case 'updateQR': return c.from('qrs').update(change.data.updates).eq('id', change.data.id);
     case 'deleteQR': return c.from('qrs').delete().eq('id', change.data);
@@ -185,6 +269,12 @@ export async function syncPendingChanges() {
           continue;
         }
       }
+      // Falta el SQL 8 (recibos numerados): no se reintenta para siempre
+      if ((change.action === 'issueReceipt' || change.action === 'attachReceipt') && /issue_receipt|attach_receipt|schema cache|does not exist|PGRST202/i.test(`${err.code || ''} ${err.message || ''}`)) {
+        console.warn('Falta ejecutar supabase/8-recibos-numerados.sql');
+        dropped++;
+        continue;
+      }
       console.error('Error sincronizando cambio:', change.action, e);
       remaining.push(change);
     }
@@ -193,7 +283,7 @@ export async function syncPendingChanges() {
   const added = getState().pendingChanges.filter(c => !snapshot.some(o => o.id === c.id));
   await savePending([...remaining, ...added]);
   if (ok > 0) toast(`✅ ${ok} cambios sincronizados`);
-  if (dropped > 0) toast('⚠️ Clientes y fiados solo se guardaron en este dispositivo: falta ejecutar supabase/5-mejoras.sql', 6000);
+  if (dropped > 0) toast('⚠️ Algunos datos solo quedaron en este dispositivo: falta ejecutar un archivo SQL (5-mejoras.sql u 8-recibos-numerados.sql)', 6000);
   if (remaining.length > 0) toast(`⚠️ ${remaining.length} cambios pendientes de sincronizar`);
   setState({ isSyncing: false });
 }

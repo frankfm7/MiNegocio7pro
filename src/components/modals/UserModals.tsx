@@ -6,6 +6,9 @@ import { closeModal, getState, localUser, setState, toast, useStore } from '../.
 import { changePassword, roleLabel, updateMyName } from '../../lib/session';
 import Avatar from '../Avatar';
 import { CONTACT_KEY } from '../../lib/constants';
+import { loadReceiptSettings, saveReceiptSettings, suggestedPrefix } from '../../lib/receipts';
+import { businessName } from '../../lib/whatsapp';
+import type { ReceiptSettings } from '../../types';
 
 export function ChangePasswordModal() {
   const [current, setCurrent] = useState('');
@@ -124,6 +127,14 @@ const GUIDE: Section[] = [
     'Desde el recibo lo envías por **WhatsApp** o lo guardas/compartes como **imagen**. **Cerrar (terminar venta)** termina la atención.',
     'Si es **Fiado**, elige o crea el cliente: la deuda queda en *Clientes y fiados*.',
   ] },
+  { icon: Receipt, title: 'Recibos numerados y datos de la tienda', steps: [
+    'Cada recibo lleva un **número correlativo** con el código de tu tienda, por ejemplo **PA7-000123**. Lo asigna la base de datos de la tienda: aunque varios vendedores vendan al mismo tiempo, **nunca se repite ni se salta**.',
+    'Configúralo en menú ☰ → **Datos del negocio → Recibo de venta**: nombre en el recibo, **código de la tienda**, desde qué número empezar (solo se puede adelantar), **teléfono, celular, dirección y NIT**, y si cada dato se muestra o no. En una tienda lo cambian solo los administradores y vale para todo el equipo.',
+    'El recibo (imagen) lleva el **logo**, los datos de la tienda, el número, la fecha y el nombre del negocio repetido en diagonal como **marca de agua**.',
+    'Si el cliente lo pide, en el recibo abre **Datos que pide el cliente** y escribe **N° de factura, código de autorización, N° de pedido o NIT/CI del cliente**: salen en la imagen y en el WhatsApp.',
+    'Sin internet el recibo sale con un número **provisional**; al volver la conexión se le asigna el número definitivo en orden.',
+    'Al reimprimir ventas desde Ventas o Informes (mantener presionada → Recibo) se muestra el número que tuvieron.',
+  ] },
   { icon: ShoppingCart, title: 'Venta rápida con escáner (Vender)', steps: [
     'Toca **Vender** en la barra de abajo: se abre la venta en curso. **Escanear** lee códigos de barras o QR, **Buscar** agrega a mano y **Catálogo** te lleva a elegir productos.',
     'Si cierras la ventana (✕ o tocando afuera) la venta NO se pierde: queda el botón **Finalizar venta**. **Descartar** la borra.',
@@ -232,13 +243,28 @@ export function ContactsModal() {
   const open = useStore(s => !!s.modals['contacts-modal']);
   const [c, setC] = useState({ name: '', whatsapp: '', email: '', business: '', countryCode: '' });
   const [cur, setCur] = useState(currency());
+  const cfg = useStore(s => s.receiptSettings);
+  const cloud = useStore(s => s.mode === 'cloud');
+  const canEditReceipt = useStore(s => s.mode !== 'cloud' || s.isAdmin());
+  const [rc, setRc] = useState<ReceiptSettings>({ prefix: '' });
+  const [startAt, setStartAt] = useState('');
+  useEffect(() => {
+    if (open) { setRc({ showPhone: true, showMobile: true, showAddress: true, showNit: true, ...cfg }); setStartAt(''); void loadReceiptSettings(); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => { if (open) setRc(prev => ({ ...prev, prefix: prev.prefix || cfg.prefix, next: cfg.next })); }, [cfg, open]);
   useEffect(() => {
     if (open) { setCur(currency()); const info = getState().contactInfo; setC({ name: info?.name || '', whatsapp: info?.whatsapp || '', email: info?.email || '', business: info?.business || '', countryCode: info?.countryCode || '' }); }
   }, [open]);
   const set = (k: keyof typeof c) => (e: React.ChangeEvent<HTMLInputElement>) => setC(prev => ({ ...prev, [k]: e.target.value }));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (canEditReceipt) {
+      const n = parseInt(startAt, 10);
+      const ok = await saveReceiptSettings(rc, n > 0 ? n : undefined);
+      if (!ok) return;
+    }
     localStorage.setItem(CURRENCY_KEY, cur);
     setState({ appCurrency: cur });
     const info = { name: c.name.trim(), whatsapp: c.whatsapp.trim(), email: c.email.trim(), business: c.business.trim(), countryCode: c.countryCode.replace(/\D/g, '') };
@@ -250,7 +276,7 @@ export function ContactsModal() {
 
   return (
     <Modal id="contacts-modal">
-      <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6">
+      <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Datos del negocio</h2><CloseButton onClick={() => closeModal('contacts-modal')} /></div>
         <form className="space-y-4" onSubmit={submit}>
           <div><label className="block font-bold text-sm mb-1.5">Nombre completo</label><input value={c.name} onChange={set('name')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: María García" /></div>
@@ -265,6 +291,23 @@ export function ContactsModal() {
             </select>
             <p className="text-[11px] text-[#756c7e] mt-1">Solo cambia la moneda que se muestra; no convierte los precios ya guardados.</p>
           </div>
+          <fieldset id="receipt-settings" disabled={!canEditReceipt} className="p-3 rounded-2xl bg-[#f6f1f8] space-y-3 disabled:opacity-70">
+            <legend className="px-2 font-bold text-sm text-[#7c43ba]">🧾 Recibo de venta{cloud ? ' (para toda la tienda)' : ''}</legend>
+            {!canEditReceipt && <p className="text-[11px] text-[#756c7e]">Solo los administradores pueden cambiar estos datos.</p>}
+            <div><label className="block font-bold text-xs mb-1">Nombre en el recibo</label><input value={rc.name || ''} onChange={e => setRc({ ...rc, name: e.target.value })} className="w-full input-field rounded-xl p-2.5" placeholder={businessName()} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="block font-bold text-xs mb-1">Código de la tienda</label><input value={rc.prefix} onChange={e => setRc({ ...rc, prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) })} className="w-full input-field rounded-xl p-2.5 font-mono font-bold" placeholder={suggestedPrefix(businessName())} /></div>
+              <div><label className="block font-bold text-xs mb-1">Empezar desde N°</label><input value={startAt} onChange={e => setStartAt(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="w-full input-field rounded-xl p-2.5" placeholder={rc.next ? String(rc.next) : '1'} /></div>
+            </div>
+            <p className="text-[11px] text-[#756c7e]">Próximo recibo: <b className="font-mono text-[#201728]">{(rc.prefix || cfg.prefix || suggestedPrefix(businessName()))}-{String(Math.max(Number(startAt) || 0, rc.next || 1)).padStart(6, '0')}</b>. Los números siguen en orden y nunca se repiten{cloud ? ', aunque vendan varios del equipo a la vez' : ''}; solo se pueden adelantar, no retroceder.</p>
+            {([['phone', 'showPhone', 'Teléfono', 'tel'], ['mobile', 'showMobile', 'Celular', 'tel'], ['address', 'showAddress', 'Dirección', 'text'], ['nit', 'showNit', 'NIT', 'text']] as const).map(([k, show, label, type]) => (
+              <div key={k}>
+                <div className="flex justify-between items-center mb-1"><label className="font-bold text-xs">{label}</label>
+                  <label className="text-[11px] text-[#756c7e] flex items-center gap-1"><input type="checkbox" checked={rc[show] !== false} onChange={e => setRc({ ...rc, [show]: e.target.checked })} className="accent-[#7c43ba]" /> Mostrar en el recibo</label></div>
+                <input value={rc[k] || ''} onChange={e => setRc({ ...rc, [k]: e.target.value })} type={type} className="w-full input-field rounded-xl p-2.5" />
+              </div>
+            ))}
+          </fieldset>
           <button type="submit" className="w-full py-3 rounded-xl btn-primary font-bold">Guardar datos</button>
         </form>
       </article>

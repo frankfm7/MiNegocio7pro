@@ -58,6 +58,8 @@ export interface Sale {
   discount?: number;
   customer_id?: string | null;
   customer_name?: string | null;
+  /** Número del recibo en el que salió esta venta */
+  receipt_no?: string | null;
 }
 
 export interface Customer {
@@ -162,12 +164,41 @@ export interface ReceiptData {
   total: number;
   /** true cuando el recibo se genera después, desde el historial de ventas */
   reprint?: boolean;
+  /** Número correlativo del recibo (ej. "PA7F3-000123") */
+  number?: string;
+  /** El número es provisional (sin conexión): se asigna el definitivo al sincronizar */
+  provisional?: boolean;
+  /** Datos opcionales que pide el cliente */
+  extra?: ReceiptExtra;
+}
+
+export interface ReceiptExtra {
+  invoice?: string;     // N° de factura
+  auth?: string;        // Código de autorización
+  order?: string;       // N° de pedido
+  customerNit?: string; // NIT / CI del cliente
+}
+
+/** Datos de la tienda que salen en el recibo */
+export interface ReceiptSettings {
+  prefix: string;
+  /** Próximo número (solo informativo) */
+  next?: number;
+  name?: string;
+  phone?: string;
+  mobile?: string;
+  address?: string;
+  nit?: string;
+  showPhone?: boolean;
+  showMobile?: boolean;
+  showAddress?: boolean;
+  showNit?: boolean;
 }
 
 export type PendingAction =
   | 'createProduct' | 'updateProduct' | 'deleteProduct'
   | 'createCatalog' | 'updateCatalog' | 'deleteCatalog'
-  | 'addSale' | 'deleteSales' | 'createQR' | 'updateQR' | 'deleteQR'
+  | 'addSale' | 'deleteSales' | 'issueReceipt' | 'attachReceipt' | 'createQR' | 'updateQR' | 'deleteQR'
   | 'upsertCustomer' | 'deleteCustomer' | 'addMovement' | 'deleteMovement';
 
 export interface PendingChange {

@@ -1,7 +1,7 @@
 import type { Product, ReceiptData, Sale, View } from './types';
 import { closeModal, getState, openAccount, openModal, setState, toast, type ModalId } from './store';
 import { SoundEffects } from './lib/sound';
-import { DB, syncPendingChanges } from './lib/db';
+import { DB, attachReceipt, issueReceipt, syncPendingChanges } from './lib/db';
 import { formatContent, formatUSD } from './lib/format';
 import { decodeProductQR, publicFromParams } from './lib/qr';
 import { openStore } from './lib/session';
@@ -230,11 +230,13 @@ export async function confirmSale(qty: number, unitPrice: number) {
       customer_id: customer?.id ?? null, customer_name: customer?.name ?? null,
     });
     if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: unitPrice * qty, method: 'Fiado', sale_id: sale.id, note: `${qty}x ${r.name}` });
+    const rc = await issueReceipt([sale.id], unitPrice * qty);
     closeModal('sale-modal');
     closeModal('detail-modal');
     setState({
       saleCustomerId: '',
       receiptData: {
+        number: rc.number, provisional: rc.provisional,
         date: new Date().toLocaleString('es'), seller: currentUser ? currentUser.name : 'Desconocido', payment: method,
         customer: customer ? { name: customer.name, phone: customer.phone } : null,
         items: [{ product: r, quantity: qty, price: unitPrice }], subtotal: unitPrice * qty, discount: 0, total: unitPrice * qty,
@@ -429,6 +431,7 @@ export async function finalizeQuickScan() {
   } : newReceipt;
   try {
     let firstSaleId = '';
+    const saleIds: string[] = [];
     for (const item of quickScanItems) {
       const sale = await DB.addSale({
         product_id: item.product.id, product_name: item.product.name, brand: item.product.brand || '',
@@ -441,6 +444,15 @@ export async function finalizeQuickScan() {
         customer_id: customer?.id ?? null, customer_name: customer?.name ?? null,
       });
       if (!firstSaleId) firstSaleId = sale.id;
+      saleIds.push(sale.id);
+    }
+    // Número del recibo: el mismo del recibo anterior si se agregaron productos, o uno nuevo
+    if (receiptCarry?.number) {
+      await attachReceipt(receiptCarry.number, saleIds, total);
+      receipt.number = receiptCarry.number; receipt.provisional = receiptCarry.provisional;
+    } else {
+      const rc = await issueReceipt(saleIds, total);
+      receipt.number = rc.number; receipt.provisional = rc.provisional;
     }
     if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: total, method: 'Fiado', sale_id: firstSaleId, note: `${quickScanItems.length} producto(s)` });
     SoundEffects.play('success');
@@ -465,9 +477,33 @@ export function showImagePreview(dataUrl: string, filename: string) {
 const row = (label: string, value: string, color = '') =>
   `<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#666;">${label}</span><span style="font-weight:bold;${color ? `color:${color};` : ''}">${value}</span></div>`;
 
+/** Nombre y datos de la tienda que salen en el recibo (según "Datos del negocio") */
+export function receiptStore() {
+  const cfg = getState().receiptSettings;
+  const name = (cfg.name || '').trim() || businessName();
+  const lines: string[] = [];
+  if (cfg.showAddress !== false && cfg.address) lines.push(`📍 ${cfg.address}`);
+  const phones = [cfg.showPhone !== false && cfg.phone ? `Tel. ${cfg.phone}` : '', cfg.showMobile !== false && cfg.mobile ? `Cel. ${cfg.mobile}` : ''].filter(Boolean).join(' · ');
+  if (phones) lines.push(`📞 ${phones}`);
+  if (cfg.showNit !== false && cfg.nit) lines.push(`NIT ${cfg.nit}`);
+  return { name, lines };
+}
+
+/** Líneas opcionales que el cliente pidió (factura, autorización, pedido, NIT del cliente) */
+function extraLines(r: ReceiptData): [string, string][] {
+  const e = r.extra || {};
+  return ([
+    ['N° de factura', e.invoice], ['Cód. de autorización', e.auth], ['N° de pedido', e.order], ['NIT / CI del cliente', e.customerNit],
+  ] as [string, string | undefined][]).filter(([, v]) => v && v.trim()).map(([k, v]) => [k, v!.trim()]);
+}
+
 /** Recibo en texto (para WhatsApp) */
 export function receiptText(r: ReceiptData) {
-  const lines = [`🧾 *${businessName()}*`, `Fecha: ${r.date}`, ...(r.customer ? [`Cliente: ${r.customer.name}`] : []), ''];
+  const st = receiptStore();
+  const lines = [`🧾 *${st.name}*`, ...st.lines, '', `*RECIBO DE VENTA${r.number ? ` N° ${r.number}` : ''}*${r.provisional ? ' (provisional)' : ''}`, `Fecha: ${r.date}`];
+  if (r.customer) lines.push(`Cliente: ${r.customer.name}`);
+  extraLines(r).forEach(([k, v]) => lines.push(`${k}: ${v}`));
+  lines.push('');
   r.items.forEach(i => {
     const c = formatContent(i.product);
     lines.push(`• ${i.quantity} x ${i.product.name}${c ? ` (${c})` : ''} — ${formatUSD(i.price * i.quantity)}`);
@@ -484,23 +520,55 @@ export function sendReceiptWhatsApp(phone: string) {
   openWhatsApp(phone || r.customer?.phone || '', receiptText(r));
 }
 
+/** Marca de agua: el nombre del negocio repetido en diagonal, semitransparente */
+function watermarkHtml(name: string) {
+  const word = esc(name.toUpperCase());
+  const row = Array.from({ length: 6 }, () => word).join('&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;');
+  const rows = Array.from({ length: 22 }, (_, i) => `<div style="white-space:nowrap;margin-left:${(i % 2) * -60}px;">${row}</div>`).join('');
+  return `<div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;">
+    <div style="position:absolute;left:-60%;top:-40%;width:220%;transform:rotate(-30deg);transform-origin:center;
+      font:800 17px Arial,sans-serif;letter-spacing:2px;line-height:46px;color:rgba(124,67,186,0.10);">${rows}</div></div>`;
+}
+
 export async function generateReceiptImage() {
   const r = getState().receiptData;
   if (!r) return;
   try {
     toast('Generando imagen del recibo...', 2000);
-    const items = r.items.map(i => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+    const st = receiptStore();
+    const items = r.items.map(i => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eee;">
         <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(i.product.name)}</div>
         <div style="font-size:12px;color:#666;">${esc(i.product.brand)}${formatContent(i.product) ? ' · ' + esc(formatContent(i.product)) : ''} · ${i.quantity} x ${formatUSD(i.price)}</div></div>
-        <div style="font-weight:bold;color:#7c43ba;">${formatUSD(i.price * i.quantity)}</div></div>`).join('');
-    const html = `
-      <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">🧾 RECIBO DE VENTA</h1><p style="color:#444;margin:5px 0;font-weight:bold;">${esc(businessName())}</p></div>
-      <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">${row('Fecha:', esc(r.date))}${row('Vendedor:', esc(r.seller))}${row('Método de pago:', esc(r.payment))}${r.customer ? row('Cliente:', esc(r.customer.name)) : ''}</div>
-      <h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Productos vendidos:</h2>${items}
-      <div style="margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;">${row('Subtotal:', formatUSD(r.subtotal))}${row('Descuento:', r.discount > 0 ? '-' + formatUSD(r.discount) : 'Sin descuento', '#d97706')}
-        <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #7c43ba;"><span style="font-weight:bold;font-size:18px;">TOTAL:</span><span style="font-weight:bold;font-size:18px;color:#7c43ba;">${formatUSD(r.total)}</span></div></div>
-      <div style="text-align:center;margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;"><p style="color:#666;font-size:12px;">¡Gracias por su compra!</p></div>`;
-    showImagePreview(await htmlToImage(html), `recibo_venta_${Date.now()}.png`);
+        <div style="font-weight:bold;color:#7c43ba;white-space:nowrap;">${formatUSD(i.price * i.quantity)}</div></div>`).join('');
+    const extras = extraLines(r).map(([k, v]) => row(esc(k) + ':', esc(v))).join('');
+    const html = `<div style="position:relative;">
+      ${watermarkHtml(st.name)}
+      <div style="position:relative;z-index:1;">
+      <div style="display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:2px solid #7c43ba;margin-bottom:14px;">
+        <img src="/icon-192.png" style="width:58px;height:58px;border-radius:14px;" />
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:19px;font-weight:800;color:#201728;line-height:1.15;">${esc(st.name)}</div>
+          ${st.lines.map(l => `<div style="font-size:11.5px;color:#555;margin-top:2px;">${esc(l)}</div>`).join('')}
+        </div>
+      </div>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:13px;letter-spacing:3px;font-weight:bold;color:#7c43ba;">RECIBO DE VENTA</div>
+        ${r.number ? `<div style="font-size:24px;font-weight:900;color:#201728;margin-top:2px;letter-spacing:1px;">N° ${esc(r.number)}</div>` : ''}
+        ${r.provisional ? '<div style="font-size:11px;color:#d97706;">Número provisional (sin conexión)</div>' : ''}
+        ${r.reprint ? '<div style="font-size:11px;color:#756c7e;">Copia del recibo</div>' : ''}
+      </div>
+      <div style="background:rgba(246,241,248,0.92);padding:12px 14px;border-radius:12px;margin-bottom:16px;">
+        ${row('Fecha:', esc(r.date))}${row('Vendedor:', esc(r.seller))}${row('Método de pago:', esc(r.payment))}${r.customer ? row('Cliente:', esc(r.customer.name)) : ''}${extras}
+      </div>
+      <h2 style="font-size:15px;margin:0 0 6px;color:#201728;">Productos:</h2>${items}
+      <div style="margin-top:16px;padding-top:12px;border-top:2px solid #e8dfec;">${row('Subtotal:', formatUSD(r.subtotal))}${r.discount > 0 ? row('Descuento:', '-' + formatUSD(r.discount), '#d97706') : ''}
+        <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #7c43ba;"><span style="font-weight:bold;font-size:18px;">TOTAL:</span><span style="font-weight:bold;font-size:20px;color:#7c43ba;">${formatUSD(r.total)}</span></div></div>
+      <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:2px solid #e8dfec;">
+        <p style="color:#444;font-size:13px;margin:0;font-weight:bold;">¡Gracias por su compra!</p>
+        <p style="color:#999;font-size:10px;margin:6px 0 0;">Emitido con Mi Negocio 7pro</p>
+      </div>
+      </div></div>`;
+    showImagePreview(await htmlToImage(html), `recibo_${(r.number || String(Date.now())).replace(/[^\w-]/g, '_')}.png`);
   } catch (e) {
     console.error('Error al generar imagen:', e);
     toast('Error al generar la imagen del recibo');
@@ -567,6 +635,7 @@ export function salesReceipt(list: Sale[]) {
       date, seller: uniq(sorted.map(s => s.seller_name)) || '—', payment: uniq(sorted.map(s => s.payment_method)) || 'Efec.',
       customer: customerName ? { name: customerName, phone: cust?.phone || '' } : null,
       items, subtotal: total, discount: 0, total, reprint: true,
+      number: [...new Set(sorted.map(x => x.receipt_no).filter(Boolean))].join(', ') || undefined,
     },
   });
   openModal('sale-receipt-modal');
