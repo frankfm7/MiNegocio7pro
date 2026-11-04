@@ -1,6 +1,8 @@
 import type { Product } from '../types';
 import { formatContent } from './format';
 
+import { guessCommonName } from './commonName';
+
 /** minúsculas, sin acentos, sin signos */
 export function normalize(s: unknown): string {
   return String(s ?? '')
@@ -56,8 +58,8 @@ function termScore(term: string, word: string): number {
 
 interface Indexed { product: Product; fields: { words: string[]; text: string; weight: number }[]; barcode: string; sku: string }
 
-const FIELDS: [keyof Product | 'content', number][] = [
-  ['name', 3], ['brand', 2.2], ['type', 1.4], ['category', 1.4], ['content', 1], ['offer_text', 0.6], ['description', 0.5],
+const FIELDS: [keyof Product | 'content' | 'common', number][] = [
+  ['name', 3], ['common', 2.8], ['brand', 2.2], ['type', 1.4], ['category', 1.4], ['content', 1], ['offer_text', 0.6], ['description', 0.5],
 ];
 
 const cache = new WeakMap<Product, Indexed>();
@@ -69,7 +71,8 @@ function index(p: Product): Indexed {
       barcode: normalize(p.barcode),
       sku: normalize(p.sku).replace(/\s/g, ''),
       fields: FIELDS.map(([f, weight]) => {
-        const text = normalize(f === 'content' ? formatContent(p) : p[f as keyof Product]);
+        // Nombre común: el guardado o, si no tiene, el sugerido ("protector solar" encuentra "Total Block")
+        const text = normalize(f === 'content' ? formatContent(p) : f === 'common' ? (p.common_name || guessCommonName(p.name || '', p.type || '')) : p[f as keyof Product]);
         return { text, words: text.split(' ').filter(Boolean), weight };
       }),
     };

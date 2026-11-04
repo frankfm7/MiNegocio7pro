@@ -12,6 +12,7 @@ import { generateProductQRImage, printProductQR } from '../../lib/qr';
 import { SoundEffects } from '../../lib/sound';
 import { downloadDataUrl } from '../../lib/image';
 import { useImageBg } from '../../lib/imageBg';
+import { guessCommonName } from '../../lib/commonName';
 import PaymentPicker from '../PaymentPicker';
 
 // ==========================================
@@ -24,6 +25,7 @@ export function DetailModal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const photoBg = useImageBg(r?.image_url);
   const [showMin, setShowMin] = useState(false);
+  const clientMode = useStore(s => s.clientMode);
   const taps = useRef<number[]>([]);
   /** 3 toques en menos de 1 segundo sobre el precio de venta */
   const secretTap = () => {
@@ -76,6 +78,7 @@ export function DetailModal() {
           <div className="flex justify-between gap-4 items-start">
             <div className="min-w-0 flex-1">
               <h2 id="detail-name" className="hero-title text-2xl sm:text-3xl font-bold leading-tight text-balance">{r.name}</h2>
+              {(r.common_name || guessCommonName(r.name, r.type)) && <p id="detail-common-name" className="text-sm italic text-[#5c5266] mt-0.5">{r.common_name || guessCommonName(r.name, r.type)}</p>}
               {r.brand && <p id="detail-brand" className="text-xs font-bold text-[#7b43a8] uppercase tracking-[.12em] mt-1.5">{r.brand}</p>}
               {content && (
                 <p id="detail-content" className="mt-2 mr-2 px-3 py-1 rounded-full bg-[#f0e7f6] text-[#70429c] text-sm font-bold inline-block">Contenido: {content}</p>
@@ -106,16 +109,17 @@ export function DetailModal() {
           <div className="mt-6 p-5 rounded-2xl bg-gradient-to-br from-[#f6f1f8] to-[#ede1f8] text-center shadow-inner">
             {Number(r.catalog_price) > Number(r.sale_price) && (
               <p className="text-sm text-[#756c7e] mb-2">Precio de catálogo <span className="line-through font-bold">{formatUSD(r.catalog_price)}</span>
-                <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#be416d] text-white text-xs font-bold">Ahorras {formatUSD(Number(r.catalog_price) - Number(r.sale_price))}</span></p>
+                <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#be416d] text-white text-xs font-bold">Ahorras {formatUSD(Number(r.catalog_price) - Number(r.sale_price))} (-{Math.round((1 - Number(r.sale_price) / Number(r.catalog_price)) * 100)}%)</span></p>
             )}
             <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397]">Precio de venta</p>
-            {/* Toque secreto: 3 toques seguidos sobre el precio muestran el precio mínimo (no se ve a simple vista) */}
-            <p id="detail-sale-price" className="price-highlight mt-2 inline-block select-none cursor-default" style={{ touchAction: "manipulation" }} onClick={secretTap}>{formatUSDShort(r.sale_price)} <span className="currency-tag">{currency()}</span></p>
+            <p id="detail-sale-price" className="price-highlight mt-2" style={clientMode ? { touchAction: 'manipulation', userSelect: 'none' } : undefined} onClick={clientMode ? secretTap : undefined}>{formatUSDShort(r.sale_price)} <span className="currency-tag">{currency()}</span></p>
+            <p id="detail-min-price" className="text-xs text-[#756c7e] mt-1 member-only"><span className="text-xs text-[#756c7e]">Mínimo:</span> <span className="font-bold text-sm text-[#a43658]">{formatUSD(r.min_price || 0)}</span></p>
           </div>
+          {/* Modo cliente: el mínimo se oculta; 3 toques seguidos sobre el precio de venta lo muestran */}
           {showMin && (
             <div className="fixed inset-0 z-[75] grid place-items-center bg-black/30 p-6" onClick={() => setShowMin(false)}>
-              <div id="secret-min-price" className="bg-white rounded-2xl shadow-2xl px-6 py-5 text-center min-w-[220px]" onClick={e => e.stopPropagation()}>
-                <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">Puedo darlo hasta</p>
+              <div id="secret-min-price" className="bg-white rounded-2xl shadow-2xl px-6 py-5 text-center min-w-[200px]" onClick={e => e.stopPropagation()}>
+                <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">Mínimo</p>
                 <p className="text-3xl font-bold text-[#a43658] mt-1">{formatUSD(r.min_price || 0)}</p>
                 <button type="button" onClick={() => setShowMin(false)} className="mt-4 w-full py-2 rounded-xl btn-ghost text-sm font-bold">Cerrar</button>
               </div>

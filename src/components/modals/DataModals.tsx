@@ -9,7 +9,7 @@ import type { CloudBackup } from '../../types';
 import { createBackup, restoreBackup } from '../../lib/exporters';
 import { commitImport, exportCSV, exportExcel, exportJSON, exportPDF, importAnyFile, importInvoiceImages, importPhotosAsProducts, importPriceListImage, invoiceFactor } from '../../lib/io';
 import { exportCatalogQRsPDF } from '../../lib/qr';
-import { cardImage, formatUSDShort } from '../../lib/format';
+import { formatUSD, cardImage, formatUSDShort } from '../../lib/format';
 
 function Row({ icon, color, title, text, onClick }: { icon: React.ReactNode; color: string; title: string; text: string; onClick: () => void }) {
   return (
@@ -87,6 +87,7 @@ export function ImportPreviewModal() {
   const [saving, setSaving] = useState(false);
   if (!pv) return <Modal id="import-preview-modal" closeOnBackdrop={false}>{null}</Modal>;
 
+  const normalizeName = (n: string) => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const update = (key: string, patch: Record<string, unknown>) =>
     setState({ importPreview: { ...pv, items: pv.items.map(i => (i._key === key ? { ...i, ...patch } : i)) } });
   const setInvoice = (patch: Partial<NonNullable<typeof pv.invoice>>) => pv.invoice && setState({ importPreview: { ...pv, invoice: { ...pv.invoice, ...patch } } });
@@ -169,7 +170,12 @@ export function ImportPreviewModal() {
                       {match?.image_url || i.image_url ? <img src={cardImage({ image_url: (match?.image_url || i.image_url) as string })} alt="" className="w-full h-full object-contain" /> : <FileImage className="w-5 h-5 text-[#d4c5e0]" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <input value={i.name || ''} onChange={e => update(i._key, { name: e.target.value })} className="w-full input-field rounded-lg px-2 py-1.5 text-sm font-bold min-w-0" placeholder="Nombre" />
+                      {match
+                        ? <p className="px-2 py-1.5 rounded-lg bg-[#f0fdf4] text-sm font-bold truncate" title="El nombre del producto existente no se cambia">{match.name}</p>
+                        : <input value={i.name || ''} onChange={e => update(i._key, { name: e.target.value })} className="w-full input-field rounded-lg px-2 py-1.5 text-sm font-bold min-w-0" placeholder="Nombre" />}
+                      {match && i._readName && normalizeName(i._readName) !== normalizeName(match.name) && (
+                        <p className="text-[10px] text-[#756c7e] mt-0.5 truncate">En la factura: “{i._readName}” · <button type="button" onClick={() => update(i._key, { _matchId: null, name: i._readName, common_name: '', sale_price: Number(i.catalog_price) || Number(i.cost_price) || 0, min_price: Number(i.cost_price) || 0 })} className="font-bold text-[#a43658] underline">No es el mismo</button></p>
+                      )}
                       <p className="text-[11px] text-[#756c7e] mt-0.5 truncate">
                         {[i.sku ? `Cód. ${i.sku}` : '', i.brand, i.content_value ? `${i.content_value} ${i.content_unit || ''}` : '', i._catalogName && pv.target === 'auto' ? `→ ${i._catalogName}` : ''].filter(Boolean).join(' · ')}
                       </p>
@@ -193,10 +199,16 @@ export function ImportPreviewModal() {
                       <input type="number" step="0.01" min={0} value={num(i.catalog_price)} onChange={e => update(i._key, { catalog_price: e.target.value === '' ? null : Number(e.target.value) })} className="w-full input-field rounded-lg px-2 py-1 text-sm text-[#201728]" />
                       {conv(i.catalog_price) && <span className="block font-normal">{conv(i.catalog_price)}</span>}
                     </label>
-                    <label className="text-[10px] font-bold text-[#7c43ba]">Tu precio ({cur})
-                      <input type="number" step="0.01" min={0} value={num(i.sale_price)} onChange={e => update(i._key, { sale_price: Number(e.target.value), min_price: Math.min(Number(i.min_price) || 0, Number(e.target.value)) })} className="w-full input-field rounded-lg px-2 py-1 text-sm font-bold text-[#201728]" />
-                      {conv(i.sale_price) && <span className="block font-normal">{conv(i.sale_price)}</span>}
-                    </label>
+                    {match ? (
+                      <div className="text-[10px] font-bold text-[#7c43ba]">Tu precio (se mantiene)
+                        <p className="w-full rounded-lg px-2 py-1 text-sm font-bold text-[#201728] bg-[#f6f1f8]">{formatUSD(match.sale_price)}</p>
+                      </div>
+                    ) : (
+                      <label className="text-[10px] font-bold text-[#7c43ba]">Tu precio ({cur})
+                        <input type="number" step="0.01" min={0} value={num(i.sale_price)} onChange={e => update(i._key, { sale_price: Number(e.target.value), min_price: Math.min(Number(i.min_price) || 0, Number(e.target.value)) })} className="w-full input-field rounded-lg px-2 py-1 text-sm font-bold text-[#201728]" />
+                        {conv(i.sale_price) && <span className="block font-normal">{conv(i.sale_price)}</span>}
+                      </label>
+                    )}
                   </div>
                 </div>
               );

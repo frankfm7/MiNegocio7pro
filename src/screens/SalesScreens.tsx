@@ -43,33 +43,43 @@ const sumBy = (list: Sale[], key: 'actual_price' | 'profit') => list.reduce((a, 
 function SalesList({ id, title, list, showDate }: { id: string; title: string; list: Sale[]; showDate: boolean }) {
   const team = useStore(s => s.team);
   const isAdmin = useStore(s => s.isAdmin());
-  const [mode, setMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(() => new Set());
+  // La selección está abierta solo mientras haya al menos una venta elegida
+  const mode = sel.size > 0;
   // Si una venta desaparece (se eliminó o se sincronizó), sale de la selección
-  useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); if (next.size === 0) setMode(false); return next.size === prev.size ? prev : next; }); }, [list]);
+  useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); return next.size === prev.size ? prev : next; }); }, [list]);
   const chosen = list.filter(s => sel.has(s.id));
-  const exit = () => { setMode(false); setSel(new Set()); };
-  // Quitar la última venta elegida cierra la selección
-  const toggle = (sid: string) => setSel(prev => {
-    const n = new Set(prev);
-    if (n.has(sid)) n.delete(sid); else n.add(sid);
-    if (n.size === 0) setMode(false);
-    return n;
-  });
-  // Doble toque sobre una venta: activa la selección múltiple con esa venta
-  const lastTap = useRef<{ id: string; t: number } | null>(null);
-  const onRowTap = (sid: string) => {
-    if (mode) { toggle(sid); return; }
-    const now = Date.now();
-    const prev = lastTap.current;
-    if (prev && prev.id === sid && now - prev.t < 400) {
-      lastTap.current = null;
-      setMode(true); setSel(new Set([sid]));
-      try { navigator.vibrate?.(30); } catch { /* sin vibración */ }
-    } else lastTap.current = { id: sid, t: now };
-  };
+  const exit = () => setSel(new Set());
+  const toggle = (sid: string) => setSel(prev => { const n = new Set(prev); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const all = chosen.length === list.length && list.length > 0;
   const remove = async () => { if (await deleteSalesWithConfirm(chosen)) exit(); };
+
+  // Pulsación larga (mantener presionado ~½ segundo) sobre una venta:
+  //  - sin selección: la abre con esa venta;
+  //  - con selección: agrega o quita esa venta (al quitar la última se cierra).
+  // Con la selección abierta, un toque normal también agrega o quita.
+  const press = useRef<{ id: string; x: number; y: number; timer: ReturnType<typeof setTimeout>; fired: boolean } | null>(null);
+  const cancelPress = () => { if (press.current) clearTimeout(press.current.timer); };
+  const onDown = (sid: string, e: React.PointerEvent) => {
+    cancelPress();
+    const p = { id: sid, x: e.clientX, y: e.clientY, fired: false, timer: setTimeout(() => {
+      p.fired = true;
+      toggle(sid);
+      try { navigator.vibrate?.(35); } catch { /* sin vibración */ }
+    }, 480) };
+    press.current = p;
+  };
+  const onMovePress = (e: React.PointerEvent) => {
+    const p = press.current;
+    if (p && !p.fired && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) { clearTimeout(p.timer); press.current = null; }
+  };
+  const onClickRow = (sid: string) => {
+    const p = press.current;
+    press.current = null;
+    if (p?.fired) return;          // ya se hizo con la pulsación larga
+    cancelPress();
+    if (mode) toggle(sid);         // con la selección abierta, un toque agrega o quita
+  };
 
   return (
     <>
@@ -82,13 +92,14 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
           </>
         )}
       </div>
-      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Toca dos veces seguidas una venta para seleccionarla (recibo, copiar, compartir o eliminar).</p>}
+      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Mantén presionada una venta para seleccionarla (recibo, copiar, compartir o eliminar).</p>}
       <div id={id} className={`space-y-2 ${mode ? 'pb-36' : ''}`}>
         {list.map(s => {
           const on = sel.has(s.id);
           const date = new Date(s.date);
           return (
-            <button type="button" key={s.id} onClick={() => onRowTap(s.id)} onDoubleClick={e => e.preventDefault()} aria-pressed={on}
+            <button type="button" key={s.id} onPointerDown={e => onDown(s.id, e)} onPointerMove={onMovePress} onPointerUp={cancelPress} onPointerLeave={cancelPress} onPointerCancel={cancelPress}
+              onClick={() => onClickRow(s.id)} onContextMenu={e => e.preventDefault()} aria-pressed={on} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}
               className={`sale-row w-full text-left rounded-xl p-3 flex items-center gap-3 shadow-sm bg-white transition ${on ? 'ring-2 ring-[#7c43ba] bg-[#f6f1f8]' : ''}`}>
               {mode && <span className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${on ? 'bg-[#7c43ba] border-[#7c43ba] text-white' : 'border-[#cbbdd6] bg-white'}`}>{on && <Check className="w-3.5 h-3.5" />}</span>}
               <div className="flex-1 min-w-0">
@@ -104,7 +115,7 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
           );
         })}
       </div>
-      {mode && chosen.length > 0 && (
+      {mode && (
         <div className="sales-actionbar fixed z-40 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-md rounded-2xl bg-white shadow-2xl border border-[#ede7f0] p-2.5">
           <p className="text-xs font-bold text-center mb-2">{chosen.length} {chosen.length === 1 ? 'venta' : 'ventas'} · <span className="text-[#7c43ba]">{formatUSD(chosen.reduce((a, x) => a + Number(x.actual_price || 0), 0))}</span> <span className="font-normal text-[#756c7e]">· toca para agregar o quitar</span></p>
           <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>

@@ -981,3 +981,31 @@ body.dark-mode .sales-actionbar { background:#2a1f35; border-color:#3d2f4d; }
 /* Fotos con fondo liso (blanco, negro o de color): el marco toma ese color, sin mezclas */
 .product-image.solid-bg, #detail-image.solid-bg { mix-blend-mode: normal !important; padding: 0 !important; }
 body.dark-mode .product-image.solid-bg, body.dark-mode #detail-image.solid-bg { mix-blend-mode: normal !important; }
+/* Modo cliente: el precio mínimo no se ve (se consulta con 3 toques sobre el precio de venta) */
+body.client-mode #detail-min-price { display: none !important; }
+
+/* ===== Bienvenida: "Mi Negocio 7pro" como protagonista ===== */
+.welcome .welcome-brand {
+  font-family: Poppins, 'DM Sans', sans-serif; font-weight: 900; margin: 0 0 14px;
+  line-height: .92; letter-spacing: -0.03em;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.welcome .wb-mi {
+  font-size: clamp(46px, 13vw, 104px); color: #fff;
+  text-shadow: 0 6px 30px rgba(124,67,186,.75), 0 2px 0 rgba(0,0,0,.25);
+}
+.welcome .wb-7pro {
+  font-size: clamp(64px, 19vw, 150px); font-style: italic; letter-spacing: -0.04em;
+  padding: 0 .08em; line-height: .95;
+}
+.welcome .welcome-tagline {
+  font-family: Fraunces, serif; font-weight: 600; font-size: clamp(18px, 4.6vw, 28px);
+  line-height: 1.2; margin: 6px auto 12px; max-width: 30ch; opacity: .95;
+}
+.welcome-footer {
+  position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); left: 0; right: 0; z-index: 2;
+  text-align: center; display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+}
+.welcome-tap-hint-inline { font-size: 11px; opacity: .6; animation: pulse 2s ease-in-out infinite; }
+.welcome-credit { font-size: 12px; letter-spacing: .08em; opacity: .85; }
+.welcome-credit b { font-family: Poppins, sans-serif; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }

@@ -12,6 +12,7 @@ import { autoFrameProduct, compressImage, downloadBlob, readFileAsBase64 } from 
 import { DB } from './db';
 import { APP_NAME, fallback, fallbackCover } from './constants';
 import { normalize } from './search';
+import { guessCommonName } from './commonName';
 import type { InvoiceResult } from './invoice';
 
 type Scope = { catalogs: Catalog[]; records: Product[]; label: string };
@@ -67,6 +68,7 @@ export async function exportExcel(catalogId: string | null = null) {
     ws.columns = [
       { header: 'Imagen', key: 'img', width: 14 },
       { header: 'Nombre', key: 'name', width: 30 },
+      { header: 'Nombre Común', key: 'common_name', width: 20 },
       { header: 'Marca', key: 'brand', width: 16 },
       { header: 'Tipo', key: 'type', width: 14 },
       { header: 'Categoría', key: 'category', width: 16 },
@@ -93,7 +95,7 @@ export async function exportExcel(catalogId: string | null = null) {
     for (let i = 0; i < sc.records.length; i++) {
       const r = sc.records[i];
       const row = ws.addRow({
-        name: r.name, brand: r.brand, type: r.type, category: r.category, content_value: r.content_value || '', content_unit: r.content_unit || '',
+        name: r.name, common_name: r.common_name || '', brand: r.brand, type: r.type, category: r.category, content_value: r.content_value || '', content_unit: r.content_unit || '',
         sku: r.sku || '', catalog_price: r.catalog_price ?? '',
         barcode: r.barcode || '', cost_price: Number(r.cost_price) || 0, sale_price: Number(r.sale_price) || 0, min_price: Number(r.min_price) || 0,
         stock: Number(r.stock) || 0, description: r.description || '', offer_text: r.offer_text || '', catalog: catName.get(r.catalog_id) || r.catalog_id, id: r.id,
@@ -138,10 +140,10 @@ export function exportCSV(catalogId: string | null = null) {
   const sc = scope(catalogId);
   if (sc.records.length === 0) { toast('No hay productos para exportar'); return; }
   const catName = new Map(getState().catalogs.map(c => [c.id, c.name]));
-  const headers = ['nombre', 'marca', 'tipo', 'categoria', 'contenido', 'unidad', 'codigo_empresa', 'codigo_barras', 'precio_catalogo', 'costo', 'precio_venta_max', 'precio_venta_min', 'stock', 'descripcion', 'oferta', 'catalogo', 'imagen_url', 'id'];
+  const headers = ['nombre', 'nombre_comun', 'marca', 'tipo', 'categoria', 'contenido', 'unidad', 'codigo_empresa', 'codigo_barras', 'precio_catalogo', 'costo', 'precio_venta_max', 'precio_venta_min', 'stock', 'descripcion', 'oferta', 'catalogo', 'imagen_url', 'id'];
   const lines = [headers.join(',')];
   sc.records.forEach(r => lines.push([
-    r.name, r.brand, r.type, r.category, r.content_value || '', r.content_unit || '', r.sku || '', r.barcode || '', r.catalog_price ?? '', r.cost_price || 0, r.sale_price || 0,
+    r.name, r.common_name || '', r.brand, r.type, r.category, r.content_value || '', r.content_unit || '', r.sku || '', r.barcode || '', r.catalog_price ?? '', r.cost_price || 0, r.sale_price || 0,
     r.min_price || 0, r.stock || 0, r.description || '', r.offer_text || '', catName.get(r.catalog_id) || '',
     r.image_url && !r.image_url.startsWith('data:') ? r.image_url : '', r.id,
   ].map(csvEscape).join(',')));
@@ -269,6 +271,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   content_value: ['contenido', 'presentacion', 'tamano', 'tamanio', 'volumen', 'peso', 'medida', 'size', 'capacidad', 'cantidadcontenido'],
   content_unit: ['unidad', 'unit', 'um', 'unidaddemedida'],
   barcode: ['codigobarras', 'codigodebarras', 'barcode', 'ean', 'upc'],
+  common_name: ['nombrecomun', 'nombregenerico', 'generico', 'comun', 'subnombre'],
   sku: ['codigoempresa', 'codigodelaempresa', 'codigoproveedor', 'codigoproducto', 'codigo', 'sku', 'cod', 'referencia', 'ref'],
   catalog_price: ['preciocatalogo', 'preciodecatalogo', 'pvpcatalogo', 'valorizado', 'valorizadopreciocatalogo', 'precioregular', 'preciolista'],
   cost_price: ['costo', 'cost', 'preciocompra', 'preciodecompra', 'preciocosto'],
@@ -329,6 +332,7 @@ function draftFrom(obj: Record<string, unknown>): DraftProduct | null {
     name, brand: String(v.brand ?? ''), type: String(v.type ?? ''), category: String(v.category ?? ''),
     content_value, content_unit: content_unit ? normUnit(content_unit) : '',
     barcode: String(v.barcode ?? '').replace(/\.0$/, ''), cost_price: parseNumber(v.cost_price), sale_price: sale,
+    common_name: v.common_name !== undefined ? String(v.common_name).trim() : '',
     sku: v.sku !== undefined ? String(v.sku).replace(/\.0$/, '') : '', catalog_price: v.catalog_price !== undefined ? parseNumber(v.catalog_price) : null,
     min_price: v.min_price !== undefined ? parseNumber(v.min_price) : sale,
     stock: v.stock !== undefined ? parseNumber(v.stock) : 1,
@@ -587,16 +591,60 @@ function guessType(name: string): { type: string; category: string } {
   return { type: '', category: '' };
 }
 
-/** Producto existente: mismo código de empresa, mismo código de barras o mismo nombre */
-function findExisting(code: string, name: string): Product | undefined {
+/** Palabras útiles de un nombre (sin marca, unidades ni números sueltos) */
+const nameTokens = (name: string) => normalize(name).split(' ')
+  .filter(w => w.length >= 2 && !/^\d+$/.test(w) && !/^(ml|g|gr|l|kg|oz|es|lb|cz|cy|de|la|el|en|y|con|para|cc)$/.test(w));
+
+/** Parecido entre dos nombres, de 0 a 1 (palabras en común, tolera letras mal leídas) */
+function nameSimilarity(a: string, b: string): number {
+  const A = nameTokens(a), B = nameTokens(b);
+  if (!A.length || !B.length) return 0;
+  const close = (x: string, y: string) => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y) || y.startsWith(x) || editDistance(x, y) <= (Math.min(x.length, y.length) >= 7 ? 2 : 1)));
+  const hits = A.filter(x => B.some(y => close(x, y))).length;
+  return (2 * hits) / (A.length + B.length);
+}
+
+function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= b.length; j++) { const t = dp[j]; dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; }
+  }
+  return dp[b.length];
+}
+
+/** Mismo código salvo un dígito (el lector confundió 5/6, 8/3...) */
+const codeNear = (a: string, b: string) => a.length === b.length && a.length >= 4 && [...a].filter((c, i) => c !== b[i]).length <= 1;
+
+/**
+ * Producto existente para una fila de factura:
+ *  1) mismo código de empresa o de barras;
+ *  2) código casi igual (un dígito distinto) y nombre parecido;
+ *  3) nombre muy parecido (aunque el lector haya cambiado alguna letra).
+ */
+function findExisting(code: string, name: string, brand = ''): Product | undefined {
   const { records } = getState();
   const c = code.replace(/\s/g, '');
+  const digits = c.replace(/\D/g, '');
   if (c) {
     const byCode = records.find(r => (r.sku && r.sku.replace(/\s/g, '') === c) || (r.barcode && r.barcode.replace(/\s/g, '') === c));
     if (byCode) return byCode;
   }
   const n = normalize(name);
-  return n.length >= 6 ? records.find(r => normalize(r.name) === n) : undefined;
+  if (n.length >= 6) {
+    const exact = records.find(r => normalize(r.name) === n);
+    if (exact) return exact;
+  }
+  let best: Product | undefined, bestScore = 0;
+  for (const r of records) {
+    const sim = nameSimilarity(name, r.name);
+    const sameBrand = !brand || !r.brand || normalize(r.brand) === normalize(brand);
+    const nearCode = digits && r.sku ? codeNear(digits, r.sku.replace(/\D/g, '')) : false;
+    const score = sim + (nearCode ? 0.3 : 0) + (sameBrand ? 0.05 : -0.3);
+    const ok = (nearCode && sim >= 0.35) || sim >= 0.8;
+    if (ok && score > bestScore) { best = r; bestScore = score; }
+  }
+  return best;
 }
 
 /** Elige el catálogo donde guardar según la marca/tipo; '' = preguntar */
@@ -634,7 +682,11 @@ export async function importInvoiceImages(files: File[]) {
         const textA = await readTextFromImage(await prepareInvoiceImage(list[i], { width: 3400, k: 0.92 }), true);
         const resA = parseInvoiceText(textA);
         if (resA.vendor === 'Belcorp') {
-          res = { ...mergeResults(resA, res.vendor === 'Belcorp' ? res : { ...resA, items: [] }), rate: res.rate ?? resA.rate };
+          res = {
+            ...mergeResults(resA, res.vendor === 'Belcorp' ? res : { ...resA, items: [] }),
+            rate: res.rate ?? resA.rate,
+            currency: res.currency === 'USD' || resA.currency === 'USD' ? 'USD' : (resA.currency ?? res.currency),
+          };
           pageText = textA;
         } else if (resultScore(resA) > resultScore(res)) { res = resA; pageText = textA; }
       }
@@ -656,13 +708,14 @@ export async function importInvoiceImages(files: File[]) {
       }
       items = [...merged.values()].map(it => {
         const sp = splitContent(it.name);
-        const ex = findExisting(it.code, it.name);
+        const ex = findExisting(it.code, it.name, it.brand);
         const { type, category } = guessType(it.name);
         const notes = [it.check ? '⚠ Revisa cantidad y precios' : '', it.isMaterial ? 'Material / servicio' : '', it.isGift ? 'Obsequio' : ''].filter(Boolean).join(' · ');
         return {
-          _key: newId(), _include: !it.isMaterial && !it.isGift, _matchId: ex?.id || null, _note: notes,
+          _key: newId(), _include: !it.isMaterial && !it.isGift, _matchId: ex?.id || null, _note: notes, _readName: it.name,
           name: ex?.name || it.name, brand: it.brand || ex?.brand || '', type: ex?.type || type, category: ex?.category || category,
-          sku: it.code, barcode: ex?.barcode || '', content_value: ex?.content_value || sp?.value || '', content_unit: ex?.content_unit || sp?.unit || '',
+          common_name: ex?.common_name || guessCommonName(it.name, type),
+          sku: ex?.sku || it.code, barcode: ex?.barcode || '', content_value: ex?.content_value || sp?.value || '', content_unit: ex?.content_unit || sp?.unit || '',
           stock: it.qty, catalog_price: it.catalogUnit || null, cost_price: it.costUnit,
           sale_price: ex ? ex.sale_price : (it.catalogUnit || it.costUnit), min_price: ex ? ex.min_price : it.costUnit,
           description: '', offer_text: '', image_url: '',
@@ -761,8 +814,8 @@ export async function commitImport() {
   let restocked = 0;
 
   for (const d of pv.items.filter(i => i._include && i.name?.trim())) {
-    const { _key, _catalogName, _include, _matchId, _note, ...rest } = d;
-    void _key; void _include; void _note;
+    const { _key, _catalogName, _include, _matchId, _note, _readName, ...rest } = d;
+    void _key; void _include; void _note; void _readName;
     if (pv.invoice) {
       rest.cost_price = money(rest.cost_price);
       rest.catalog_price = rest.catalog_price ? money(rest.catalog_price) : null;
@@ -775,8 +828,12 @@ export async function commitImport() {
       const cur = records[matchIdx];
       const upd: Product = {
         ...cur, stock: Number(cur.stock || 0) + Number(rest.stock || 0), cost_price: rest.cost_price ?? cur.cost_price,
-        catalog_price: rest.catalog_price ?? cur.catalog_price, sale_price: Number(rest.sale_price) || cur.sale_price,
-        min_price: Number(rest.min_price) || cur.min_price, sku: rest.sku || cur.sku, brand: cur.brand || rest.brand || '',
+        // Tu precio de venta y tu mínimo se mantienen (ya están en la moneda de la app)
+        catalog_price: rest.catalog_price ?? cur.catalog_price, sale_price: cur.sale_price,
+        min_price: cur.min_price, sku: cur.sku || rest.sku, brand: cur.brand || rest.brand || '',
+        // El nombre y la foto del producto existente no se tocan; solo se completa lo que falte
+        name: cur.name, common_name: cur.common_name || rest.common_name || null,
+        content_value: cur.content_value || rest.content_value || '', content_unit: cur.content_value ? cur.content_unit : (rest.content_unit || ''),
       };
       records[matchIdx] = upd;
       touched.push(upd);

@@ -9,12 +9,13 @@ import { downloadDataUrl } from '../lib/image';
 import { autoFrameProduct, compressImage } from '../lib/image';
 import { captureFromCamera } from '../lib/camera';
 import { editProductImage } from './ImageEditor';
+import { guessCommonName } from '../lib/commonName';
 import { CONTENT_UNITS, fallback } from '../lib/constants';
 import type { Product } from '../types';
 
 const empty = {
   name: '', brand: '', type: '', category: '', catalog_id: '', content_value: '', content_unit: 'ml', barcode: '', description: '',
-  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1', min_stock: '', catalog_price: '', sku: '',
+  sale_price: '', min_price: '', cost_price: '', offer_text: '', stock: '1', min_stock: '', catalog_price: '', sku: '', common_name: '',
 };
 type FormState = typeof empty;
 
@@ -26,6 +27,7 @@ function fromProduct(r: Product): FormState {
     offer_text: r.offer_text || '', stock: String(r.stock ?? 0),
     min_stock: r.min_stock === null || r.min_stock === undefined ? '' : String(r.min_stock),
     catalog_price: r.catalog_price === null || r.catalog_price === undefined ? '' : String(r.catalog_price), sku: r.sku || '',
+    common_name: r.common_name || '',
   };
 }
 
@@ -107,6 +109,8 @@ export default function ProductFormDrawer() {
       content_value: f.content_value.trim(), content_unit: f.content_value.trim() ? f.content_unit : '',
       min_stock: f.min_stock.trim() === '' ? null : Number(f.min_stock),
       catalog_price: f.catalog_price.trim() === '' ? null : Number(f.catalog_price), sku: f.sku.trim(),
+      // Si se deja vacío se usa el sugerido según el nombre
+      common_name: f.common_name.trim() || guessCommonName(f.name, f.type),
     };
     const result = editing ? await DB.updateRecord({ ...editing, ...data }) : await DB.createRecord({ ...data, id: draftId });
     if (result.isOk) { closeForm(); toast(editing ? 'Actualizado ✓' : 'Guardado ✓'); }
@@ -125,6 +129,13 @@ export default function ProductFormDrawer() {
           </div>
           <div className="space-y-4">
             <div><label className="block font-bold text-sm mb-1.5">Nombre *</label><input value={f.name} onChange={set('name')} required maxLength={80} className="w-full input-field rounded-xl p-3" type="text" /></div>
+            <div>
+              <label className="block font-bold text-sm mb-1.5">Nombre común <span className="font-normal text-[#756c7e]">(se ve debajo del nombre y ayuda a buscar)</span></label>
+              <div className="flex gap-2">
+                <input value={f.common_name} onChange={set('common_name')} maxLength={60} className="flex-1 min-w-0 input-field rounded-xl p-3" type="text" placeholder={guessCommonName(f.name, f.type) || 'Ej: Protector solar, Perfume de mujer'} />
+                {!f.common_name && guessCommonName(f.name, f.type) && <button type="button" onClick={() => setF(prev => ({ ...prev, common_name: guessCommonName(prev.name, prev.type) }))} className="px-3 rounded-xl btn-ghost text-xs font-bold whitespace-nowrap">Usar</button>}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block font-bold text-sm mb-1.5">Marca *</label><input value={f.brand} onChange={set('brand')} required maxLength={50} className="w-full input-field rounded-xl p-3" type="text" /></div>
               <div><label className="block font-bold text-sm mb-1.5">Tipo *</label><input value={f.type} onChange={set('type')} required maxLength={50} className="w-full input-field rounded-xl p-3" type="text" placeholder="Ej: Perfume" /></div>

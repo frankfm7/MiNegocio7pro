@@ -1,7 +1,6 @@
 import { ArrowRight, LogIn } from 'lucide-react';
 import { openAccount, useStore } from '../store';
 import { enterStore } from '../actions';
-import Brand from './Brand';
 import Avatar from './Avatar';
 
 export default function WelcomeScreen() {
@@ -19,9 +18,13 @@ export default function WelcomeScreen() {
         </div>
       )}
       <div className="welcome-content">
-        <p className="font-extrabold text-2xl sm:text-3xl tracking-tight"><Brand bright /></p>
-        <h1>Tu negocio, <br />organizado y listo para vender.</h1>
-        <p className="max-w-md mx-auto text-base sm:text-lg leading-relaxed opacity-90">Gestiona tus productos, controla el stock y genera pedidos al instante desde tu móvil o computadora.</p>
+        {/* Nombre de la app, protagonista: "Mi Negocio 7pro" */}
+        <h1 className="welcome-brand" aria-label="Mi Negocio 7pro">
+          <span className="wb-mi">Mi Negocio</span>
+          <span className="wb-7pro gold-text-bright">7pro</span>
+        </h1>
+        <p className="welcome-tagline">Tu negocio, organizado y listo para vender.</p>
+        <p className="max-w-md mx-auto text-sm sm:text-base leading-relaxed opacity-80">Gestiona tus productos, controla el stock y genera pedidos al instante desde tu móvil o computadora.</p>
         <div className="mt-6 flex flex-col items-center gap-3">
           <button id="enter-store" type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); enterStore(); }} className="rounded-full px-7 py-3.5 font-bold inline-flex items-center gap-2 bg-white text-[#7c43ba] hover:bg-[#f6f1f8] transition shadow-xl">
             <span>Entrar a la tienda</span><ArrowRight className="w-4 h-4" />
@@ -33,7 +36,10 @@ export default function WelcomeScreen() {
           )}
         </div>
       </div>
-      <p className="welcome-tap-hint">Toca cualquier parte para entrar</p>
+      <div className="welcome-footer">
+        <p className="welcome-tap-hint-inline">Toca cualquier parte para entrar</p>
+        <p className="welcome-credit">Desarrollado por <b>Ruah Producciones</b></p>
+      </div>
     </section>
   );
 }

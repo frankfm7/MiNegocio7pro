@@ -101,8 +101,9 @@ const GUIDE: Section[] = [
     'Dentro del catálogo toca **Añadir** para crear un producto: nombre, marca, tipo, contenido (ml, g, L...), stock y precios.',
     'Precios: **Costo** (lo que pagaste), **Precio de venta**, **Precio mínimo** (hasta cuánto puedes rebajar) y **Precio de catálogo** (opcional: se muestra tachado para que el cliente vea que le das mejor precio).',
     '**Código de la empresa** (opcional): el código de Ésika, L\'Bel, Cyzone, Yanbal... Sirve para reconocer el producto al importar facturas y sumarle el stock.',
+    '**Nombre común** (ej. "Protector solar" para "Total Block", "Perfume de mujer" para "Ccori Rose"): se ve debajo del nombre y sirve para buscar. Si lo dejas vacío, la app lo sugiere sola según el nombre.',
     'Para editar: abre el producto → **Editar**. Para borrar, duplicar o ver el historial de precios usa el botón ⋮ del detalle.',
-    'Buscador: escribe parte del nombre, la marca, el contenido o el código. Entiende palabras sin acentos y pequeños errores. El ícono de cámara busca por foto y el de escáner lee códigos de barras o QR.',
+    'Buscador: escribe parte del nombre, el nombre común (ej. "protector solar"), la marca, el contenido o el código. Entiende palabras sin acentos y pequeños errores. El ícono de cámara busca por foto y el de escáner lee códigos de barras o QR.',
   ] },
   { icon: ImageIcon, title: 'Fotos de los productos (editor)', steps: [
     'Al elegir una foto (Galería o Cámara) se abre el editor. Para una foto que ya existe: **Editar producto → Ajustar foto**.',
@@ -130,7 +131,7 @@ const GUIDE: Section[] = [
   ] },
   { icon: TrendingUp, title: 'Ventas, recibos e informes', steps: [
     '**Ventas** (barra de abajo) muestra lo vendido hoy por efectivo, QR y fiado; **Informes** muestra todo el historial y un gráfico de 7 días.',
-    'Para seleccionar ventas: **toca dos veces seguidas** una venta. Luego toca otras para agregarlas o quitarlas. Al quitar la última se cierra la selección sola.',
+    'Para seleccionar ventas: **mantén presionada** una venta (medio segundo). Luego toca o mantén presionadas otras para agregarlas o quitarlas. Cuando no queda ninguna seleccionada, la selección se cierra sola.',
     'Con las ventas elegidas: **Recibo** (genera el recibo de venta con todas, para WhatsApp o imagen), **Copiar**, **Compartir** o **Eliminar** (solo administradores; te pregunta si devuelves las unidades al stock, por ejemplo si se anuló la venta).',
     '**Cierre de caja** (Ventas o menú ☰): total cobrado por efectivo, QR, fiado y por vendedor, más los abonos de fiados. Envíalo por WhatsApp, cópialo o guárdalo como imagen (**Tabla de cierre**).',
     'En Informes puedes **Exportar Excel o CSV** con todas las ventas.',
@@ -141,7 +142,8 @@ const GUIDE: Section[] = [
     'La app reconoce el código, el nombre, la marca, la cantidad, el costo y el precio de catálogo. Revistas, catálogos, flyers y regalos quedan desmarcados.',
     'Revisa la lista: corrige lo marcado con ⚠, cambia el **Tu precio** si quieres y elige el **catálogo** donde guardar.',
     'Factura en dólares (Belcorp): la app detecta el tipo de cambio de la misma hoja y convierte a tu moneda. Puedes cambiar el valor "1 USD = ... Bs" antes de guardar.',
-    'Si el producto ya existe (mismo código o nombre) verás "Ya existe": al guardar se **suma el stock** y se actualizan costo y precio de catálogo.',
+    'Si el producto ya existe (mismo código, código casi igual o nombre parecido) verás "Ya existe": al guardar se **suma el stock** y se actualizan costo y precio de catálogo. **El nombre, la foto y tu precio de venta no cambian.**',
+    'Si la app unió dos productos que no son el mismo, toca **No es el mismo** y se guardará como producto nuevo.',
     'También puedes importar Excel, CSV, JSON, PDF o fotos de listas de precios desde la misma ventana, y exportar tu catálogo en Excel (con fotos) o PDF.',
   ] },
   { icon: Contact, title: 'Clientes y fiados', steps: [
@@ -156,7 +158,8 @@ const GUIDE: Section[] = [
   ] },
   { icon: EyeOff, title: 'Modo cliente y precio mínimo secreto', steps: [
     'Activa el **Modo cliente** (ícono del ojo arriba) antes de mostrar el celular a un comprador: se ocultan costos, ganancias, ventas y el precio mínimo.',
-    'El precio mínimo no se ve en el detalle. Para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita "Puedo darlo hasta ...". Ciérrala tocando fuera o en Cerrar.',
+    'Fuera del modo cliente, el detalle muestra el precio mínimo debajo del precio de venta, como siempre.',
+    'En modo cliente, para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita con el **Mínimo**. Ciérrala tocando fuera o en Cerrar.',
   ] },
   { icon: QrCode, title: 'QR, etiquetas y cobro', steps: [
     'Cada producto tiene su **QR**. Con la app se abre el producto al instante; con otro lector solo se ven el nombre, el contenido y el precio (nunca los costos).',

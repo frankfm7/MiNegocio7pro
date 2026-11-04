@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.3
+# MiNegocio7pro · v1.4
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -14,8 +14,8 @@ Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin inter
 3. **SQL Editor → New query**: pega y ejecuta `supabase/1-migracion-multi-tienda.sql`
    (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
    vienes de la app anterior con datos; en un proyecto nuevo se omite.
-   Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`
-   y por último `supabase/4-verificar.sql` (todo debe decir OK).
+   Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`,
+   luego `supabase/7-nombre-comun.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
 4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
    (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
    (agrega además `http://localhost:5173` para probar en tu computadora).
@@ -74,10 +74,23 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.3
+## 4a. Novedades v1.4
 
-- **Selección múltiple de ventas con doble toque**: toca dos veces seguidas una venta para empezar; toca otras para
-  agregarlas o quitarlas. Al quitar la última, la selección se cierra sola.
+- **Selección múltiple de ventas**: se activa **manteniendo presionada** una venta (½ segundo). Con la selección abierta,
+  un toque o una pulsación larga agrega o quita ventas; **cuando no queda ninguna seleccionada se cierra sola**.
+- **Precio mínimo**: vuelve a verse como antes en el detalle. **Solo en modo cliente** se oculta y se consulta con
+  **3 toques seguidos sobre el precio de venta** (ventanita "Mínimo"). El ahorro frente al catálogo muestra también el %.
+- **Nombre común** del producto (ej. "Protector solar" para "Total Block"): se ve debajo del nombre en tarjetas y detalle,
+  y el buscador lo usa. Si no se escribe, se sugiere solo según el nombre. Columna "Nombre Común" en Excel/CSV.
+  Para guardarlo en la nube ejecuta `supabase/7-nombre-comun.sql`.
+- **Importar facturas sobre productos que ya existen**: se reconocen por código, código casi igual o nombre parecido;
+  solo se suman stock y se actualizan costo y precio de catálogo. **El nombre, la foto y tu precio de venta no cambian.**
+  Botón *No es el mismo* si la coincidencia no es correcta. Corregido: al reimportar facturas en dólares ya no se vuelve
+  a convertir tu precio de venta. Detección más firme de dólares y del tipo de cambio en Belcorp.
+- **Bienvenida**: "Mi Negocio 7pro" como protagonista y "Desarrollado por Ruah Producciones" al pie.
+
+## 4a·1. Novedades v1.3
+
 - **Editor de fotos**: cada foto empieza normal; los ajustes de una foto ya no se aplican a la siguiente.
 - **Precio mínimo oculto**: ya no se ve en el detalle (ni en modo cliente). Toca **3 veces seguidas el precio de venta**
   para ver la ventanita "Puedo darlo hasta ...".

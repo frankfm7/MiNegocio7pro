@@ -289,19 +289,29 @@ function parseYanbal(lines: string[]): InvoiceItem[] {
 
 /** Tipo de cambio a partir de "TOTAL GENERAL ($)" y "TOTAL GENERAL (Bs)" */
 function detectRate(lines: string[]): number | null {
-  const usd = lines.find(l => /TOTAL\s+GENERAL\s*\(\s*\$/i.test(l));
-  const bs = lines.find(l => /TOTAL\s+GENERAL\s*\(\s*Bs/i.test(l));
+  const totals = lines.filter(l => /TOTAL\s+GENERAL/i.test(l));
+  const bs = totals.find(l => /\(\s*Bs/i.test(l));
+  // La otra línea de total general es la de dólares (el "$" a veces se lee como "5" o "S")
+  const usd = totals.find(l => /TOTAL\s+GENERAL\s*\(\s*\$/i.test(l)) || totals.find(l => l !== bs);
   if (!usd || !bs) return null;
-  const nums = (l: string) => cleanLine(l.replace(/^.*?\)\s*:?/, '')).split(' ').filter(isNumTok).map(money).filter(n => n > 0);
+  // Números de la línea, sin basura suelta ("1", "7", la cantidad "34") y uniendo "1 077.60" → 1077.60
+  const nums = (l: string) => cleanLine(l.replace(/^.*?\)\s*:?/, '').replace(/\b(\d{1,3}) (\d{3}[.,]\d{2})\b/g, '$1$2'))
+    .split(' ').filter(t => isNumTok(t) && (/[.,]/.test(t) || t.replace(/\D/g, '').length >= 3)).map(money).filter(n => n > 0);
   const a = nums(usd), b = nums(bs);
-  const ratios: number[] = [];
-  for (let i = 0; i < Math.min(a.length, b.length); i++) {
-    const r = b[b.length - 1 - i] / a[a.length - 1 - i];
-    if (r > 3 && r < 20) ratios.push(r);
+  // Las dos líneas tienen las mismas columnas al final: compra total | monto a pagar | ahorro.
+  // Se comparan columna por columna desde la derecha; primero "monto a pagar" (la más confiable).
+  const valid = (k: number) => {
+    const x = a[a.length - 1 - k], y = b[b.length - 1 - k];
+    const r = x && y ? y / x : 0;
+    return r > 3 && r < 20 && x >= 1 ? r : 0;
+  };
+  const cand = [1, 0, 2].map(valid).filter(Boolean);
+  if (!cand.length) return null;
+  // Si dos columnas dan casi lo mismo, ese es el valor; si no, la de "monto a pagar"
+  for (let i = 0; i < cand.length; i++) for (let j = i + 1; j < cand.length; j++) {
+    if (Math.abs(cand[i] - cand[j]) / cand[i] < 0.01) return round2((cand[i] + cand[j]) / 2);
   }
-  if (!ratios.length) return null;
-  ratios.sort((x, y) => x - y);
-  return round2(ratios[Math.floor(ratios.length / 2)]);
+  return round2(cand[0]);
 }
 
 /** Calidad de una lectura: filas que cuadran y nombres limpios */
@@ -340,7 +350,9 @@ export function parseInvoiceText(text: string): InvoiceResult {
     || lines.filter(l => /^\W*\d{4,6}\s+(ES|LB|CZ|CY|C2)\s/i.test(l)).length >= 2;
   const yanbal = !belcorp && (/UNIDAD\s*\(?\s*BIENES|YANBAL|CR[EÉ]DITO FISCAL/i.test(all) || lines.filter(l => YANBAL_CODE.test(l)).length >= 2);
   if (belcorp) {
-    return { vendor: 'Belcorp', currency: /\(\s*\$\s*\)|US\$|D[OÓ]LAR/i.test(all) ? 'USD' : (/Bs/i.test(all) ? 'Bs' : null), rate: detectRate(lines), items: parseBelcorp(lines), totals };
+    // Detalle de pedido Belcorp: precios en dólares con un segundo total en Bs
+    const twoTotals = lines.filter(l => /TOTAL\s+GENERAL/i.test(l)).length >= 2 && lines.some(l => /TOTAL\s+GENERAL\s*\(\s*Bs/i.test(l));
+    return { vendor: 'Belcorp', currency: /\(\s*\$\s*\)|US\$|D[OÓ]LAR/i.test(all) || twoTotals ? 'USD' : (/Bs/i.test(all) ? 'Bs' : null), rate: detectRate(lines), items: parseBelcorp(lines), totals };
   }
   if (yanbal) {
     return { vendor: 'Yanbal', currency: /\bBs\b|Bolivianos/i.test(all) ? 'Bs' : null, rate: null, items: parseYanbal(lines), totals };

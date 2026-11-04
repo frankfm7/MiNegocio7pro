@@ -4,6 +4,7 @@ import { cardImage, formatContent, formatUSD } from '../lib/format';
 import { fallback } from '../lib/constants';
 import { addCart, openDetail } from '../actions';
 import { useImageBg } from '../lib/imageBg';
+import { guessCommonName } from '../lib/commonName';
 
 /**
  * Tarjeta de producto. Orden: foto → nombre → detalle (marca, contenido, precios) → botones.
@@ -19,6 +20,7 @@ export default function ProductCard({ r }: { r: Product }) {
   const savePct = showCatalog ? Math.round((1 - sale / catalog) * 100) : 0;
   const details = [r.brand, content].filter(Boolean).join(' · ');
   const photoBg = useImageBg(r.image_url);
+  const common = r.common_name || guessCommonName(r.name, r.type);
   return (
     <article className={`product-card flex flex-col ${stateCls}`} data-id={r.id} onClick={() => openDetail(r)}>
       <div className="relative">
@@ -30,6 +32,7 @@ export default function ProductCard({ r }: { r: Product }) {
       </div>
       <div className="p-3 sm:p-4 flex flex-col flex-1">
         <h3 className="card-name font-bold leading-snug line-clamp-2 text-[15px] text-[#201728]" title={r.name}>{r.name}</h3>
+        {common && <p className="card-common text-[12px] italic text-[#5c5266] leading-tight truncate mt-0.5" title={common}>{common}</p>}
         {details && <p className="card-brand text-[11px] font-bold text-[#7b43a8] mt-1 truncate" title={details}>{details}</p>}
         {(r.type || r.category) && <p className="card-category text-[11px] text-[#756c7e] truncate">{[r.type, r.category].filter(Boolean).join(' · ')}</p>}
         {r.offer_text && <div className="card-offer mt-1.5 self-start px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] text-[11px] font-bold truncate max-w-full">{r.offer_text}</div>}

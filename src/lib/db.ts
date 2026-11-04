@@ -52,7 +52,7 @@ export function addToPendingChanges(action: PendingAction, data: any) {
 // ==========================================
 // Columnas que se agregaron con migraciones nuevas. Si la base de datos todavía no las
 // tiene, la app sigue funcionando sin ellas (y avisa en la consola).
-const OPTIONAL_PRODUCT_FIELDS = ['content_value', 'content_unit', 'min_stock', 'catalog_price', 'sku'] as const;
+const OPTIONAL_PRODUCT_FIELDS = ['content_value', 'content_unit', 'min_stock', 'catalog_price', 'sku', 'common_name'] as const;
 const missingColumns = new Set<string>();
 
 function productRow(p: Partial<Product>, sid: string) {
@@ -64,7 +64,7 @@ function productRow(p: Partial<Product>, sid: string) {
     content_value: p.content_value ?? '', content_unit: p.content_unit ?? '',
     min_stock: p.min_stock === undefined || p.min_stock === null || String(p.min_stock) === '' ? null : Number(p.min_stock),
     catalog_price: p.catalog_price === undefined || p.catalog_price === null || String(p.catalog_price) === '' ? null : Number(p.catalog_price),
-    sku: p.sku ?? '',
+    sku: p.sku ?? '', common_name: p.common_name ?? '',
     store_id: sid,
   };
   missingColumns.forEach(f => delete row[f]);

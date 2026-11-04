@@ -26,6 +26,8 @@ export interface Product {
   catalog_price?: number | null;
   /** Código del producto en la empresa/proveedor (ej. 13014 de Ésika, 5109-20014207 de Yanbal) */
   sku?: string | null;
+  /** Nombre común (ej. "Protector solar" para "Total Block"): se ve bajo el nombre y ayuda a buscar */
+  common_name?: string | null;
 }
 
 export interface Catalog {
@@ -226,6 +228,8 @@ export interface DraftProduct extends Partial<Product> {
   _include: boolean;
   /** Producto ya existente al que se le sumará el stock (importar factura) */
   _matchId?: string | null;
+  /** Nombre tal como se leyó en la factura (cuando coincide con un producto existente) */
+  _readName?: string;
   /** Aviso para revisar (ej. precios que no cuadran en la factura) */
   _note?: string;
 }
