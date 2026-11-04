@@ -97,7 +97,7 @@ const GUIDE: Section[] = [
     'Con cuenta: toca **Entrar** (arriba a la derecha) → Google o correo → **Crear mi propia tienda**. Tus datos quedan en la nube y en todos tus dispositivos.',
     'Si ya tenías datos sin cuenta, al crear la tienda la app te ofrece subirlos.',
     'Instala la app en el celular: menú ☰ → **Instalar la app**. Funciona también sin internet; los cambios se suben solos al volver la conexión.',
-    'Moneda: menú ☰ → **Datos del negocio** → *Moneda de los precios* (Bs, USD, S/...). Ahí también van el nombre del negocio, el WhatsApp y el código de país.',
+    'Moneda: menú ☰ → **Datos de la tienda (recibo)** → *Moneda de los precios* (Bs, USD, S/...). Ahí también van el nombre del negocio, el WhatsApp y el código de país.',
   ] },
   { icon: FolderPlus, title: 'Catálogos y productos', steps: [
     'Crea un catálogo con **Añadir catálogo** en la pantalla principal (ej. "Perfumes", "Maquillaje"). Toca la ⭐ para dejarlo como favorito.',
@@ -129,7 +129,7 @@ const GUIDE: Section[] = [
   ] },
   { icon: Receipt, title: 'Recibos numerados y datos de la tienda', steps: [
     'Cada recibo lleva un **número correlativo** con el código de tu tienda, por ejemplo **PA7-000123**. Lo asigna la base de datos de la tienda: aunque varios vendedores vendan al mismo tiempo, **nunca se repite ni se salta**.',
-    'Configúralo en menú ☰ → **Datos del negocio → Recibo de venta**: nombre en el recibo, **código de la tienda**, desde qué número empezar (solo se puede adelantar), **teléfono, celular, dirección y NIT**, y si cada dato se muestra o no. En una tienda lo cambian solo los administradores y vale para todo el equipo.',
+    'Configúralo en menú ☰ → **Datos de la tienda (recibo)**, arriba de todo: nombre de la tienda, **código de la tienda**, desde qué número empezar (solo se puede adelantar), **teléfono, celular, dirección y NIT**, y si cada dato se muestra o no. En una tienda lo cambian solo los administradores y vale para todo el equipo.',
     'El recibo (imagen) lleva el **logo**, los datos de la tienda, el número, la fecha y el nombre del negocio repetido en diagonal como **marca de agua**.',
     'Si el cliente lo pide, en el recibo abre **Datos que pide el cliente** y escribe **N° de factura, código de autorización, N° de pedido o NIT/CI del cliente**: salen en la imagen y en el WhatsApp.',
     'Sin internet el recibo sale con un número **provisional**; al volver la conexión se le asigna el número definitivo en orden.',
@@ -155,7 +155,10 @@ const GUIDE: Section[] = [
     'En Informes puedes **Exportar Excel o CSV** con todas las ventas.',
   ] },
   { icon: FileUp, title: 'Importar productos desde una factura o recibo', intro: 'Sirve para cargar de una vez lo que pediste a Belcorp (Ésika, L\'Bel, Cyzone), Yanbal u otra empresa.', steps: [
-    'Barra de abajo **Datos → Importar → Foto de factura, recibo o detalle de pedido**. Puedes elegir varias fotos (varias páginas).',
+    'Barra de abajo **Datos → Importar → Factura, recibo o detalle de pedido (foto o PDF)**. Puedes elegir varias fotos (varias páginas) o el **PDF** de la factura electrónica.',
+    'Con el **PDF** la lectura es casi perfecta: la tabla se lee por columnas, así una descripción escrita en 2 o 3 líneas queda en su producto, con su cantidad. Un PDF escaneado se lee como foto.',
+    'El **código del producto** es el número **antes del guión** (ej. 5109-20014207 → 5109); lo de después es el código de servicio.',
+    '**Ajustar precios de toda la lista**: *Mi costo* = factura ± % (ej. +5 por envío); *Descuento de la empresa* (31% editable) muestra el costo referencial = catálogo − 31% y puedes usarlo como tu costo; *Mi precio de venta* = catálogo ± % (ej. −10) o costo + % de ganancia (ej. +40). Toca **Aplicar a toda la lista** y luego edita cada producto si quieres.',
     'Toma la foto de frente, con buena luz, sin sombras y con la hoja plana. Tarda de 20 a 40 segundos por foto.',
     'La app reconoce el código, el nombre, la marca, la cantidad, el costo y el precio de catálogo. Revistas, catálogos, flyers y regalos quedan desmarcados.',
     'Revisa la lista: corrige lo marcado con ⚠, cambia el **Tu precio** si quieres y elige el **catálogo** donde guardar.',
@@ -280,24 +283,12 @@ export function ContactsModal() {
   return (
     <Modal id="contacts-modal">
       <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Datos del negocio</h2><CloseButton onClick={() => closeModal('contacts-modal')} /></div>
+        <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Datos de la tienda y del negocio</h2><CloseButton onClick={() => closeModal('contacts-modal')} /></div>
         <form className="space-y-4" onSubmit={submit}>
-          <div><label className="block font-bold text-sm mb-1.5">Nombre completo</label><input value={c.name} onChange={set('name')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: María García" /></div>
-          <div><label className="block font-bold text-sm mb-1.5">WhatsApp</label><input value={c.whatsapp} onChange={set('whatsapp')} type="tel" className="w-full input-field rounded-xl p-3" placeholder="Ej: +591 70000000" /></div>
-          <div><label className="block font-bold text-sm mb-1.5">Código de país (para enviar WhatsApp)</label><input value={c.countryCode} onChange={set('countryCode')} inputMode="numeric" className="w-full input-field rounded-xl p-3" placeholder="Ej: 591 (Bolivia), 51 (Perú), 57 (Colombia)" /></div>
-          <div><label className="block font-bold text-sm mb-1.5">Correo electrónico</label><input value={c.email} onChange={set('email')} type="email" className="w-full input-field rounded-xl p-3" placeholder="Ej: maria@email.com" /></div>
-          <div><label className="block font-bold text-sm mb-1.5">Negocio / Empresa</label><input value={c.business} onChange={set('business')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: Tienda María" /></div>
-          <div>
-            <label className="block font-bold text-sm mb-1.5">Moneda de los precios</label>
-            <select value={cur} onChange={e => setCur(e.target.value)} className="w-full input-field rounded-xl p-3">
-              {CURRENCIES.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
-            </select>
-            <p className="text-[11px] text-[#756c7e] mt-1">Solo cambia la moneda que se muestra; no convierte los precios ya guardados.</p>
-          </div>
           <fieldset id="receipt-settings" disabled={!canEditReceipt} className="p-3 rounded-2xl bg-[#f6f1f8] space-y-3 disabled:opacity-70">
-            <legend className="px-2 font-bold text-sm text-[#7c43ba]">🧾 Recibo de venta{cloud ? ' (para toda la tienda)' : ''}</legend>
+            <legend className="px-2 font-bold text-sm text-[#7c43ba]">🏪 Datos de la tienda (salen en recibos y cierres){cloud ? ' · para toda la tienda' : ''}</legend>
             {!canEditReceipt && <p className="text-[11px] text-[#756c7e]">Solo los administradores pueden cambiar estos datos.</p>}
-            <div><label className="block font-bold text-xs mb-1">Nombre en el recibo</label><input value={rc.name || ''} onChange={e => setRc({ ...rc, name: e.target.value })} className="w-full input-field rounded-xl p-2.5" placeholder={businessName()} /></div>
+            <div><label className="block font-bold text-xs mb-1">Nombre de la tienda</label><input value={rc.name || ''} onChange={e => setRc({ ...rc, name: e.target.value })} className="w-full input-field rounded-xl p-2.5" placeholder={businessName()} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="block font-bold text-xs mb-1">Código de la tienda</label><input value={rc.prefix} onChange={e => setRc({ ...rc, prefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) })} className="w-full input-field rounded-xl p-2.5 font-mono font-bold" placeholder={suggestedPrefix(businessName())} /></div>
               <div><label className="block font-bold text-xs mb-1">Empezar desde N°</label><input value={startAt} onChange={e => setStartAt(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="w-full input-field rounded-xl p-2.5" placeholder={rc.next ? String(rc.next) : '1'} /></div>
@@ -311,6 +302,19 @@ export function ContactsModal() {
               </div>
             ))}
           </fieldset>
+          <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e] pt-1">Tus datos</p>
+          <div><label className="block font-bold text-sm mb-1.5">Nombre completo</label><input value={c.name} onChange={set('name')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: María García" /></div>
+          <div><label className="block font-bold text-sm mb-1.5">WhatsApp</label><input value={c.whatsapp} onChange={set('whatsapp')} type="tel" className="w-full input-field rounded-xl p-3" placeholder="Ej: +591 70000000" /></div>
+          <div><label className="block font-bold text-sm mb-1.5">Código de país (para enviar WhatsApp)</label><input value={c.countryCode} onChange={set('countryCode')} inputMode="numeric" className="w-full input-field rounded-xl p-3" placeholder="Ej: 591 (Bolivia), 51 (Perú), 57 (Colombia)" /></div>
+          <div><label className="block font-bold text-sm mb-1.5">Correo electrónico</label><input value={c.email} onChange={set('email')} type="email" className="w-full input-field rounded-xl p-3" placeholder="Ej: maria@email.com" /></div>
+          <div><label className="block font-bold text-sm mb-1.5">Negocio / Empresa</label><input value={c.business} onChange={set('business')} type="text" className="w-full input-field rounded-xl p-3" placeholder="Ej: Tienda María" /></div>
+          <div>
+            <label className="block font-bold text-sm mb-1.5">Moneda de los precios</label>
+            <select value={cur} onChange={e => setCur(e.target.value)} className="w-full input-field rounded-xl p-3">
+              {CURRENCIES.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
+            </select>
+            <p className="text-[11px] text-[#756c7e] mt-1">Solo cambia la moneda que se muestra; no convierte los precios ya guardados.</p>
+          </div>
           <button type="submit" className="w-full py-3 rounded-xl btn-primary font-bold">Guardar datos</button>
         </form>
       </article>

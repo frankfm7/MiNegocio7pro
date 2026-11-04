@@ -307,6 +307,8 @@ export function QuickScanManualModal() {
 // ==========================================
 export function SaleReceiptModal() {
   const r = useStore(s => s.receiptData);
+  const storeCfg = useStore(s => s.receiptSettings);
+  const isAdmin = useStore(s => s.isAdmin());
   const [waPhone, setWaPhone] = useState('');
   useEffect(() => { setWaPhone(r?.customer?.phone || ''); }, [r]);
   return (
@@ -356,6 +358,9 @@ export function SaleReceiptModal() {
             <div className="flex justify-between text-sm mb-1"><span className="text-gray-600">Descuento:</span><span className="font-bold text-orange-600">{r.discount > 0 ? `-${formatUSD(r.discount)}` : 'Sin descuento'}</span></div>
             <div className="flex justify-between text-xl mt-2 pt-2 border-t border-gray-200"><span className="font-bold">TOTAL:</span><span className="font-bold text-green-700">{formatUSD(r.total)}</span></div>
           </div>
+          {isAdmin && !(storeCfg.address || storeCfg.phone || storeCfg.mobile || storeCfg.nit) && (
+            <button type="button" onClick={() => openModal('contacts-modal')} className="w-full mb-3 p-2.5 rounded-xl bg-[#fffbeb] border border-[#fde68a] text-[12px] text-[#92400e] font-bold text-left">🏪 Agrega la dirección, teléfono y NIT de tu tienda para que salgan en el recibo →</button>
+          )}
           <details className="mb-3 rounded-xl border border-[#ede7f0] p-3 group" open={!!(r.extra && Object.values(r.extra).some(Boolean))}>
             <summary className="text-xs font-bold text-[#7c43ba] cursor-pointer select-none">+ Datos que pide el cliente (opcional): factura, autorización, pedido, NIT</summary>
             <div className="grid grid-cols-2 gap-2 mt-3">

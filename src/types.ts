@@ -275,6 +275,9 @@ export interface DraftProduct extends Partial<Product> {
   _matchId?: string | null;
   /** Nombre tal como se leyó en la factura (cuando coincide con un producto existente) */
   _readName?: string;
+  /** Valores originales de la factura (para aplicar porcentajes sin acumular) */
+  _baseCost?: number;
+  _baseCatalog?: number;
   /** Aviso para revisar (ej. precios que no cuadran en la factura) */
   _note?: string;
 }

@@ -9,7 +9,7 @@ import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '.
 import { fallback } from '../lib/constants';
 import { getLowStockProducts, getOutOfStockProducts, getTodaySales, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
 import Avatar from '../components/Avatar';
-import { exportOutOfStock, exportSalesCSV, exportSalesXLSX } from '../lib/exporters';
+import { exportOutOfStock, exportSalesCSV, exportSalesXLSX, issueReportNumber, shareSalesReport } from '../lib/exporters';
 import { TopbarMenuButton } from './CatalogsScreen';
 import { hideStockAlerts, showStockAlertsAgain, useStockAlerts } from '../lib/stockAlerts';
 import type { Product, Sale } from '../types';
@@ -313,6 +313,10 @@ export function ReportsScreen() {
   const allSales = useStore(s => s.sales);
   const sales = useMemo(() => sortByDateDesc(allSales), [allSales]);
   const profit = sumBy(sales, 'profit');
+  const [report, setReport] = useState<{ code: string } | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  /** Primero se numera y se muestra el número; después se descarga o comparte */
+  const makeReport = async () => { setReportBusy(true); try { setReport({ code: await issueReportNumber('Excel') }); } finally { setReportBusy(false); } };
   return (
     <section id="reports-screen" className="screen active">
       <Header kicker="Análisis" kickerColor="text-[#756c7e]" title="Informes de venta" />
@@ -330,9 +334,21 @@ export function ReportsScreen() {
         <SalesList id="sales-list" title="Historial de ventas" list={sales} showDate />
         {sales.length === 0 && <Empty id="no-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas aún" text="Registra ventas desde el detalle de cada producto" />}
         <div className="mt-6 flex gap-2 flex-wrap">
-          <button onClick={() => exportSalesXLSX()} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> Exportar Excel</button>
-          <button onClick={() => exportSalesCSV()} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileText className="w-4 h-4" /> Exportar CSV</button>
+          <button id="make-report" onClick={makeReport} disabled={reportBusy || !sales.length} className="btn-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" /> {reportBusy ? 'Numerando...' : 'Generar informe numerado'}</button>
         </div>
+        {report && (
+          <div id="report-ready" className="mt-3 p-4 rounded-2xl border-2 border-[#7c43ba] bg-[#f6f1f8]">
+            <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">Informe de ventas</p>
+            <p className="font-mono font-black text-xl text-[#201728]">{report.code ? `N° ${report.code}` : 'Sin número (sin conexión)'}</p>
+            <p className="text-xs text-[#756c7e] mt-0.5">{sales.length} ventas · {formatUSD(sumBy(sales, 'actual_price'))}</p>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <button type="button" onClick={() => exportSalesXLSX(report.code || undefined)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+              <button type="button" onClick={() => exportSalesCSV(report.code || undefined)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileText className="w-4 h-4" /> CSV</button>
+              <button type="button" onClick={() => shareSalesReport(report.code || 'sin-numero')} className="py-2.5 rounded-xl bg-[#25D366] text-white text-xs font-bold flex flex-col items-center gap-0.5"><Share2 className="w-4 h-4" /> Compartir</button>
+            </div>
+            <p className="text-[10px] text-[#756c7e] mt-2">Si no te sirve, simplemente no lo descargues: el número queda registrado en "Recibos y cierres".</p>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -157,7 +157,7 @@ export default function Sidebar() {
           <p className="text-[10px] uppercase tracking-[.15em] font-bold text-[#756c7e] px-3 py-2 mt-4">Soporte</p>
           {canInstall && <Item onClick={() => later(installApp)}><Download className={icon} /> Instalar la app</Item>}
           <Item onClick={() => later(() => openModal('help-modal'))}><HelpCircle className={icon} /> Cómo usar la app</Item>
-          <Item className="admin-only" onClick={() => later(() => openModal('contacts-modal'))}><Phone className={icon} /> Datos del negocio</Item>
+          <Item className="admin-only" onClick={() => later(() => openModal('contacts-modal'))}><Phone className={icon} /> Datos de la tienda (recibo)</Item>
           <Item onClick={showWelcome}><Tv2 className={icon} /> Ver bienvenida</Item>
 
           <p className="text-[10px] uppercase tracking-[.15em] font-bold text-[#756c7e] px-3 py-2 mt-4">Apariencia</p>

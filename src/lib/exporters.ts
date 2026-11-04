@@ -11,6 +11,27 @@ import { businessName } from './whatsapp';
 // ==========================================
 // INFORMES DE VENTAS
 // ==========================================
+/** Numera un informe nuevo (para mostrar el número ANTES de descargarlo o compartirlo) */
+export async function issueReportNumber(format: 'Excel' | 'CSV' = 'Excel') {
+  return reportNumber(format);
+}
+
+/** Comparte el informe como archivo (WhatsApp, correo...) */
+export async function shareSalesReport(code: string) {
+  const XLSX = await import('xlsx');
+  const { sales } = getState();
+  const ws = XLSX.utils.aoa_to_sheet([[`Informe de ventas N° ${code} · ${businessName()}`], [`Generado el ${new Date().toLocaleString('es')}`], []]);
+  XLSX.utils.sheet_add_json(ws, sales.map(s => ({ 'Fecha': new Date(s.date).toLocaleString('es'), 'Recibo': s.receipt_no || '', 'Producto': s.product_name, 'Cantidad': s.quantity || 1, 'Precio Real': s.actual_price, 'Método': s.payment_method || 'Efec.', 'Cliente': s.customer_name || '', 'Vendedor': s.seller_name || '', 'Ganancia': s.profit })), { origin: 'A4' });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Informe Ventas');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const file = new File([out], `informe_ventas_${code}.xlsx`, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], text: `Informe de ventas N° ${code}` }); return; } catch (e) { if ((e as Error).name === 'AbortError') return; }
+  }
+  downloadBlob(file, file.name);
+  toast('Este navegador no permite compartir archivos: se descargó el informe');
+}
+
 /** Numera el informe (ANA-I-000001) y deja la copia en "Recibos y cierres" */
 async function reportNumber(format: 'Excel' | 'CSV', reuse?: string) {
   if (reuse) return reuse;
@@ -115,7 +136,7 @@ export async function exportCartToPDF() {
 // ==========================================
 export function createBackup() {
   const { catalogs, records, sales, contactInfo, customers, movements } = getState();
-  const backup = { app: APP_NAME, version: '1.7', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
+  const backup = { app: APP_NAME, version: '1.8', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
   downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `respaldo_catalogo_${Date.now()}.json`);
   toast('Respaldo creado ✓');
   SoundEffects.play('success');

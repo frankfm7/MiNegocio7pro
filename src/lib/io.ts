@@ -458,7 +458,7 @@ export function parseTextLines(lines: string[]): DraftProduct[] {
   return out;
 }
 
-async function pageImages(page: import('pdfjs-dist').PDFPageProxy, pdfjs: typeof import('pdfjs-dist')): Promise<string[]> {
+async function pageImages(page: import('pdfjs-dist').PDFPageProxy, pdfjs: typeof import('pdfjs-dist'), lossless = false): Promise<string[]> {
   const ops = await page.getOperatorList();
   const names: string[] = [];
   ops.fnArray.forEach((fn, i) => { if (fn === pdfjs.OPS.paintImageXObject) names.push(ops.argsArray[i][0]); });
@@ -482,9 +482,80 @@ async function pageImages(page: import('pdfjs-dist').PDFPageProxy, pdfjs: typeof
       }
       ctx.putImageData(img, 0, 0);
     } else continue;
-    out.push(c.toDataURL('image/jpeg', 0.85));
+    out.push(lossless ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.85));
   }
   return out;
+}
+
+/**
+ * Texto de un PDF de factura armado por FILAS DE PRODUCTO: cada código de la primera
+ * columna es una fila, y a ella se le juntan los pedazos de texto más cercanos (aunque la
+ * descripción esté escrita en 2 o 3 líneas arriba o abajo del código).
+ */
+async function pdfInvoiceLines(pdf: import('pdfjs-dist').PDFDocumentProxy): Promise<{ lines: string[]; chars: number }> {
+  const out: string[] = [];
+  let chars = 0;
+  const CODE = /^\d{2,6}-\d{3,10}$|^\d{4,8}$/;
+  const NUM = /^[\d.,]+%?$/;
+  const UNIT = /^(UNIDAD(ES)?|\(?BIENES\)?|SERVICIOS?|UND|PZA|PIEZAS?|KIT)$/i;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    type T = { x: number; y: number; s: string };
+    const items: T[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const it of tc.items as any[]) {
+      const str = String(it.str || '').trim();
+      if (!str) continue;
+      chars += str.length;
+      // Un mismo pedazo puede traer varias palabras: se separan para ubicar el código
+      const words = str.split(/\s+/);
+      const w = Number(it.width) || str.length * 4;
+      let off = 0;
+      words.forEach(word => { items.push({ x: it.transform[4] + (off / str.length) * w, y: it.transform[5], s: word }); off += word.length + 1; });
+    }
+    if (!items.length) continue;
+    const minX = Math.min(...items.map(i => i.x));
+    const maxX = Math.max(...items.map(i => i.x));
+    // Códigos en la primera columna (a la izquierda)
+    const anchors = items.filter(i => CODE.test(i.s) && i.x <= minX + (maxX - minX) * 0.14).sort((a, b) => b.y - a.y);
+    const anchorSet = new Set(anchors);
+    const gaps = anchors.slice(1).map((a, i) => anchors[i].y - a.y).filter(g => g > 1).sort((a, b) => a - b);
+    const gap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 30;
+    const tol = Math.max(6, gap * 0.6);
+    const groups = new Map<T, T[]>();
+    anchors.forEach(a => groups.set(a, []));
+    const loose: T[] = [];
+    for (const it of items) {
+      if (anchorSet.has(it)) continue;
+      let best: T | null = null, bd = Infinity;
+      for (const a of anchors) { const d = Math.abs(a.y - it.y); if (d < bd) { bd = d; best = a; } }
+      if (best && bd <= tol) groups.get(best)!.push(it); else loose.push(it);
+    }
+    // Filas: las del producto (código + cantidad/unidad + descripción completa + números) y las sueltas (totales, encabezados)
+    const rows: { y: number; text: string }[] = [];
+    for (const a of anchors) {
+      const g = groups.get(a)!;
+      const sameRow = (t: T) => Math.abs(t.y - a.y) <= 2.5;
+      const words = g.filter(t => !NUM.test(t.s) && !UNIT.test(t.s));
+      const descX = words.length ? Math.min(...words.map(t => t.x)) : Infinity;
+      // Columna de precios: el primer monto con decimales a la derecha de la descripción
+      const money = g.filter(t => sameRow(t) && t.x >= descX && /^\d[\d.,]*[.,]\d{2}$/.test(t.s));
+      const priceX = money.length ? Math.min(...money.map(t => t.x)) - 1 : Infinity;
+      const left = g.filter(t => sameRow(t) && t.x < descX && (NUM.test(t.s) || UNIT.test(t.s))).sort((x, y) => x.x - y.x);
+      const right = g.filter(t => t.x >= priceX && NUM.test(t.s)).sort((x, y) => (Math.abs(x.y - y.y) > 2.5 ? y.y - x.y : x.x - y.x));
+      // La descripción incluye sus números ("SPF 50", "100 ML"), que están antes de la columna de precios
+      const desc = g.filter(t => !UNIT.test(t.s) && t.x >= descX && t.x < priceX);
+      const name = desc.sort((x, y) => (Math.abs(x.y - y.y) > 2.5 ? y.y - x.y : x.x - y.x)).map(t => t.s).join(' ');
+      const units = g.filter(t => UNIT.test(t.s) && !left.includes(t)).map(t => t.s);
+      rows.push({ y: a.y, text: [a.s, ...left.map(t => t.s), ...units, name, ...right.map(t => t.s)].filter(Boolean).join('   ') });
+    }
+    const looseRows = new Map<number, T[]>();
+    for (const t of loose) { const k = Math.round(t.y / 3) * 3; if (!looseRows.has(k)) looseRows.set(k, []); looseRows.get(k)!.push(t); }
+    looseRows.forEach((ts, y) => rows.push({ y, text: ts.sort((a, b) => a.x - b.x).map(t => t.s).join(' ') }));
+    rows.sort((a, b) => b.y - a.y).forEach(r => out.push(r.text));
+  }
+  return { lines: out, chars };
 }
 
 async function parsePDFFile(file: File) {
@@ -509,7 +580,46 @@ async function parsePDFFile(file: File) {
       return;
     } catch (e) { console.warn('Datos del PDF dañados, se leerá el texto', e); }
   }
-  // 2) Otro PDF: leer el texto (y las fotos si coinciden con los productos)
+  // 2) Factura / detalle de pedido en PDF: se lee la tabla por columnas
+  const { lines: invLines, chars } = await pdfInvoiceLines(pdf);
+  if (chars < 40) {
+    // PDF escaneado (solo imágenes): se lee como foto
+    toast('PDF escaneado: leyendo las páginas como foto...', 4000);
+    const files: File[] = [];
+    for (let p = 1; p <= Math.min(pdf.numPages, 10); p++) {
+      const page = await pdf.getPage(p);
+      // 1º la foto original que trae el PDF (misma calidad que la foto)
+      try {
+        const imgs = await pageImages(page, pdfjs, true);
+        if (imgs.length) {
+          const sizes = await Promise.all(imgs.map(src => new Promise<number>(ok => { const i = new Image(); i.onload = () => ok(i.width * i.height); i.onerror = () => ok(0); i.src = src; })));
+          const big = imgs[sizes.indexOf(Math.max(...sizes))];
+          if (Math.max(...sizes) > 400000) {
+            const blob = await (await fetch(big)).blob();
+            files.push(new File([blob], `pagina-${p}.png`, { type: 'image/png' }));
+            continue;
+          }
+        }
+      } catch { /* se dibuja la página */ }
+      // Tamaño parecido al de una foto de celular (~1750 px de ancho): así se lee igual que la foto
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale: Math.min(4, Math.max(1.5, 1750 / base.width)) });
+      const c = document.createElement('canvas');
+      c.width = vp.width; c.height = vp.height;
+      await page.render({ canvasContext: c.getContext('2d')!, viewport: vp }).promise;
+      const blob = await new Promise<Blob | null>(ok => c.toBlob(ok, 'image/png'));
+      if (blob) files.push(new File([blob], `pagina-${p}.png`, { type: 'image/png' }));
+    }
+    if (files.length) { await importInvoiceImages(files); return; }
+  }
+  const { parseInvoiceText } = await import('./invoice');
+  const invText = invLines.join('\n');
+  (window as unknown as { __mn7UltimoTexto?: string }).__mn7UltimoTexto = invText;
+  const inv = parseInvoiceText(invText);
+  if (inv.items.length && (inv.vendor !== 'Factura' || inv.items.length >= 2)) {
+    if (openInvoicePreview(inv, invText, `PDF ${file.name}`)) return;
+  }
+  // 3) Otro PDF: leer el texto (y las fotos si coinciden con los productos)
   const items: DraftProduct[] = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
@@ -625,9 +735,10 @@ const codeNear = (a: string, b: string) => a.length === b.length && a.length >= 
 function findExisting(code: string, name: string, brand = ''): Product | undefined {
   const { records } = getState();
   const c = code.replace(/\s/g, '');
-  const digits = c.replace(/\D/g, '');
+  const digits = productCode(c).replace(/\D/g, '');
   if (c) {
-    const byCode = records.find(r => (r.sku && r.sku.replace(/\s/g, '') === c) || (r.barcode && r.barcode.replace(/\s/g, '') === c));
+    const pc = productCode(c);
+    const byCode = records.find(r => (r.sku && (r.sku.replace(/\s/g, '') === c || productCode(r.sku) === pc)) || (r.barcode && r.barcode.replace(/\s/g, '') === c));
     if (byCode) return byCode;
   }
   const n = normalize(name);
@@ -639,7 +750,7 @@ function findExisting(code: string, name: string, brand = ''): Product | undefin
   for (const r of records) {
     const sim = nameSimilarity(name, r.name);
     const sameBrand = !brand || !r.brand || normalize(r.brand) === normalize(brand);
-    const nearCode = digits && r.sku ? codeNear(digits, r.sku.replace(/\D/g, '')) : false;
+    const nearCode = digits && r.sku ? codeNear(digits, productCode(r.sku).replace(/\D/g, '')) : false;
     const score = sim + (nearCode ? 0.3 : 0) + (sameBrand ? 0.05 : -0.3);
     const ok = (nearCode && sim >= 0.35) || sim >= 0.8;
     if (ok && score > bestScore) { best = r; bestScore = score; }
@@ -697,6 +808,18 @@ export async function importInvoiceImages(files: File[]) {
     (window as unknown as { __mn7UltimoTexto?: string }).__mn7UltimoTexto = text;
     if (!pages.length) return;
     const inv: InvoiceResult = pages.reduce((a, r) => ({ ...a, rate: a.rate ?? r.rate, currency: a.currency ?? r.currency, items: [...a.items, ...r.items], totals: [...a.totals, ...r.totals] }));
+    openInvoicePreview(inv, text, `${list.length} foto${list.length > 1 ? 's' : ''}`);
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo leer la foto: ' + (e as Error).message, 4000);
+  }
+}
+
+/** Código de producto de la empresa: lo que va ANTES del guión ("5109-20014207" → "5109"; lo de después es el código de servicio) */
+export const productCode = (code: string) => (code || '').trim().split('-')[0].replace(/\s/g, '');
+
+/** Abre la revisión de una factura ya leída (foto o PDF) */
+function openInvoicePreview(inv: InvoiceResult, text: string, label: string): boolean {
     let items: DraftProduct[] = [];
     if (inv.items.length) {
       // Juntar filas repetidas (mismo código y nombre)
@@ -715,8 +838,9 @@ export async function importInvoiceImages(files: File[]) {
           _key: newId(), _include: !it.isMaterial && !it.isGift, _matchId: ex?.id || null, _note: notes, _readName: it.name,
           name: ex?.name || it.name, brand: it.brand || ex?.brand || '', type: ex?.type || type, category: ex?.category || category,
           common_name: ex?.common_name || guessCommonName(it.name, type),
-          sku: ex?.sku || it.code, barcode: ex?.barcode || '', content_value: ex?.content_value || sp?.value || '', content_unit: ex?.content_unit || sp?.unit || '',
+          sku: ex?.sku || productCode(it.code), barcode: ex?.barcode || '', content_value: ex?.content_value || sp?.value || '', content_unit: ex?.content_unit || sp?.unit || '',
           stock: it.qty, catalog_price: it.catalogUnit || null, cost_price: it.costUnit,
+          _baseCost: it.costUnit, _baseCatalog: it.catalogUnit || 0,
           sale_price: ex ? ex.sale_price : (it.catalogUnit || it.costUnit), min_price: ex ? ex.min_price : it.costUnit,
           description: '', offer_text: '', image_url: '',
         } as DraftProduct;
@@ -724,23 +848,20 @@ export async function importInvoiceImages(files: File[]) {
     } else {
       items = parseTextLines(text.split(/\r?\n/));
     }
-    if (!items.length) { toast('No se encontraron productos en la foto. Prueba con más luz, sin sombras y la hoja recta.', 5000); return; }
+    if (!items.length) { toast(`No se encontraron productos en ${label.includes('PDF') ? 'el PDF' : 'la foto'}. Prueba con más luz, sin sombras y la hoja recta.`, 5000); return false; }
     const app = getState().appCurrency;
     const saved = Number(localStorage.getItem(INVOICE_RATE_KEY)) || 0;
     const rate = inv.rate || saved || 6.96;
     const currencyOf = inv.currency || app;
     setState({
       importPreview: {
-        source: `${inv.vendor === 'Factura' ? 'Foto' : inv.vendor} · ${list.length} foto${list.length > 1 ? 's' : ''}`,
+        source: `${inv.vendor === 'Factura' ? 'Documento' : inv.vendor} · ${label}`,
         items, catalogs: [], target: guessCatalog(items), newCatalogName: inv.vendor === 'Yanbal' ? 'Yanbal' : inv.vendor === 'Belcorp' ? 'Perfumería' : 'Compras ' + new Date().toLocaleDateString('es'),
         invoice: { vendor: inv.vendor, currency: currencyOf, rate, convert: currencyOf !== app, totals: inv.totals.slice(-4) },
       },
     });
     openModal('import-preview-modal');
-  } catch (e) {
-    console.error(e);
-    toast('No se pudo leer la foto: ' + (e as Error).message, 4000);
-  }
+    return true;
 }
 
 /** Factor para pasar los precios de la factura a la moneda de la app */
@@ -814,8 +935,8 @@ export async function commitImport() {
   let restocked = 0;
 
   for (const d of pv.items.filter(i => i._include && i.name?.trim())) {
-    const { _key, _catalogName, _include, _matchId, _note, _readName, ...rest } = d;
-    void _key; void _include; void _note; void _readName;
+    const { _key, _catalogName, _include, _matchId, _note, _readName, _baseCost, _baseCatalog, ...rest } = d;
+    void _key; void _include; void _note; void _readName; void _baseCost; void _baseCatalog;
     if (pv.invoice) {
       rest.cost_price = money(rest.cost_price);
       rest.catalog_price = rest.catalog_price ? money(rest.catalog_price) : null;

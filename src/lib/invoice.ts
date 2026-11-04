@@ -263,11 +263,13 @@ function parseYanbal(lines: string[]): InvoiceItem[] {
     // "1.00", "4.00", "100" (= 1.00) o "2"; no "273" (resto de un código mal leído)
     const qtyTok = toks.slice(0, unitIdx > 0 ? unitIdx : 3).find(t => isNumTok(t) && /^(\d{1,2}|\d[.]\d{2}|\d{1,2}00)$/.test(t.replace(/[^\d.]/g, '')));
     const qtyRead = (qtyTok && quantity(qtyTok)) || 1;
-    const nums = toks.filter((t, idx) => isMoneyTok(t) && t !== qtyTok && !(idx < 2 && /^\d{1,2}$/.test(t)) && /[.]|\d{3,}/.test(t)
+    // Números que son parte del nombre: "100 ML", "SPF 50", "FPS 30"
+    const inName = (idx: number) => /^\d{1,3}$/.test(toks[idx]) && (/^(ML|G|GR|GRS|KG|L|LT|MG|OZ|CM|MM)$/i.test(toks[idx + 1] || '') || /^(SPF|FPS)$/i.test(toks[idx - 1] || ''));
+    const nums = toks.filter((t, idx) => !inName(idx) && isMoneyTok(t) && t !== qtyTok && !(idx < 2 && /^\d{1,2}$/.test(t)) && /[.]|\d{3,}/.test(t)
       && !/^20[1-4]\d$/.test(t.replace(/\D/g, '')))    // años del nombre ("C12 2026")
       .map(money).filter(n => !isNaN(n));
     const { unit, disc, subtotal, qty, ok } = solveRow(nums, qtyRead);
-    const words = upperWords(toks.filter(t => !isNumTok(t)).join(' '))
+    const words = upperWords(toks.filter((t, idx) => !isNumTok(t) || inName(idx)).join(' '))
       .filter(w => !/^(UNIDAD|UNIDA|NDAD|SERVICIOS|BENS|BENTOS|INAS)$/i.test(w) && !/IENES\)?$/i.test(w));
     // Basura corta del OCR al inicio del nombre (ej. "DS CT")
     while (words.length > 1 && words[0].length <= 2 && !/\d/.test(words[0])) words.shift();
@@ -281,7 +283,8 @@ function parseYanbal(lines: string[]): InvoiceItem[] {
       code: b.code, name: prettyName(name), brand: 'Yanbal', qty,
       catalogUnit: round2(unit), costUnit: costUnit < 0 ? 0 : costUnit,
       isMaterial: MATERIAL_RE.test(name), isGift: (unit <= 0.01 || GIFT_RE.test(name)) && !MATERIAL_RE.test(name),
-      check: !ok,
+      // Cantidad que no coincide con la leída y precio sospechoso: revisar
+      check: !ok || (qty !== qtyRead && (qty > 12 || unit < 2)),
     });
   }
   return out;

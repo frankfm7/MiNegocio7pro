@@ -28,8 +28,15 @@ export default function CashCloseScreen() {
   const text = (n = number) => cashSummaryText(sum, isAdmin, n);
 
   const shift = (days: number) => { const d = new Date(dateKey + 'T12:00:00'); d.setDate(d.getDate() + days); setDateKey(dateKeyOf(d)); };
-  const copy = async () => { const n = await ensureNumber(); try { await navigator.clipboard.writeText(text(n)); toast('Resumen copiado ✓'); } catch { toast('No se pudo copiar'); } };
-  const sendWhatsApp = async () => { const n = await ensureNumber(); openWhatsApp(whatsapp, text(n)); };
+  /** Si el cierre aún no tiene número, primero se asigna y se muestra (se envía al tocar otra vez) */
+  const numberFirst = async () => {
+    if (number) return number;
+    const n = await ensureNumber();
+    if (n) toast(`🧾 Cierre N° ${n} asignado. Revísalo y toca otra vez para enviarlo o copiarlo.`, 4500);
+    return n ? '' : 'sin-numero';
+  };
+  const copy = async () => { const n = await numberFirst(); if (!n) return; try { await navigator.clipboard.writeText(text(n === 'sin-numero' ? '' : n)); toast('Resumen copiado ✓'); } catch { toast('No se pudo copiar'); } };
+  const sendWhatsApp = async () => { const n = await numberFirst(); if (!n) return; openWhatsApp(whatsapp, text(n === 'sin-numero' ? '' : n)); };
 
   return (
     <section id="cash-close-screen" className="screen active">
@@ -45,7 +52,14 @@ export default function CashCloseScreen() {
           <input type="date" value={dateKey} max={todayKey()} onChange={e => e.target.value && setDateKey(e.target.value)} className="flex-1 input-field rounded-xl p-2.5 text-center font-bold" />
           <button type="button" disabled={dateKey >= todayKey()} onClick={() => shift(1)} className="btn-ghost rounded-full w-10 h-10 font-bold disabled:opacity-40" aria-label="Día siguiente">›</button>
         </div>
-        <p className="text-sm text-[#756c7e] mb-4 first-letter:uppercase">{sum.label}{number && <span id="close-number" className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#f6f1f8] text-[#7c43ba] font-bold font-mono text-xs">N° {number}</span>}</p>
+        <p className="text-sm text-[#756c7e] mb-3 first-letter:uppercase">{sum.label}</p>
+        <div className="mb-4 p-3 rounded-2xl bg-[#f6f1f8] flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">N° de cierre</p>
+            {number ? <p id="close-number" className="font-mono font-black text-lg text-[#201728]">{number}</p> : <p className="text-sm text-[#756c7e]">Aún sin número</p>}
+          </div>
+          {!number && <button type="button" onClick={() => void ensureNumber()} className="px-3 py-2 rounded-xl btn-primary text-xs font-bold">Asignar número</button>}
+        </div>
 
         <section className="grid grid-cols-2 gap-3 mb-5">
           <article className="stat-card rounded-2xl p-4 border-l-4 border-l-[#23805d]"><p className="font-bold text-xl text-[#166534]">{formatUSD(sum.collected)}</p><p className="text-[11px] text-[#756c7e]">Total cobrado</p></article>
@@ -96,7 +110,7 @@ export default function CashCloseScreen() {
           <button type="button" onClick={copy} className="py-3 rounded-xl btn-ghost font-bold text-sm flex items-center justify-center gap-2"><Copy className="w-4 h-4" /> Copiar resumen</button>
           <button type="button" onClick={async () => { await generateDailyCloseImage(dateKey); localDocs().then(list => setNumber(list.find(d => d.kind === 'cierre' && d.ref === dateKey)?.code || number)); }} className="py-3 rounded-xl btn-primary font-bold text-sm flex items-center justify-center gap-2"><ImageDown className="w-4 h-4" /> Imagen del cierre</button>
         </div>
-        <p className="text-[11px] text-[#756c7e] mt-2">“Enviar por WhatsApp” usa el número de «Datos del negocio»; si no hay, WhatsApp te deja elegir el contacto.</p>
+        <p className="text-[11px] text-[#756c7e] mt-2">“Enviar por WhatsApp” usa el número de «Datos de la tienda»; si no hay, WhatsApp te deja elegir el contacto.</p>
       </div>
     </section>
   );

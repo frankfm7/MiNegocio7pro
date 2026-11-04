@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.7
+# MiNegocio7pro · v1.8
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -74,7 +74,21 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.7 · Cierres e informes numerados, historial y WhatsApp con imagen
+## 4a. Novedades v1.8
+
+- **Datos de la tienda** (nombre, dirección, teléfono, celular, NIT, código): ahora arriba de todo en menú ☰ →
+  **Datos de la tienda (recibo)**; el recibo avisa si faltan.
+- **Números visibles antes de enviar**: el cierre de caja muestra "N° de cierre" (botón *Asignar número*; el primer
+  toque en WhatsApp/Copiar asigna y muestra el número). Informes: *Generar informe numerado* muestra el N° y luego
+  Excel / CSV / Compartir.
+- **Facturas en PDF**: se leen con el lector de facturas por columnas (descripciones en varias líneas, cantidades);
+  PDF escaneado → se usa la foto original del PDF.
+- **Código de producto** = lo que va antes del guión (5109-20014207 → 5109); los productos ya importados se reconocen igual.
+- **Porcentajes** al importar: costo ± %, descuento de la empresa sobre catálogo (31% editable, costo referencial) y
+  precio de venta = catálogo ± % o costo + % de ganancia, "Aplicar a toda la lista".
+- Campos numéricos (tipo de cambio, cantidad, costo, precios) se pueden borrar sin que salte a 0.
+
+## 4a·0. Novedades v1.7 · Cierres e informes numerados, historial y WhatsApp con imagen
 
 - **Recibo desde la selección múltiple**: si las ventas son de un mismo recibo se abre ese recibo (copia, mismo número);
   si no tienen recibo se emite uno nuevo; **una venta nunca sale en dos recibos** (si se mezclan, la app avisa).
