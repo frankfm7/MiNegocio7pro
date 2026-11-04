@@ -23,6 +23,15 @@ export function DetailModal() {
   const r = useStore(s => (s.detail ? s.records.find(x => x.id === s.detail!.id) || s.detail : null));
   const [menuOpen, setMenuOpen] = useState(false);
   const photoBg = useImageBg(r?.image_url);
+  const [showMin, setShowMin] = useState(false);
+  const taps = useRef<number[]>([]);
+  /** 3 toques en menos de 1 segundo sobre el precio de venta */
+  const secretTap = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter(t => now - t < 1000), now];
+    if (taps.current.length >= 3) { taps.current = []; setShowMin(true); }
+  };
+  useEffect(() => { setShowMin(false); }, [detail?.id]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -100,9 +109,18 @@ export function DetailModal() {
                 <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#be416d] text-white text-xs font-bold">Ahorras {formatUSD(Number(r.catalog_price) - Number(r.sale_price))}</span></p>
             )}
             <p className="text-xs uppercase tracking-[.15em] font-bold text-[#704397]">Precio de venta</p>
-            <p id="detail-sale-price" className="price-highlight mt-2">{formatUSDShort(r.sale_price)} <span className="currency-tag">{currency()}</span></p>
-            <p id="detail-min-price" className="text-xs text-[#756c7e] mt-1 member-only"><span className="text-xs text-[#756c7e]">Mínimo:</span> <span className="font-bold text-sm text-[#a43658]">{formatUSD(r.min_price || 0)}</span></p>
+            {/* Toque secreto: 3 toques seguidos sobre el precio muestran el precio mínimo (no se ve a simple vista) */}
+            <p id="detail-sale-price" className="price-highlight mt-2 inline-block select-none cursor-default" style={{ touchAction: "manipulation" }} onClick={secretTap}>{formatUSDShort(r.sale_price)} <span className="currency-tag">{currency()}</span></p>
           </div>
+          {showMin && (
+            <div className="fixed inset-0 z-[75] grid place-items-center bg-black/30 p-6" onClick={() => setShowMin(false)}>
+              <div id="secret-min-price" className="bg-white rounded-2xl shadow-2xl px-6 py-5 text-center min-w-[220px]" onClick={e => e.stopPropagation()}>
+                <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">Puedo darlo hasta</p>
+                <p className="text-3xl font-bold text-[#a43658] mt-1">{formatUSD(r.min_price || 0)}</p>
+                <button type="button" onClick={() => setShowMin(false)} className="mt-4 w-full py-2 rounded-xl btn-ghost text-sm font-bold">Cerrar</button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sensitive-data">
             <div className="rounded-2xl bg-white border border-[#ede7f0] p-3 text-center shadow-sm">
               <p className="text-[10px] text-[#746d7d] uppercase tracking-wide font-bold">Costo</p>
@@ -172,7 +190,7 @@ export function SaleModal() {
             <div className="flex flex-wrap gap-1.5 mt-2 text-[11px] font-bold">
               {Number(r.catalog_price) > 0 && <span className="px-2 py-0.5 rounded-full bg-white text-[#756c7e]">Catálogo {formatUSD(r.catalog_price)}</span>}
               <span className="px-2 py-0.5 rounded-full bg-white text-[#201728] sensitive-data">Costo {formatUSD(r.cost_price)}</span>
-              {Number(r.min_price) > 0 && <span className="px-2 py-0.5 rounded-full bg-white text-[#a43658]">Mínimo {formatUSD(r.min_price)}</span>}
+              {Number(r.min_price) > 0 && <span className="px-2 py-0.5 rounded-full bg-white text-[#a43658] sensitive-data">Mínimo {formatUSD(r.min_price)}</span>}
             </div>
           </div>
           <div className="bg-[#f0fdf4] p-4 rounded-2xl mb-4 text-center border border-[#bbf7d0]">

@@ -15,10 +15,8 @@ import { toast } from '../store';
 interface EditorStore { src: string | null; initial: Partial<EditState> | null; resolve: ((v: string | null) => void) | null }
 const useEditor = create<EditorStore>(() => ({ src: null, initial: null, resolve: null }));
 
-const PREFS_KEY = 'mn7_img_prefs';
-function savedPrefs(): Partial<EditState> {
-  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; }
-}
+// Los ajustes NO se recuerdan: cada foto empieza normal (cada imagen es distinta).
+try { localStorage.removeItem('mn7_img_prefs'); } catch { /* sin acceso */ }
 
 /** Abre el editor con una foto (dataURL o URL). Devuelve la foto final o null. */
 export function editProductImage(src: string, initial: Partial<EditState> = {}): Promise<string | null> {
@@ -43,7 +41,7 @@ function EditorInner({ src }: { src: string }) {
   const initial = useEditor(s => s.initial);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
-  const [st, setSt] = useState<EditState>(() => ({ ...DEFAULT_EDIT, ...pick(savedPrefs()), ...initial }));
+  const [st, setSt] = useState<EditState>(() => ({ ...DEFAULT_EDIT, ...initial }));
   const [tab, setTab] = useState<Tab>('frame');
   const [tool, setTool] = useState<Tool>('move');
   const [brush, setBrush] = useState(28);
@@ -200,8 +198,6 @@ function EditorInner({ src }: { src: string }) {
       out.width = ratio <= 1 ? Math.round(OUT_LONG * ratio) : OUT_LONG;
       out.height = ratio <= 1 ? OUT_LONG : Math.round(OUT_LONG / ratio);
       compose(out.getContext('2d')!, out.width, out.height, cut, st, originalBg);
-      // Recordar el estilo elegido para la próxima foto
-      try { localStorage.setItem(PREFS_KEY, JSON.stringify({ bg: st.bg, aspect: st.aspect, shadow: st.shadow, removeBg: st.removeBg, auto: st.auto, sharpen: st.sharpen })); } catch { /* sin espacio */ }
       close(out.toDataURL('image/jpeg', 0.88));
     } finally { setBusy(false); }
   };
@@ -328,18 +324,6 @@ function ToolBtn({ onClick, icon, label, active }: { onClick: () => void; icon: 
 
 const mid = (pts: { x: number; y: number }[]) => ({ x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length });
 const clampZoom = (z: number) => Math.max(0.3, Math.min(6, z));
-
-/** Solo las preferencias que tiene sentido recordar entre fotos */
-function pick(p: Partial<EditState>): Partial<EditState> {
-  const out: Partial<EditState> = {};
-  if (typeof p.bg === 'string') out.bg = p.bg;
-  if (p.aspect && p.aspect in ASPECTS) out.aspect = p.aspect;
-  if (typeof p.shadow === 'boolean') out.shadow = p.shadow;
-  if (typeof p.removeBg === 'boolean') out.removeBg = p.removeBg;
-  if (typeof p.auto === 'boolean') out.auto = p.auto;
-  if (typeof p.sharpen === 'number') out.sharpen = p.sharpen;
-  return out;
-}
 
 /** Tamaño del marco en pantalla según el espacio disponible y la proporción */
 function useFrameSize(ref: React.RefObject<HTMLDivElement>, aspect: Aspect) {

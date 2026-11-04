@@ -509,8 +509,11 @@ export function startHeartbeat() {
   stopHeartbeat();
   const beat = () => { const sid = storeId(); if (sid && canUseCloud()) supabaseClient!.rpc('touch_member', { p_store: sid }).then(() => {}, () => {}); };
   beat();
-  heartbeatInterval = setInterval(beat, 60000);
+  heartbeatInterval = setInterval(() => { if (document.visibilityState !== 'hidden') beat(); }, 60000);
+  // Al volver a la app se marca "en línea" al instante
+  if (!visibilityHooked) { visibilityHooked = true; document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && heartbeatInterval) beat(); }); }
 }
+let visibilityHooked = false;
 export function stopHeartbeat() {
   if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
 }

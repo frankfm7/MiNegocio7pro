@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.2
+# MiNegocio7pro · v1.3
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -74,14 +74,25 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.2 · Editor de fotos de producto
+## 4a. Novedades v1.3
+
+- **Selección múltiple de ventas con doble toque**: toca dos veces seguidas una venta para empezar; toca otras para
+  agregarlas o quitarlas. Al quitar la última, la selección se cierra sola.
+- **Editor de fotos**: cada foto empieza normal; los ajustes de una foto ya no se aplican a la siguiente.
+- **Precio mínimo oculto**: ya no se ve en el detalle (ni en modo cliente). Toca **3 veces seguidas el precio de venta**
+  para ver la ventanita "Puedo darlo hasta ...".
+- **Equipo en línea**: en *Equipo e invitaciones* cada miembro muestra **En línea** (verde) o **Últ. vez ...** (negro).
+  Se actualiza cada 30 s mientras la ventana está abierta. No requiere cambios en Supabase.
+- **Cómo usar la app**: guía completa por temas (ventas, recibos, venta rápida, facturas, fiados, cierre de caja, equipo...).
+
+## 4a·0. Novedades v1.2 · Editor de fotos de producto
 
 Al elegir una foto (o con **Ajustar foto** sobre la imagen en *Editar producto*) se abre el editor:
 - **Encuadre**: vertical, cuadrada u horizontal; zoom; mover con el dedo (pellizcar para acercar); girar, espejo y *Centrar* automático.
 - **Fondo**: original, **blanco**, **negro** o cualquier color. *Quitar el fondo* lo separa del producto
   (mejor con pared, mesa o papel de un solo color), con *Sensibilidad*, pincel **Borrar / Recuperar**, *Deshacer* y sombra suave.
 - **Luz y color**: auto-mejorar, brillo, contraste, color y nitidez.
-- Recuerda el último estilo (ej. fondo blanco) para la siguiente foto. Todo funciona sin internet.
+- Cada foto empieza normal (los ajustes no pasan a la siguiente). Todo funciona sin internet.
 - Las tarjetas y el detalle usan el mismo color del fondo de la foto, para que se vea de borde a borde.
 
 ## 4a·0. Novedades v1.1

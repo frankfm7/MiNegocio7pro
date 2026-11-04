@@ -15,14 +15,31 @@ const ROLE_STYLE: Record<string, [string, string]> = {
   admin: ['👑', '#7c43ba'], coadmin: ['⭐', '#d97706'], supervisor: ['📊', '#3875a5'], vendedor: ['👤', '#23805d'],
 };
 
+/** En línea = la app abierta en los últimos ~2 minutos (la app avisa cada minuto) */
+const ONLINE_MS = 150000;
+const isOnlineNow = (iso: string | null) => !!iso && Date.now() - new Date(iso).getTime() < ONLINE_MS;
 const ago = (iso: string | null) => {
-  if (!iso) return 'Nunca';
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (m < 2) return 'Activo ahora';
-  if (m < 60) return `Hace ${m} min`;
-  if (m < 1440) return `Hace ${Math.round(m / 60)} h`;
-  return new Date(iso).toLocaleDateString('es');
+  if (!iso) return 'Nunca se conectó';
+  const d = new Date(iso);
+  const m = Math.round((Date.now() - d.getTime()) / 60000);
+  if (m < 60) return `Últ. vez hace ${Math.max(1, m)} min`;
+  const time = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (d >= today) return `Últ. vez hoy ${time}`;
+  const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+  if (d >= yest) return `Últ. vez ayer ${time}`;
+  return `Últ. vez ${d.toLocaleDateString('es', { day: '2-digit', month: 'short' })} ${time}`;
 };
+
+/** Etiqueta verde "En línea" o negra con la última conexión */
+function Presence({ iso }: { iso: string | null }) {
+  const on = isOnlineNow(iso);
+  return (
+    <span className={`member-presence inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${on ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#201728] text-white'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-[#22c55e] animate-pulse' : 'bg-white/60'}`} />{on ? 'En línea' : ago(iso)}
+    </span>
+  );
+}
 
 export function TeamModal() {
   const open = useStore(s => !!s.modals['team-modal']);
@@ -47,6 +64,9 @@ export function TeamModal() {
     if (!open) return;
     if (!isOnline) { toast('⚠️ La gestión de equipo requiere conexión a internet'); closeModal('team-modal'); return; }
     load();
+    // Mientras la ventana está abierta se actualiza quién está en línea
+    const t = setInterval(() => { listMembers().then(setMembers).catch(() => {}); }, 30000);
+    return () => clearInterval(t);
   }, [open, load, isOnline]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -99,7 +119,7 @@ export function TeamModal() {
               <div key={m.user_id} className={`rounded-2xl border-2 ${blocked ? 'border-[#a43658] opacity-60' : 'border-[#ede7f0]'} bg-white`}>
                 <div className="flex items-center gap-3 p-3">
                   {m.avatar_url
-                    ? <span className="relative flex-shrink-0"><Avatar size={44} name={m.name || m.email || '?'} url={m.avatar_url} /><span className="absolute -bottom-1 -right-1 text-sm leading-none bg-white rounded-full w-5 h-5 grid place-items-center shadow">{icon}</span></span>
+                    ? <span className="relative flex-shrink-0"><Avatar size={44} name={m.name || m.email || '?'} url={m.avatar_url} />{(isMe || isOnlineNow(m.last_seen)) && <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-[#22c55e] ring-2 ring-white" />}<span className="absolute -bottom-1 -right-1 text-sm leading-none bg-white rounded-full w-5 h-5 grid place-items-center shadow">{icon}</span></span>
                     : <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0" style={{ background: color + '20' }}>{icon}</div>}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -107,7 +127,8 @@ export function TeamModal() {
                       {isMe && <span className="text-[10px] bg-[#7c43ba] text-white px-2 py-0.5 rounded-full font-bold">Tú</span>}
                       {blocked && <span className="text-[10px] bg-[#a43658] text-white px-2 py-0.5 rounded-full font-bold">Bloqueado</span>}
                     </div>
-                    <p className="text-[11px] text-[#756c7e] truncate">{m.email} · {roleLabel(m.role)} · {ago(m.last_seen)}</p>
+                    <p className="text-[11px] text-[#756c7e] truncate">{m.email} · {roleLabel(m.role)}</p>
+                    <div className="mt-1"><Presence iso={isMe ? new Date().toISOString() : m.last_seen} /></div>
                   </div>
                   {!isMe && <button onClick={() => { selectedMember = m; openModal('team-user-menu-modal'); }} className="w-9 h-9 rounded-full hover:bg-[#f1ecf4] grid place-items-center flex-shrink-0"><MoreVertical className="w-4 h-4" /></button>}
                 </div>

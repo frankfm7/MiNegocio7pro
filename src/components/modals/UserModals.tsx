@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Camera, Cloud, EyeOff, FileUp, Maximize2, QrCode, ScanLine, Search, ShieldCheck, Ruler, Ticket } from 'lucide-react';
+import { AlertCircle, ChevronDown, Cloud, Contact, EyeOff, FileUp, FolderPlus, Globe, Image as ImageIcon, MessageCircle, QrCode, Receipt, Rocket, ShieldCheck, ShoppingCart, TrendingUp, Users } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { CURRENCIES, CURRENCY_KEY, currency } from '../../lib/format';
 import { closeModal, getState, localUser, setState, toast, useStore } from '../../store';
@@ -84,31 +84,136 @@ export function UserProfileModal() {
   );
 }
 
-const HELP = [
-  [Cloud, 'Tus datos o los de una tienda', 'Sin cuenta, todo se guarda solo en tu dispositivo. Con una cuenta puedes crear tu tienda en la nube o unirte a una con un código.'],
-  [Ticket, 'Invitar vendedores', 'En Equipo e invitaciones genera un código y envíalo por WhatsApp. Cada tienda tiene sus propios datos, separados de las demás.'],
-  [QrCode, 'QR de productos', 'Imprime los QR de un catálogo en PDF. Con la app se abre el producto al instante; con otro lector solo se ve nombre, contenido y precio.'],
-  [Search, 'Buscador inteligente', 'Escribe parte del nombre, la marca o el contenido; entiende palabras sin acentos y pequeños errores.'],
-  [Camera, 'Buscar por foto', 'Enfoca el producto con la cámara: se compara la forma, los colores, el texto de la etiqueta y el código.'],
-  [ShieldCheck, 'Respaldo de datos', 'Crea copias de seguridad de todos tus datos y restáuralas cuando necesites.'],
-  [QrCode, 'QR de cobro', 'Sube la imagen QR de tu banco o billetera para mostrarla al cobrar.'],
-  [EyeOff, 'Modo Cliente', 'Oculta costos, ganancias y ventas al mostrar el catálogo a un comprador.'],
-  [Maximize2, 'Ver imagen en grande', 'En el detalle de un producto toca la foto para verla a pantalla completa. Al tomar fotos usa el marco para que perfumes y botellas se vean completos.'],
-  [Ruler, 'Contenido del producto', 'Indica cuántos ml, litros, gramos, kilos o qué medidas tiene cada producto.'],
-  [FileUp, 'Importar / Exportar', 'Excel con fotos, PDF (para clientes o inventario), JSON y CSV. Importa también desde PDF, fotos de productos o fotos de listas de precios.'],
-  [ScanLine, 'Escanear códigos', 'Usa la cámara para escanear códigos de barras de tus productos.'],
-  [AlertCircle, 'Stock bajo', 'Recibe alertas cuando tus productos tengan 3 unidades o menos.'],
-] as const;
+type Step = string;
+interface Section { icon: typeof Cloud; title: string; intro?: string; steps: Step[] }
+
+/** Guía completa, por temas. Cada tema se abre y se cierra tocándolo. */
+const GUIDE: Section[] = [
+  { icon: Rocket, title: 'Primeros pasos', intro: 'Puedes usar la app sin cuenta o con tu tienda en la nube.', steps: [
+    'Sin cuenta: todo se guarda solo en este celular o computadora. Nadie más ve tus datos.',
+    'Con cuenta: toca **Entrar** (arriba a la derecha) → Google o correo → **Crear mi propia tienda**. Tus datos quedan en la nube y en todos tus dispositivos.',
+    'Si ya tenías datos sin cuenta, al crear la tienda la app te ofrece subirlos.',
+    'Instala la app en el celular: menú ☰ → **Instalar la app**. Funciona también sin internet; los cambios se suben solos al volver la conexión.',
+    'Moneda: menú ☰ → **Datos del negocio** → *Moneda de los precios* (Bs, USD, S/...). Ahí también van el nombre del negocio, el WhatsApp y el código de país.',
+  ] },
+  { icon: FolderPlus, title: 'Catálogos y productos', steps: [
+    'Crea un catálogo con **Añadir catálogo** en la pantalla principal (ej. "Perfumes", "Maquillaje"). Toca la ⭐ para dejarlo como favorito.',
+    'Dentro del catálogo toca **Añadir** para crear un producto: nombre, marca, tipo, contenido (ml, g, L...), stock y precios.',
+    'Precios: **Costo** (lo que pagaste), **Precio de venta**, **Precio mínimo** (hasta cuánto puedes rebajar) y **Precio de catálogo** (opcional: se muestra tachado para que el cliente vea que le das mejor precio).',
+    '**Código de la empresa** (opcional): el código de Ésika, L\'Bel, Cyzone, Yanbal... Sirve para reconocer el producto al importar facturas y sumarle el stock.',
+    'Para editar: abre el producto → **Editar**. Para borrar, duplicar o ver el historial de precios usa el botón ⋮ del detalle.',
+    'Buscador: escribe parte del nombre, la marca, el contenido o el código. Entiende palabras sin acentos y pequeños errores. El ícono de cámara busca por foto y el de escáner lee códigos de barras o QR.',
+  ] },
+  { icon: ImageIcon, title: 'Fotos de los productos (editor)', steps: [
+    'Al elegir una foto (Galería o Cámara) se abre el editor. Para una foto que ya existe: **Editar producto → Ajustar foto**.',
+    '**Encuadre**: vertical, cuadrada u horizontal; zoom con la barra o pellizcando; arrastra con el dedo para mover; girar, espejo y **Centrar** (pone el producto al centro y del tamaño justo).',
+    '**Fondo**: original, blanco, negro u otro color. Activa **Quitar el fondo de la foto** (mejor si la foto se tomó sobre una pared o mesa lisa) y ajusta la *Sensibilidad*. Corrige con el pincel **Borrar** / **Recuperar** y **Deshacer**. Opcional: sombra suave.',
+    '**Luz y color**: Auto-mejorar, brillo, contraste, color y nitidez.',
+    'Cada foto empieza normal: lo que ajustas en una no se aplica a la siguiente.',
+    'En el catálogo, si la foto tiene fondo liso, la tarjeta usa ese mismo color para que se vea de borde a borde. Toca la foto en el detalle para verla en grande.',
+  ] },
+  { icon: Receipt, title: 'Vender un producto', steps: [
+    'Abre el producto → **Vender**. Elige la cantidad y el precio (sale el precio de venta; puedes cambiarlo).',
+    'Elige cómo te pagan: **Efectivo**, **QR** o **Fiado**. Si es fiado, elige o crea el cliente: la deuda queda anotada en *Clientes y fiados*.',
+    'Toca **Confirmar**: se descuenta el stock y aparece el **recibo**. Desde ahí lo envías por **WhatsApp** (escribe el número o deja vacío para elegir el contacto) o lo guardas o compartes como **imagen**.',
+    'Antes de vender ves el costo y el precio de catálogo (el costo se oculta en modo cliente).',
+  ] },
+  { icon: ShoppingCart, title: 'Venta rápida de varios productos (Vender)', steps: [
+    'Toca **Vender** en la barra de abajo. Escanea los códigos de barras o QR de cada producto, o toca **Agregar** para buscarlos a mano.',
+    'Ajusta cantidades, aplica un **Descuento** si quieres y elige el método de pago.',
+    'Toca **Finalizar**: se registran todas las ventas, se descuenta el stock y sale el recibo con todos los productos, el descuento y el total, listo para WhatsApp o imagen.',
+  ] },
+  { icon: MessageCircle, title: 'Pedidos por WhatsApp (carrito)', steps: [
+    'En cada producto toca **+ Pedido** (o **+ Carrito** en el detalle) para armar un pedido.',
+    'El ícono del carrito (arriba) muestra el pedido actual: cambia cantidades y toca **Enviar por WhatsApp**.',
+    'Ideal para tomar pedidos de clientes y venderlos después.',
+  ] },
+  { icon: TrendingUp, title: 'Ventas, recibos e informes', steps: [
+    '**Ventas** (barra de abajo) muestra lo vendido hoy por efectivo, QR y fiado; **Informes** muestra todo el historial y un gráfico de 7 días.',
+    'Para seleccionar ventas: **toca dos veces seguidas** una venta. Luego toca otras para agregarlas o quitarlas. Al quitar la última se cierra la selección sola.',
+    'Con las ventas elegidas: **Recibo** (genera el recibo de venta con todas, para WhatsApp o imagen), **Copiar**, **Compartir** o **Eliminar** (solo administradores; te pregunta si devuelves las unidades al stock, por ejemplo si se anuló la venta).',
+    '**Cierre de caja** (Ventas o menú ☰): total cobrado por efectivo, QR, fiado y por vendedor, más los abonos de fiados. Envíalo por WhatsApp, cópialo o guárdalo como imagen (**Tabla de cierre**).',
+    'En Informes puedes **Exportar Excel o CSV** con todas las ventas.',
+  ] },
+  { icon: FileUp, title: 'Importar productos desde una factura o recibo', intro: 'Sirve para cargar de una vez lo que pediste a Belcorp (Ésika, L\'Bel, Cyzone), Yanbal u otra empresa.', steps: [
+    'Barra de abajo **Datos → Importar → Foto de factura, recibo o detalle de pedido**. Puedes elegir varias fotos (varias páginas).',
+    'Toma la foto de frente, con buena luz, sin sombras y con la hoja plana. Tarda de 20 a 40 segundos por foto.',
+    'La app reconoce el código, el nombre, la marca, la cantidad, el costo y el precio de catálogo. Revistas, catálogos, flyers y regalos quedan desmarcados.',
+    'Revisa la lista: corrige lo marcado con ⚠, cambia el **Tu precio** si quieres y elige el **catálogo** donde guardar.',
+    'Factura en dólares (Belcorp): la app detecta el tipo de cambio de la misma hoja y convierte a tu moneda. Puedes cambiar el valor "1 USD = ... Bs" antes de guardar.',
+    'Si el producto ya existe (mismo código o nombre) verás "Ya existe": al guardar se **suma el stock** y se actualizan costo y precio de catálogo.',
+    'También puedes importar Excel, CSV, JSON, PDF o fotos de listas de precios desde la misma ventana, y exportar tu catálogo en Excel (con fotos) o PDF.',
+  ] },
+  { icon: Contact, title: 'Clientes y fiados', steps: [
+    'Menú ☰ → **Clientes y fiados**: lista de clientes con lo que te deben.',
+    'Las ventas con pago **Fiado** se anotan solas. Registra los **abonos** cuando te paguen (efectivo o QR).',
+    'Envía un recordatorio de pago por WhatsApp desde la ficha del cliente.',
+  ] },
+  { icon: AlertCircle, title: 'Stock bajo y agotados', steps: [
+    'La app avisa cuando un producto tiene pocas unidades (mínimo general en *Stock bajo*, o el mínimo propio de cada producto en *Editar producto*) o se agota.',
+    'Toca **Ocultar** en el aviso de la pantalla principal, o **Ya lo vi** en cada lista. Solo vuelve a avisar si otro producto se agota o baja de stock.',
+    'En *Agotados* puedes exportar la lista de reposición.',
+  ] },
+  { icon: EyeOff, title: 'Modo cliente y precio mínimo secreto', steps: [
+    'Activa el **Modo cliente** (ícono del ojo arriba) antes de mostrar el celular a un comprador: se ocultan costos, ganancias, ventas y el precio mínimo.',
+    'El precio mínimo no se ve en el detalle. Para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita "Puedo darlo hasta ...". Ciérrala tocando fuera o en Cerrar.',
+  ] },
+  { icon: QrCode, title: 'QR, etiquetas y cobro', steps: [
+    'Cada producto tiene su **QR**. Con la app se abre el producto al instante; con otro lector solo se ven el nombre, el contenido y el precio (nunca los costos).',
+    'Menú ☰ → **Etiquetas (QR + barras)**: imprime etiquetas en A4 o en impresora térmica. También puedes imprimir todos los QR de un catálogo en PDF.',
+    'Menú ☰ → **QR de cobro**: sube el QR de tu banco o billetera para mostrarlo al cobrar.',
+  ] },
+  { icon: Globe, title: 'Catálogo público', steps: [
+    'Menú ☰ → **Catálogo público**: actívalo, elige el nombre del enlace y el WhatsApp que recibe pedidos.',
+    'Comparte el enlace o su QR: tus clientes ven productos y precios (sin costos) y te piden por WhatsApp, sin instalar nada.',
+  ] },
+  { icon: Users, title: 'Equipo e invitaciones', steps: [
+    'Menú ☰ → **Equipo e invitaciones → Invitar**: elige el rol y envía el código o enlace por WhatsApp.',
+    'Roles: **Administrador** (todo), **Co-administrador**, **Supervisor** y **Vendedor** (vende, pero no ve costos ni edita).',
+    'En la lista ves a cada miembro con **En línea** (verde) si tiene la app abierta, o **Últ. vez ...** (negro) con su última conexión. Desde ⋮ puedes cambiar el rol, bloquear o quitar.',
+    'Cada venta guarda quién la hizo (con su foto) y el cierre de caja separa por vendedor.',
+  ] },
+  { icon: ShieldCheck, title: 'Respaldos y seguridad', steps: [
+    'Menú ☰ → **Respaldo de datos**: crea copias de seguridad (en la nube si tienes tienda) y restáuralas si hace falta. La app hace una copia automática al abrirla (máximo una cada 20 horas).',
+    'También puedes descargar todo en un archivo para guardarlo donde quieras.',
+    'Cada tienda solo ve sus propios datos: otras personas que instalen la app no ven los tuyos.',
+  ] },
+];
+
+/** Convierte **texto** en negrita */
+function rich(t: string) {
+  return t.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (part.startsWith('**') ? <b key={i} className="text-[#201728]">{part.slice(2, -2)}</b> : part));
+}
 
 export function HelpModal() {
+  const [open, setOpen] = useState<number | null>(0);
   return (
     <Modal id="help-modal">
-      <article className="modal-card w-full max-w-lg bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Cómo usar la app</h2><CloseButton onClick={() => closeModal('help-modal')} /></div>
-        <div className="space-y-3">
-          {HELP.map(([Icon, title, text]) => (
-            <div key={title} className="help-item"><Icon className="w-5 h-5" /><div><p className="font-bold text-sm">{title}</p><p className="text-xs text-[#756c7e] mt-1">{text}</p></div></div>
-          ))}
+      <article className="modal-card w-full max-w-lg bg-white rounded-3xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-1"><h2 className="font-bold text-xl hero-title">Cómo usar la app</h2><CloseButton onClick={() => closeModal('help-modal')} /></div>
+        <p className="text-xs text-[#756c7e] mb-4">Toca un tema para ver los pasos.</p>
+        <div className="space-y-2">
+          {GUIDE.map((sec, i) => {
+            const Icon = sec.icon;
+            const isOpen = open === i;
+            return (
+              <div key={sec.title} className={`help-item !block rounded-2xl border ${isOpen ? 'border-[#cdb6e2]' : 'border-[#ede7f0]'}`}>
+                <button type="button" onClick={() => setOpen(isOpen ? null : i)} className="w-full flex items-center gap-3 text-left" aria-expanded={isOpen}>
+                  <Icon className="w-5 h-5 flex-shrink-0 text-[#7c43ba]" />
+                  <span className="font-bold text-sm flex-1">{sec.title}</span>
+                  <ChevronDown className={`w-4 h-4 text-[#756c7e] transition ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="mt-3 pl-8">
+                    {sec.intro && <p className="text-xs text-[#4a3f55] mb-2">{sec.intro}</p>}
+                    <ol className="list-decimal pl-4 space-y-1.5 text-xs text-[#5c5266] leading-relaxed">
+                      {sec.steps.map((st, k) => <li key={k}>{rich(st)}</li>)}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </article>
     </Modal>

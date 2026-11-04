@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, AlertTriangle, BellOff, Check, CheckCircle, CheckSquare, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
+  AlertCircle, AlertTriangle, BellOff, Check, CheckCircle, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
 } from 'lucide-react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 import { setState, toast, useStore } from '../store';
@@ -46,10 +46,28 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
   const [mode, setMode] = useState(false);
   const [sel, setSel] = useState<Set<string>>(() => new Set());
   // Si una venta desaparece (se eliminó o se sincronizó), sale de la selección
-  useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); return next.size === prev.size ? prev : next; }); }, [list]);
+  useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); if (next.size === 0) setMode(false); return next.size === prev.size ? prev : next; }); }, [list]);
   const chosen = list.filter(s => sel.has(s.id));
-  const toggle = (sid: string) => { setMode(true); setSel(prev => { const n = new Set(prev); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; }); };
   const exit = () => { setMode(false); setSel(new Set()); };
+  // Quitar la última venta elegida cierra la selección
+  const toggle = (sid: string) => setSel(prev => {
+    const n = new Set(prev);
+    if (n.has(sid)) n.delete(sid); else n.add(sid);
+    if (n.size === 0) setMode(false);
+    return n;
+  });
+  // Doble toque sobre una venta: activa la selección múltiple con esa venta
+  const lastTap = useRef<{ id: string; t: number } | null>(null);
+  const onRowTap = (sid: string) => {
+    if (mode) { toggle(sid); return; }
+    const now = Date.now();
+    const prev = lastTap.current;
+    if (prev && prev.id === sid && now - prev.t < 400) {
+      lastTap.current = null;
+      setMode(true); setSel(new Set([sid]));
+      try { navigator.vibrate?.(30); } catch { /* sin vibración */ }
+    } else lastTap.current = { id: sid, t: now };
+  };
   const all = chosen.length === list.length && list.length > 0;
   const remove = async () => { if (await deleteSalesWithConfirm(chosen)) exit(); };
 
@@ -57,22 +75,20 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
     <>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <h2 className="font-bold text-lg hero-title mr-auto">{title}</h2>
-        {list.length > 0 && (mode ? (
+        {mode && (
           <>
-            <button type="button" onClick={() => setSel(all ? new Set() : new Set(list.map(s => s.id)))} className="px-3 py-1.5 rounded-full btn-ghost text-xs font-bold">{all ? 'Ninguna' : 'Todas'}</button>
-            <button type="button" onClick={exit} className="px-3 py-1.5 rounded-full bg-[#201728] text-white text-xs font-bold flex items-center gap-1"><X className="w-3.5 h-3.5" /> Listo</button>
+            <button type="button" onClick={() => (all ? exit() : setSel(new Set(list.map(s => s.id))))} className="px-3 py-1.5 rounded-full btn-ghost text-xs font-bold">{all ? 'Quitar todas' : 'Todas'}</button>
+            <button type="button" onClick={exit} className="px-3 py-1.5 rounded-full bg-[#201728] text-white text-xs font-bold flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancelar</button>
           </>
-        ) : (
-          <button type="button" onClick={() => setMode(true)} className="sales-select-btn px-3 py-1.5 rounded-full btn-ghost text-xs font-bold flex items-center gap-1"><CheckSquare className="w-3.5 h-3.5" /> Seleccionar</button>
-        ))}
+        )}
       </div>
-      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Toca una venta para seleccionarla y generar su recibo, copiarla, compartirla o eliminarla.</p>}
+      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Toca dos veces seguidas una venta para seleccionarla (recibo, copiar, compartir o eliminar).</p>}
       <div id={id} className={`space-y-2 ${mode ? 'pb-36' : ''}`}>
         {list.map(s => {
           const on = sel.has(s.id);
           const date = new Date(s.date);
           return (
-            <button type="button" key={s.id} onClick={() => toggle(s.id)} aria-pressed={on}
+            <button type="button" key={s.id} onClick={() => onRowTap(s.id)} onDoubleClick={e => e.preventDefault()} aria-pressed={on}
               className={`sale-row w-full text-left rounded-xl p-3 flex items-center gap-3 shadow-sm bg-white transition ${on ? 'ring-2 ring-[#7c43ba] bg-[#f6f1f8]' : ''}`}>
               {mode && <span className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${on ? 'bg-[#7c43ba] border-[#7c43ba] text-white' : 'border-[#cbbdd6] bg-white'}`}>{on && <Check className="w-3.5 h-3.5" />}</span>}
               <div className="flex-1 min-w-0">
@@ -88,9 +104,9 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
           );
         })}
       </div>
-      {mode && (
+      {mode && chosen.length > 0 && (
         <div className="sales-actionbar fixed z-40 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-md rounded-2xl bg-white shadow-2xl border border-[#ede7f0] p-2.5">
-          <p className="text-xs font-bold text-center mb-2">{chosen.length ? <>{chosen.length} {chosen.length === 1 ? 'venta' : 'ventas'} · <span className="text-[#7c43ba]">{formatUSD(chosen.reduce((a, x) => a + Number(x.actual_price || 0), 0))}</span></> : 'Toca las ventas que quieras elegir'}</p>
+          <p className="text-xs font-bold text-center mb-2">{chosen.length} {chosen.length === 1 ? 'venta' : 'ventas'} · <span className="text-[#7c43ba]">{formatUSD(chosen.reduce((a, x) => a + Number(x.actual_price || 0), 0))}</span> <span className="font-normal text-[#756c7e]">· toca para agregar o quitar</span></p>
           <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
             <button type="button" disabled={!chosen.length} onClick={() => salesReceipt(chosen)} className="py-2 rounded-xl btn-primary text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Receipt className="w-4 h-4" /> Recibo</button>
             <button type="button" disabled={!chosen.length} onClick={() => copySales(chosen)} className="py-2 rounded-xl btn-ghost text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Copy className="w-4 h-4" /> Copiar</button>
