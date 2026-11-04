@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, ImageDown, MessageCircle } from 'lucide-react';
 import { toast, useStore } from '../store';
 import { formatUSD } from '../lib/format';
 import { buildCashSummary, cashSummaryText, dateKeyOf, todayKey } from '../lib/cashClose';
 import { openWhatsApp } from '../lib/whatsapp';
-import { generateDailyCloseImage } from '../actions';
+import { closeNumber, generateDailyCloseImage } from '../actions';
+import { localDocs } from '../lib/documents';
 import { sellerOf } from '../lib/selectors';
 import Avatar from '../components/Avatar';
 import { TopbarMenuButton } from './CatalogsScreen';
@@ -20,10 +21,15 @@ export default function CashCloseScreen() {
   const [dateKey, setDateKey] = useState(todayKey());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const sum = useMemo(() => buildCashSummary(dateKey), [dateKey, sales, movements]);
-  const text = () => cashSummaryText(sum, isAdmin);
+  const [number, setNumber] = useState('');
+  useEffect(() => { setNumber(''); localDocs().then(list => setNumber(list.find(d => d.kind === 'cierre' && d.ref === dateKey)?.code || '')); }, [dateKey]);
+  /** Numera el cierre del día (si ya tiene número, lo reutiliza) */
+  const ensureNumber = async () => { const n = await closeNumber(dateKey); if (n) setNumber(n); return n; };
+  const text = (n = number) => cashSummaryText(sum, isAdmin, n);
 
   const shift = (days: number) => { const d = new Date(dateKey + 'T12:00:00'); d.setDate(d.getDate() + days); setDateKey(dateKeyOf(d)); };
-  const copy = async () => { try { await navigator.clipboard.writeText(text()); toast('Resumen copiado ✓'); } catch { toast('No se pudo copiar'); } };
+  const copy = async () => { const n = await ensureNumber(); try { await navigator.clipboard.writeText(text(n)); toast('Resumen copiado ✓'); } catch { toast('No se pudo copiar'); } };
+  const sendWhatsApp = async () => { const n = await ensureNumber(); openWhatsApp(whatsapp, text(n)); };
 
   return (
     <section id="cash-close-screen" className="screen active">
@@ -39,7 +45,7 @@ export default function CashCloseScreen() {
           <input type="date" value={dateKey} max={todayKey()} onChange={e => e.target.value && setDateKey(e.target.value)} className="flex-1 input-field rounded-xl p-2.5 text-center font-bold" />
           <button type="button" disabled={dateKey >= todayKey()} onClick={() => shift(1)} className="btn-ghost rounded-full w-10 h-10 font-bold disabled:opacity-40" aria-label="Día siguiente">›</button>
         </div>
-        <p className="text-sm text-[#756c7e] mb-4 first-letter:uppercase">{sum.label}</p>
+        <p className="text-sm text-[#756c7e] mb-4 first-letter:uppercase">{sum.label}{number && <span id="close-number" className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#f6f1f8] text-[#7c43ba] font-bold font-mono text-xs">N° {number}</span>}</p>
 
         <section className="grid grid-cols-2 gap-3 mb-5">
           <article className="stat-card rounded-2xl p-4 border-l-4 border-l-[#23805d]"><p className="font-bold text-xl text-[#166534]">{formatUSD(sum.collected)}</p><p className="text-[11px] text-[#756c7e]">Total cobrado</p></article>
@@ -86,9 +92,9 @@ export default function CashCloseScreen() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button type="button" onClick={() => openWhatsApp(whatsapp, text())} className="py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"><MessageCircle className="w-4 h-4" /> Enviar por WhatsApp</button>
+          <button type="button" onClick={sendWhatsApp} className="py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"><MessageCircle className="w-4 h-4" /> Enviar por WhatsApp</button>
           <button type="button" onClick={copy} className="py-3 rounded-xl btn-ghost font-bold text-sm flex items-center justify-center gap-2"><Copy className="w-4 h-4" /> Copiar resumen</button>
-          <button type="button" onClick={() => generateDailyCloseImage(dateKey)} className="py-3 rounded-xl btn-primary font-bold text-sm flex items-center justify-center gap-2"><ImageDown className="w-4 h-4" /> Imagen del cierre</button>
+          <button type="button" onClick={async () => { await generateDailyCloseImage(dateKey); localDocs().then(list => setNumber(list.find(d => d.kind === 'cierre' && d.ref === dateKey)?.code || number)); }} className="py-3 rounded-xl btn-primary font-bold text-sm flex items-center justify-center gap-2"><ImageDown className="w-4 h-4" /> Imagen del cierre</button>
         </div>
         <p className="text-[11px] text-[#756c7e] mt-2">“Enviar por WhatsApp” usa el número de «Datos del negocio»; si no hay, WhatsApp te deja elegir el contacto.</p>
       </div>

@@ -11,7 +11,7 @@ export type ModalId =
   | 'barcode-scanner-modal' | 'barcode-print-modal' | 'share-catalog-modal' | 'team-modal'
   | 'invite-modal' | 'team-user-menu-modal' | 'team-change-role-modal' | 'change-password-modal'
   | 'user-profile-modal' | 'help-modal' | 'contacts-modal' | 'product-qr-modal' | 'quick-scan-modal'
-  | 'quick-scan-manual-modal' | 'image-preview-modal' | 'sale-receipt-modal' | 'public-product-modal'
+  | 'quick-scan-manual-modal' | 'documents-modal' | 'image-preview-modal' | 'sale-receipt-modal' | 'public-product-modal'
   | 'import-preview-modal' | 'install-help-modal' | 'customer-form-modal' | 'customer-detail-modal' | 'movement-modal'
   | 'price-history-modal' | 'labels-modal' | 'public-shop-modal';
 
@@ -92,6 +92,8 @@ interface State {
   receiptData: ReceiptData | null;
   /** Recibo ya cobrado al que se le están agregando más productos ("Agregar más productos") */
   receiptCarry: ReceiptData | null;
+  /** Búsqueda inicial en "Recibos y cierres" */
+  docsQuery: string;
   /** Código y datos de la tienda para los recibos */
   receiptSettings: ReceiptSettings;
   previewImage: { dataUrl: string; filename: string } | null;
@@ -206,6 +208,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   quickScanDiscount: 0,
   receiptData: null,
   receiptCarry: null,
+  docsQuery: '',
   receiptSettings: readJSON<ReceiptSettings>('mn7_receipt_cfg_local', { prefix: '' }),
   previewImage: null,
   barcodeScanTarget: null,

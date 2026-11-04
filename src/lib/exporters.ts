@@ -5,37 +5,55 @@ import { downloadBlob } from './image';
 import { DB } from './db';
 import { APP_NAME, CONTACT_KEY } from './constants';
 import { getOutOfStockProducts } from './selectors';
+import { issueDocument } from './documents';
+import { businessName } from './whatsapp';
 
 // ==========================================
 // INFORMES DE VENTAS
 // ==========================================
-export async function exportSalesXLSX() {
+/** Numera el informe (ANA-I-000001) y deja la copia en "Recibos y cierres" */
+async function reportNumber(format: 'Excel' | 'CSV', reuse?: string) {
+  if (reuse) return reuse;
+  const { sales } = getState();
+  const dates = sales.map(x => x.date).sort();
+  const total = sales.reduce((a, x) => a + Number(x.actual_price || 0), 0);
+  return issueDocument('informe', null, { format, count: sales.length, from: dates[0] || null, to: dates[dates.length - 1] || null, total }, total);
+}
+
+/** Informe de ventas en Excel. reuse = volver a descargar un informe ya numerado */
+export async function exportSalesXLSX(reuse?: string) {
   const XLSX = await import('xlsx');
   const { sales } = getState();
   if (sales.length === 0) { toast('No hay ventas para exportar'); return; }
   try {
+    const number = await reportNumber('Excel', reuse);
     const wb = XLSX.utils.book_new();
     const data = sales.map(s => ({
-      'Fecha': new Date(s.date).toLocaleString('es'), 'Producto': s.product_name, 'Marca': s.brand || '',
+      'Fecha': new Date(s.date).toLocaleString('es'), 'Recibo': s.receipt_no || '', 'Producto': s.product_name, 'Marca': s.brand || '',
       'Cantidad': s.quantity || 1, 'Costo Unit.': s.cost_price, 'Precio Real': s.actual_price,
-      'Método': s.payment_method || 'Efec.', 'Vendedor': s.seller_name || '', 'Ganancia': s.profit,
+      'Método': s.payment_method || 'Efec.', 'Cliente': s.customer_name || '', 'Vendedor': s.seller_name || '', 'Ganancia': s.profit,
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Informe Ventas');
-    XLSX.writeFile(wb, `informe_ventas_${Date.now()}.xlsx`);
-    toast('Informe Excel descargado ✓');
+    const head = [[`Informe de ventas${number ? ` N° ${number}` : ''} · ${businessName()}`], [`Generado el ${new Date().toLocaleString('es')} por ${getState().currentUser?.name || ''}`], []];
+    const ws = XLSX.utils.aoa_to_sheet(head);
+    XLSX.utils.sheet_add_json(ws, data, { origin: 'A4' });
+    XLSX.utils.book_append_sheet(wb, ws, 'Informe Ventas');
+    XLSX.writeFile(wb, `informe_ventas_${number || Date.now()}.xlsx`);
+    toast(`Informe${number ? ` N° ${number}` : ''} descargado ✓`);
     SoundEffects.play('success');
   } catch (e) { toast('Error: ' + (e as Error).message, 3000); }
 }
 
-export function exportSalesCSV() {
+export async function exportSalesCSV(reuse?: string) {
   const { sales } = getState();
   if (sales.length === 0) { toast('No hay ventas'); return; }
-  const lines = [['fecha', 'producto', 'marca', 'cantidad', 'costo', 'precio_real', 'metodo', 'vendedor', 'ganancia'].join(',')];
+  const number = await reportNumber('CSV', reuse);
+  const lines = [csvEscape(`Informe de ventas${number ? ` N° ${number}` : ''} · ${businessName()}`), '',
+    ['fecha', 'recibo', 'producto', 'marca', 'cantidad', 'costo', 'precio_real', 'metodo', 'cliente', 'vendedor', 'ganancia'].join(',')];
   sales.forEach(s => {
-    lines.push([new Date(s.date).toLocaleString('es'), csvEscape(s.product_name), csvEscape(s.brand || ''), s.quantity || 1, s.cost_price, s.actual_price, s.payment_method || 'Efec.', csvEscape(s.seller_name || ''), s.profit].join(','));
+    lines.push([new Date(s.date).toLocaleString('es'), csvEscape(s.receipt_no || ''), csvEscape(s.product_name), csvEscape(s.brand || ''), s.quantity || 1, s.cost_price, s.actual_price, s.payment_method || 'Efec.', csvEscape(s.customer_name || ''), csvEscape(s.seller_name || ''), s.profit].join(','));
   });
-  downloadBlob(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }), `informe_ventas_${Date.now()}.csv`);
-  toast('Informe CSV descargado ✓');
+  downloadBlob(new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }), `informe_ventas_${number || Date.now()}.csv`);
+  toast(`Informe CSV${number ? ` N° ${number}` : ''} descargado ✓`);
   SoundEffects.play('success');
 }
 
@@ -97,7 +115,7 @@ export async function exportCartToPDF() {
 // ==========================================
 export function createBackup() {
   const { catalogs, records, sales, contactInfo, customers, movements } = getState();
-  const backup = { app: APP_NAME, version: '1.6', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
+  const backup = { app: APP_NAME, version: '1.7', date: new Date().toISOString(), catalogs, records, sales, contactInfo, customers, movements };
   downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `respaldo_catalogo_${Date.now()}.json`);
   toast('Respaldo creado ✓');
   SoundEffects.play('success');

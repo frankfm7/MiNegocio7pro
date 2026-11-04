@@ -35,10 +35,13 @@ Ejecútalos **en este orden** (cada uno en una consulta nueva: *New query → pe
 4. `supabase/7-nombre-comun.sql` → **nuevo en la v1.4**: nombre común del producto (ej. "Protector solar"), que se ve bajo el nombre y ayuda a buscar.
 5. `supabase/8-recibos-numerados.sql` → **nuevo en la v1.6**: recibos de venta numerados en orden por tienda
    (nunca se repiten aunque vendan varios a la vez), código de la tienda y datos del recibo (teléfono, dirección, NIT).
-6. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
+6. `supabase/9-documentos-numerados.sql` → **nuevo en la v1.7**: cierres de caja (ANA-C-000001) e informes (ANA-I-000001)
+   numerados, historial para revisar y reenviar recibos/cierres, y las ventas a fiado guardan el cliente en la nube.
+   ⚠️ Si alguna vez vuelves a ejecutar el archivo 1, ejecuta después otra vez el 9.
+7. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
    (cambia `TU_CORREO@ejemplo.com` por el correo con el que creaste tu tienda).
-7. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 69 revisiones).
-   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6, el 7 y el 8.
+8. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 76 revisiones; las que dicen FALTA salen primero).
+   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6, el 7, el 8 y el 9.
 
 > Si NO ejecutas el 8, los recibos de la tienda salen con número provisional y la app te avisa.
 > Si NO ejecutas el 7, el nombre común solo queda en el dispositivo (en la nube se muestra el sugerido).

@@ -71,8 +71,8 @@ export function buildCashSummary(dateKey: string): CashSummary {
 }
 
 /** Texto del cierre de caja (para WhatsApp o copiar) */
-export function cashSummaryText(s: CashSummary, showProfit: boolean) {
-  const L: string[] = [`📊 *Cierre de caja — ${businessName()}*`, `📅 ${s.label}`, ''];
+export function cashSummaryText(s: CashSummary, showProfit: boolean, number = '') {
+  const L: string[] = [`📊 *Cierre de caja — ${(getState().receiptSettings.name || '').trim() || businessName()}*`, ...(number ? [`*N° ${number}*`] : []), `📅 ${s.label}`, ''];
   L.push(`Ventas: ${s.salesCount} · Total vendido: *${formatUSD(s.total)}*`);
   s.byMethod.forEach(m => L.push(`${m.method === 'Efec.' ? '💵' : m.method === 'QR' ? '📱' : m.method === 'Fiado' ? '📒' : '•'} ${m.method === 'Fiado' ? 'Fiado (por cobrar)' : m.method}: ${formatUSD(m.total)} (${m.count})`));
   if (s.abonoCount) L.push(`💰 Abonos de fiados: ${formatUSD(s.abonoCash + s.abonoQr)} (${s.abonoCount})`);

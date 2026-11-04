@@ -4,12 +4,13 @@ import { BookOpen, Camera, CheckCircle, Download, PlusCircle, Receipt as Receipt
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import {
-  addMoreToReceipt, addToQuickScan, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, hideQuickScan, navigate, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
+  addMoreToReceipt, addToQuickScan, sendReceiptImage, finalizeQuickScan, generateReceiptImage, handleBarcodeScanned, hideQuickScan, navigate, openBarcodeScanner, openDetail, sendReceiptWhatsApp, stopQuickScanMode,
 } from '../../actions';
 import { cardImage, currency, formatContent, formatUSD } from '../../lib/format';
 import { searchByImage } from '../../lib/imageSearch';
 import { captureFromCamera } from '../../lib/camera';
 import { downloadDataUrl } from '../../lib/image';
+import { saveReceiptCopy } from '../../lib/documents';
 import { SoundEffects } from '../../lib/sound';
 import PaymentPicker from '../PaymentPicker';
 
@@ -316,6 +317,7 @@ export function SaleReceiptModal() {
             <div className="text-center mb-4">
               <div className="w-16 h-16 mx-auto bg-[#f6f1f8] rounded-full flex items-center justify-center mb-3"><ReceiptIcon className="w-9 h-9 text-[#7c43ba]" /></div>
               <h2 className="font-bold text-2xl hero-title text-[#7c43ba]">Recibo de venta</h2>
+              {r.number && <p className="text-[11px] font-bold text-[#756c7e] uppercase tracking-wider">Copia</p>}
               <p className="text-sm text-gray-600 mt-1">{r.items.length} {r.items.length === 1 ? 'producto' : 'productos'} · listo para enviar</p>
             </div>
           ) : (
@@ -359,19 +361,23 @@ export function SaleReceiptModal() {
             <div className="grid grid-cols-2 gap-2 mt-3">
               {([['invoice', 'N° de factura'], ['auth', 'Cód. de autorización'], ['order', 'N° de pedido'], ['customerNit', 'NIT / CI del cliente']] as const).map(([k, label]) => (
                 <label key={k} className="text-[10px] font-bold text-[#756c7e]">{label}
-                  <input value={r.extra?.[k] || ''} onChange={e => setState({ receiptData: { ...r, extra: { ...(r.extra || {}), [k]: e.target.value } } })} className="w-full input-field rounded-lg px-2 py-1.5 text-sm text-[#201728] font-normal" />
+                  <input value={r.extra?.[k] || ''} onChange={e => { const next = { ...r, extra: { ...(r.extra || {}), [k]: e.target.value } }; setState({ receiptData: next }); saveReceiptCopy(next); }} className="w-full input-field rounded-lg px-2 py-1.5 text-sm text-[#201728] font-normal" />
                 </label>
               ))}
             </div>
             <p className="text-[10px] text-[#756c7e] mt-2">Salen en la imagen y en el WhatsApp del recibo.</p>
           </details>
           <div className="mt-1 p-3 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0]">
-            <p className="text-xs font-bold text-[#166534] mb-2">Enviar ticket al cliente</p>
-            <div className="flex gap-2">
-              <input value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" className="flex-1 min-w-0 input-field rounded-lg p-2 text-sm" placeholder="WhatsApp del cliente" />
-              <button type="button" onClick={() => sendReceiptWhatsApp(waPhone)} className="px-3 rounded-lg bg-[#25D366] text-white font-bold text-sm flex items-center gap-1.5 flex-shrink-0"><MessageCircle className="w-4 h-4" /> WhatsApp</button>
-            </div>
-            <p className="text-[10px] text-[#756c7e] mt-1">Si lo dejas vacío, WhatsApp te deja elegir el contacto.</p>
+            <p className="text-xs font-bold text-[#166534] mb-2">Enviar el recibo al cliente</p>
+            <button id="send-receipt-image" type="button" onClick={() => sendReceiptImage(waPhone)} className="w-full py-3 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"><MessageCircle className="w-5 h-5" /> Enviar recibo por WhatsApp (imagen)</button>
+            <p className="text-[10px] text-[#756c7e] mt-1.5">Se abre el menú para compartir: elige WhatsApp y el contacto. La imagen lleva el logo, el número y los datos de la tienda.</p>
+            <details className="mt-2">
+              <summary className="text-[11px] font-bold text-[#166534] cursor-pointer">Enviar como texto a un número</summary>
+              <div className="flex gap-2 mt-2">
+                <input value={waPhone} onChange={e => setWaPhone(e.target.value)} type="tel" className="flex-1 min-w-0 input-field rounded-lg p-2 text-sm" placeholder="WhatsApp del cliente" />
+                <button type="button" onClick={() => sendReceiptWhatsApp(waPhone)} className="px-3 rounded-lg bg-white border border-[#bbf7d0] text-[#166534] font-bold text-xs flex-shrink-0">Enviar texto</button>
+              </div>
+            </details>
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
             <button type="button" onClick={generateReceiptImage} className="py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Guardar imagen</button>

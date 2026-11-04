@@ -133,7 +133,10 @@ const GUIDE: Section[] = [
     'El recibo (imagen) lleva el **logo**, los datos de la tienda, el número, la fecha y el nombre del negocio repetido en diagonal como **marca de agua**.',
     'Si el cliente lo pide, en el recibo abre **Datos que pide el cliente** y escribe **N° de factura, código de autorización, N° de pedido o NIT/CI del cliente**: salen en la imagen y en el WhatsApp.',
     'Sin internet el recibo sale con un número **provisional**; al volver la conexión se le asigna el número definitivo en orden.',
-    'Al reimprimir ventas desde Ventas o Informes (mantener presionada → Recibo) se muestra el número que tuvieron.',
+    'Desde Ventas o Informes (mantener presionada → **Recibo**): si las ventas elegidas son de un mismo recibo se abre ese recibo (**copia**, mismo número); si no tienen recibo se emite uno nuevo. **Una venta nunca sale en dos recibos**: si eliges ventas de recibos distintos la app te avisa.',
+    '**Enviar recibo por WhatsApp (imagen)**: se abre el menú para compartir del celular; elige WhatsApp y el contacto. También puedes enviarlo como texto a un número.',
+    '**Cierres de caja** (y su tabla/imagen) se numeran **ANA-C-000001** al enviarlos, copiarlos o generar la imagen; un mismo día conserva siempre su número. Los **informes** de Excel/CSV se numeran **ANA-I-000001**.',
+    'Menú ☰ → **Recibos y cierres**: lista de todos los recibos, cierres e informes emitidos (de todo el equipo), con buscador. Puedes **verlos**, **reenviarlos** como imagen o volver a **descargar** un informe.',
   ] },
   { icon: ShoppingCart, title: 'Venta rápida con escáner (Vender)', steps: [
     'Toca **Vender** en la barra de abajo: se abre la venta en curso. **Escanear** lee códigos de barras o QR, **Buscar** agrega a mano y **Catálogo** te lleva a elegir productos.',

@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.6
+# MiNegocio7pro · v1.7
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -15,7 +15,7 @@ Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin inter
    (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
    vienes de la app anterior con datos; en un proyecto nuevo se omite.
    Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`,
-   luego `supabase/7-nombre-comun.sql`, `supabase/8-recibos-numerados.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
+   luego `supabase/7-nombre-comun.sql`, `supabase/8-recibos-numerados.sql`, `supabase/9-documentos-numerados.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
 4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
    (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
    (agrega además `http://localhost:5173` para probar en tu computadora).
@@ -74,7 +74,19 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.6 · Recibos numerados
+## 4a. Novedades v1.7 · Cierres e informes numerados, historial y WhatsApp con imagen
+
+- **Recibo desde la selección múltiple**: si las ventas son de un mismo recibo se abre ese recibo (copia, mismo número);
+  si no tienen recibo se emite uno nuevo; **una venta nunca sale en dos recibos** (si se mezclan, la app avisa).
+- **Cierre de caja / tabla de cierre** numerados `ANA-C-000001` (un día = siempre el mismo número, aunque lo genere otra persona).
+- **Informes de venta** (Excel/CSV) numerados `ANA-I-000001`, con columna de N° de recibo y cliente.
+- **WhatsApp con imagen**: el recibo se envía como imagen con el menú de compartir del celular (o como texto, opcional).
+- **Recibos y cierres** (menú ☰): historial de recibos, cierres e informes de todo el equipo, con buscador; ver, reenviar
+  o volver a descargar.
+- Corregido en la nube: las ventas a fiado guardan el cliente, y una venta que sube tarde toma el número de su recibo.
+- Requiere ejecutar `supabase/9-documentos-numerados.sql` (y luego `4-verificar.sql`: 76 revisiones OK).
+
+## 4a·0. Novedades v1.6 · Recibos numerados
 
 - **Número correlativo en cada recibo** con el código de la tienda (ej. `ANA-000123`). En una tienda lo da la base de
   datos en un solo paso: aunque vendan varios del equipo a la vez, **nunca se repite ni se salta**. Queda registro de

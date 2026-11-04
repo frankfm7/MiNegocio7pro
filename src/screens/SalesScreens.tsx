@@ -330,8 +330,8 @@ export function ReportsScreen() {
         <SalesList id="sales-list" title="Historial de ventas" list={sales} showDate />
         {sales.length === 0 && <Empty id="no-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas aún" text="Registra ventas desde el detalle de cada producto" />}
         <div className="mt-6 flex gap-2 flex-wrap">
-          <button onClick={exportSalesXLSX} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> Exportar Excel</button>
-          <button onClick={exportSalesCSV} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileText className="w-4 h-4" /> Exportar CSV</button>
+          <button onClick={() => exportSalesXLSX()} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> Exportar Excel</button>
+          <button onClick={() => exportSalesCSV()} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileText className="w-4 h-4" /> Exportar CSV</button>
         </div>
       </div>
     </section>

@@ -3,6 +3,7 @@ import {
   AlertCircle, AlertTriangle, BarChart3, BookOpen, Wallet, Contact, Globe, Tag, Cloud, Download, FileUp, HelpCircle, Key, LogOut, Moon, MoreVertical,
   Package, Phone, QrCode, RefreshCw, Scan, ScanLine, ShieldCheck, ShoppingCart, Smartphone, Store, Sun, TrendingUp, Tv2, User, Users,
   Volume2, VolumeX, X,
+  FileText,
 } from 'lucide-react';
 import { openAccount, openModal, setState, useStore, type ModalId } from '../store';
 import { navigate, openAdminModal, openBarcodeScanner, openTeam, showWelcome, toggleDarkMode, toggleSound } from '../actions';
@@ -136,6 +137,7 @@ export default function Sidebar() {
           <Item active={isActive('products', true)} onClick={() => go('products')}><Package className={icon} /> Todos los productos</Item>
           <Item active={isActive('daily-sales')} onClick={() => go('daily-sales')}><TrendingUp className={icon} /> Ventas del día</Item>
           <Item active={isActive('cash-close')} onClick={() => go('cash-close')}><Wallet className={icon} /> Cierre de caja</Item>
+          <Item onClick={() => later(() => openModal('documents-modal'))}><FileText className={icon} /> Recibos y cierres</Item>
           <Item active={isActive('customers')} onClick={() => go('customers')}><Contact className={icon} /> Clientes y fiados <Badge count={debtors} color="bg-[#a43658]" /></Item>
           <Item active={isActive('out-of-stock')} onClick={() => go('out-of-stock')}><AlertTriangle className={icon} /> Agotados <Badge count={stock.outNew} color="bg-[#a43658]" /></Item>
           <Item active={isActive('low-stock')} onClick={() => go('low-stock')}><AlertCircle className={icon} /> Stock bajo <Badge count={stock.lowNew} color="bg-[#d97706]" /></Item>

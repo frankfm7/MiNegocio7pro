@@ -7,6 +7,8 @@ import { decodeProductQR, publicFromParams } from './lib/qr';
 import { openStore } from './lib/session';
 import { businessName, openWhatsApp } from './lib/whatsapp';
 import { esc, htmlToImage } from './lib/htmlImage';
+import { downloadDataUrl } from './lib/image';
+import { issueDocument, saveReceiptCopy } from './lib/documents';
 import { buildCashSummary, dateKeyOf, todayKey } from './lib/cashClose';
 import { APP_NAME, WELCOME_KEY } from './lib/constants';
 import { searchProducts } from './lib/search';
@@ -242,6 +244,7 @@ export async function confirmSale(qty: number, unitPrice: number) {
         items: [{ product: r, quantity: qty, price: unitPrice }], subtotal: unitPrice * qty, discount: 0, total: unitPrice * qty,
       },
     });
+    saveReceiptCopy(getState().receiptData);
     openModal('sale-receipt-modal');
     toast(`¡Venta registrada! ${qty}x ${r.name}${customer ? ` · fiado a ${customer.name}` : ''} 🎉`, 3000);
     SoundEffects.play('success');
@@ -457,6 +460,7 @@ export async function finalizeQuickScan() {
     if (customer) await DB.addMovement({ customer_id: customer.id, type: 'fiado', amount: total, method: 'Fiado', sale_id: firstSaleId, note: `${quickScanItems.length} producto(s)` });
     SoundEffects.play('success');
     setState({ quickScanItems: [], quickScanDiscount: 0, receiptData: receipt, saleCustomerId: '', receiptCarry: null, quickScanMode: false });
+    saveReceiptCopy(receipt);
     closeModal('quick-scan-modal');
     openModal('sale-receipt-modal');
     if (getState().isOnline) setTimeout(() => syncPendingChanges(), 500);
@@ -530,11 +534,8 @@ function watermarkHtml(name: string) {
       font:800 17px Arial,sans-serif;letter-spacing:2px;line-height:46px;color:rgba(124,67,186,0.10);">${rows}</div></div>`;
 }
 
-export async function generateReceiptImage() {
-  const r = getState().receiptData;
-  if (!r) return;
-  try {
-    toast('Generando imagen del recibo...', 2000);
+/** Imagen (PNG) del recibo */
+export async function renderReceiptImage(r: ReceiptData): Promise<string> {
     const st = receiptStore();
     const items = r.items.map(i => `<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eee;">
         <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(i.product.name)}</div>
@@ -568,11 +569,69 @@ export async function generateReceiptImage() {
         <p style="color:#999;font-size:10px;margin:6px 0 0;">Emitido con Mi Negocio 7pro</p>
       </div>
       </div></div>`;
-    showImagePreview(await htmlToImage(html), `recibo_${(r.number || String(Date.now())).replace(/[^\w-]/g, '_')}.png`);
+    return htmlToImage(html);
+}
+
+const receiptFile = (r: ReceiptData) => `recibo_${(r.number || String(Date.now())).replace(/[^\w-]/g, '_')}.png`;
+
+export async function generateReceiptImage() {
+  const r = getState().receiptData;
+  if (!r) return;
+  try {
+    toast('Generando imagen del recibo...', 2000);
+    saveReceiptCopy(r);
+    showImagePreview(await renderReceiptImage(r), receiptFile(r));
   } catch (e) {
     console.error('Error al generar imagen:', e);
     toast('Error al generar la imagen del recibo');
   }
+}
+
+/**
+ * Comparte una imagen (WhatsApp, etc.) con el menú del celular.
+ * Si el navegador no puede compartir archivos, se descarga la imagen y se abre WhatsApp con el texto.
+ */
+export async function shareImage(dataUrl: string, filename: string, text: string, phone = '') {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], filename, { type: 'image/png' });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], text });
+      return true;
+    }
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') return false;
+    console.warn('share', e);
+  }
+  downloadDataUrl(dataUrl, filename);
+  toast('📥 Imagen guardada. Adjúntala en el chat de WhatsApp que se abre.', 4500);
+  openWhatsApp(phone, text);
+  return false;
+}
+
+/** Envía el recibo como IMAGEN por WhatsApp (más presentable que el texto) */
+export async function sendReceiptImage(phone = '') {
+  const r = getState().receiptData;
+  if (!r) return;
+  try {
+    toast('Preparando la imagen del recibo...', 2000);
+    saveReceiptCopy(r);
+    const img = await renderReceiptImage(r);
+    await shareImage(img, receiptFile(r), `🧾 ${receiptStore().name} · Recibo${r.number ? ` N° ${r.number}` : ''} · Total ${formatUSD(r.total)}`, phone || r.customer?.phone || '');
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo preparar la imagen; se envía como texto');
+    sendReceiptWhatsApp(phone);
+  }
+}
+
+
+
+/** Número del cierre de un día (el mismo día conserva su número) */
+export async function closeNumber(dateKey: string): Promise<string> {
+  const sum = buildCashSummary(dateKey);
+  const snap = { label: sum.label, salesCount: sum.salesCount, total: sum.total, collected: sum.collected, cashExpected: sum.cashExpected, byMethod: sum.byMethod, bySeller: sum.bySeller, profit: sum.profit };
+  return issueDocument('cierre', dateKey, snap, sum.collected);
 }
 
 export async function generateDailyCloseImage(dateKey = todayKey()) {
@@ -583,11 +642,18 @@ export async function generateDailyCloseImage(dateKey = todayKey()) {
   const methods = sum.byMethod.map(m => row(`${m.method === 'Efec.' ? '💵' : m.method === 'QR' ? '📱' : m.method === 'Fiado' ? '📒' : '•'} ${m.method === 'Fiado' ? 'Fiado (por cobrar)' : esc(m.method)} (${m.count}):`, formatUSD(m.total), m.method === 'Fiado' ? '#a43658' : '#7c43ba')).join('');
   const sellers = sum.bySeller.map(v => row(esc(v.name) + ` (${v.count}):`, formatUSD(v.total))).join('');
   const items = day.map(s => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
-      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}${s.customer_name ? ' - ' + esc(s.customer_name) : ''} - ${esc(s.seller_name || '')}</div></div>
+      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}${s.customer_name ? ' - ' + esc(s.customer_name) : ''} - ${esc(s.seller_name || '')}${s.receipt_no ? ' · N° ' + esc(s.receipt_no) : ''}</div></div>
       <div style="font-weight:bold;color:#7c43ba;">${formatUSD(s.actual_price)}</div></div>`).join('');
-  const html = `
-    <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">📊 CIERRE DE CAJA</h1>
-      <p style="color:#444;margin:5px 0;font-weight:bold;">${esc(businessName())}</p><p style="color:#666;margin:5px 0;">${esc(sum.label)}</p></div>
+  const number = await closeNumber(dateKey);
+  const st = receiptStore();
+  const html = `<div style="position:relative;">${watermarkHtml(st.name)}<div style="position:relative;z-index:1;">
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:2px solid #7c43ba;margin-bottom:14px;">
+      <img src="/icon-192.png" style="width:50px;height:50px;border-radius:12px;" />
+      <div><div style="font-size:18px;font-weight:800;color:#201728;">${esc(st.name)}</div>${st.lines.map(l => `<div style="font-size:11px;color:#555;">${esc(l)}</div>`).join('')}</div>
+    </div>
+    <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:22px;letter-spacing:2px;">📊 CIERRE DE CAJA</h1>
+      ${number ? `<p style="color:#201728;margin:4px 0;font-size:20px;font-weight:900;">N° ${esc(number)}</p>` : ''}
+      <p style="color:#666;margin:5px 0;">${esc(sum.label)}</p></div>
     <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">
       ${row('Ventas:', String(sum.salesCount))}${methods}
       ${sum.abonoCount ? row('💰 Abonos de fiados:', formatUSD(sum.abonoCash + sum.abonoQr), '#166534') : ''}
@@ -596,10 +662,10 @@ export async function generateDailyCloseImage(dateKey = todayKey()) {
       <div style="display:flex;justify-content:space-between;padding-top:6px;"><span style="font-weight:bold;">Efectivo en caja:</span><span style="font-weight:bold;">${formatUSD(sum.cashExpected)}</span></div></div>
     ${sellers ? `<h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Por vendedor:</h2><div style="background:#faf7fc;padding:12px;border-radius:12px;margin-bottom:16px;">${sellers}</div>` : ''}
     <h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Detalle de ventas:</h2>${items}
-    <div style="text-align:center;margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;"><p style="color:#666;font-size:12px;">Generado el ${new Date().toLocaleString('es')}</p></div>`;
+    <div style="text-align:center;margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;"><p style="color:#666;font-size:12px;">Generado el ${new Date().toLocaleString('es')} por ${esc(getState().currentUser?.name || '')}</p></div></div></div>`;
   try {
     toast('Generando imagen del cierre...', 2000);
-    showImagePreview(await htmlToImage(html), `cierre_caja_${dateKey}.png`);
+    showImagePreview(await htmlToImage(html), `cierre_caja_${number || dateKey}.png`);
   } catch (e) {
     console.error('Error al generar imagen:', e);
     toast('Error al generar la imagen del cierre');
@@ -611,9 +677,8 @@ export async function generateDailyCloseImage(dateKey = todayKey()) {
 // ==========================================
 const fmtDate = (iso: string) => new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-/** Recibo (el mismo de "Venta exitosa") armado con las ventas elegidas */
-export function salesReceipt(list: Sale[]) {
-  if (!list.length) return;
+/** Arma un recibo con ventas ya registradas */
+function receiptFromSales(list: Sale[]): ReceiptData {
   const { records, customers } = getState();
   const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
   const items = sorted.map(s => {
@@ -630,14 +695,67 @@ export function salesReceipt(list: Sale[]) {
   const date = first.toDateString() === last.toDateString()
     ? first.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })
     : `${first.toLocaleDateString('es')} – ${last.toLocaleDateString('es')}`;
+  return {
+    date, seller: uniq(sorted.map(s => s.seller_name)) || '—', payment: uniq(sorted.map(s => s.payment_method)) || 'Efec.',
+    customer: customerName ? { name: customerName, phone: cust?.phone || '' } : null,
+    items, subtotal: total, discount: 0, total,
+  };
+}
+
+/** Abre el recibo ya emitido con ese número (copia), con todas sus ventas y los datos guardados */
+export async function openReceiptByNumber(code: string, saved?: Partial<ReceiptData> | null) {
+  const sales = getState().sales.filter(x => x.receipt_no === code);
+  let snap = saved;
+  if (!snap) {
+    const { localDocs } = await import('./lib/documents');
+    snap = (await localDocs()).find(d => d.kind === 'recibo' && d.code === code)?.data || null;
+  }
+  if (!sales.length && !snap?.items?.length) { toast(`No se encontraron las ventas del recibo ${code}`); return; }
+  const base = sales.length ? receiptFromSales(sales) : (snap as ReceiptData);
   setState({
     receiptData: {
-      date, seller: uniq(sorted.map(s => s.seller_name)) || '—', payment: uniq(sorted.map(s => s.payment_method)) || 'Efec.',
-      customer: customerName ? { name: customerName, phone: cust?.phone || '' } : null,
-      items, subtotal: total, discount: 0, total, reprint: true,
-      number: [...new Set(sorted.map(x => x.receipt_no).filter(Boolean))].join(', ') || undefined,
+      ...base,
+      ...(snap ? { date: snap.date || base.date, discount: snap.discount ?? base.discount, subtotal: snap.subtotal ?? base.subtotal, total: snap.total ?? base.total, extra: snap.extra, customer: snap.customer ?? base.customer, payment: snap.payment || base.payment } : {}),
+      ...(snap?.items?.length && !sales.length ? { items: snap.items } : {}),
+      number: code, reprint: true,
     },
   });
+  openModal('sale-receipt-modal');
+}
+
+/**
+ * Recibo desde la selección múltiple. Una venta nunca sale en dos recibos distintos:
+ *  - todas las ventas elegidas son de UN recibo → se abre ese recibo (copia, mismo número);
+ *  - ninguna tiene recibo → se emite un número nuevo para ellas;
+ *  - mezcla → se avisa y se ofrece numerar solo las que no tienen recibo.
+ */
+export async function salesReceipt(list: Sale[]) {
+  if (!list.length) return;
+  const numbers = [...new Set(list.map(x => x.receipt_no).filter(Boolean))] as string[];
+  const without = list.filter(x => !x.receipt_no);
+  if (numbers.length === 1 && !without.length) { await openReceiptByNumber(numbers[0]); return; }
+  if (!numbers.length) {
+    if (!confirm(`Estas ${list.length} ${list.length === 1 ? 'venta no tiene' : 'ventas no tienen'} recibo.\n¿Emitir un recibo nuevo (con el siguiente número) para ${list.length === 1 ? 'ella' : 'ellas'}?`)) return;
+    await issueReceiptFor(list);
+    return;
+  }
+  const msg = `Las ventas elegidas ya están en ${numbers.length === 1 ? 'el recibo' : 'los recibos'} ${numbers.join(', ')}` +
+    (without.length ? ` y ${without.length} no ${without.length === 1 ? 'tiene' : 'tienen'} recibo.` : '.') +
+    '\nUna venta no puede salir en dos recibos.';
+  if (without.length && confirm(msg + `\n\n¿Emitir un recibo nuevo SOLO para ${without.length === 1 ? 'la venta' : `las ${without.length} ventas`} sin recibo?`)) { await issueReceiptFor(without); return; }
+  if (!without.length) {
+    toast(`${msg.replace('\n', ' ')} Ábrelos desde "Recibos y cierres".`, 6000);
+    setState({ docsQuery: numbers[0] });
+    openModal('documents-modal');
+  }
+}
+
+async function issueReceiptFor(list: Sale[]) {
+  const r = receiptFromSales(list);
+  const rc = await issueReceipt(list.map(x => x.id), r.total);
+  const receipt = { ...r, number: rc.number, provisional: rc.provisional };
+  setState({ receiptData: receipt });
+  saveReceiptCopy(receipt);
   openModal('sale-receipt-modal');
 }
 

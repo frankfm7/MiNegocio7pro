@@ -14,6 +14,7 @@ import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
 import ImageEditor from './components/ImageEditor';
 import SaleInProgressBar from './components/SaleInProgressBar';
+import DocumentsModal from './components/modals/DocumentsModal';
 import ProductFormDrawer from './components/ProductFormDrawer';
 import { ProductImageLightbox, QrLightbox } from './components/ImageLightboxes';
 import CatalogsScreen from './screens/CatalogsScreen';
@@ -222,6 +223,7 @@ export default function App() {
       <QuickScanModal />
       <QuickScanManualModal />
       <ImagePreviewModal />
+      <DocumentsModal />
       <SaleReceiptModal />
       <PublicProductModal />
       <ImportPreviewModal />

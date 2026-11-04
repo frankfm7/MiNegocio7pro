@@ -179,6 +179,20 @@ export interface ReceiptExtra {
   customerNit?: string; // NIT / CI del cliente
 }
 
+/** Documento emitido (recibo, cierre de caja o informe) para revisar y reenviar */
+export interface DocRecord {
+  kind: 'recibo' | 'cierre' | 'informe';
+  code: string;
+  /** Fecha de emisión (ISO) */
+  date: string;
+  /** Cierre: día (2026-11-04) */
+  ref?: string | null;
+  total?: number | null;
+  by?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
+}
+
 /** Datos de la tienda que salen en el recibo */
 export interface ReceiptSettings {
   prefix: string;
