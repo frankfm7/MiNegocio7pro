@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CheckCircle, Download, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
+import { Camera, CheckCircle, Download, Receipt as ReceiptIcon, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
 import {
@@ -212,7 +212,7 @@ export function QuickScanModal() {
           )}
           <div className="space-y-2">
             {items.map((item, index) => (
-              <div key={item.product.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
+              <div key={item.product.id + item.quantity} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
                 <img src={cardImage(item.product)} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm truncate">{item.product.name}{formatContent(item.product) ? ` · ${formatContent(item.product)}` : ''}</p>
@@ -304,15 +304,24 @@ export function SaleReceiptModal() {
     <Modal id="sale-receipt-modal" className="z-[70] bg-[#1e1427]/60">
       {r && (
         <article id="receipt-content" className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
-          <div className="text-center mb-4">
-            <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><CheckCircle className="w-12 h-12 text-green-600" /></div>
-            <h2 className="font-bold text-2xl hero-title text-green-700">¡Venta Exitosa!</h2>
-            <p className="text-sm text-gray-600 mt-1">La venta ha sido registrada correctamente</p>
-          </div>
+          {r.reprint ? (
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 mx-auto bg-[#f6f1f8] rounded-full flex items-center justify-center mb-3"><ReceiptIcon className="w-9 h-9 text-[#7c43ba]" /></div>
+              <h2 className="font-bold text-2xl hero-title text-[#7c43ba]">Recibo de venta</h2>
+              <p className="text-sm text-gray-600 mt-1">{r.items.length} {r.items.length === 1 ? 'producto' : 'productos'} · listo para enviar</p>
+            </div>
+          ) : (
+            <div className="text-center mb-4">
+              <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-3"><CheckCircle className="w-12 h-12 text-green-600" /></div>
+              <h2 className="font-bold text-2xl hero-title text-green-700">¡Venta Exitosa!</h2>
+              <p className="text-sm text-gray-600 mt-1">La venta ha sido registrada correctamente</p>
+            </div>
+          )}
           <div className="bg-gray-50 rounded-xl p-4 mb-4">
             <div className="flex justify-between items-center mb-2"><span className="text-sm text-gray-600">Fecha:</span><span className="text-sm font-bold">{r.date}</span></div>
             <div className="flex justify-between items-center mb-2"><span className="text-sm text-gray-600">Vendedor:</span><span className="text-sm font-bold">{r.seller}</span></div>
-            <div className="flex justify-between items-center"><span className="text-sm text-gray-600">Método de pago:</span><span className="text-sm font-bold">{r.payment}</span></div>
+            <div className="flex justify-between items-center gap-3"><span className="text-sm text-gray-600">Método de pago:</span><span className="text-sm font-bold text-right">{r.payment}</span></div>
+            {r.customer && <div className="flex justify-between items-center gap-3 mt-2"><span className="text-sm text-gray-600">Cliente:</span><span className="text-sm font-bold text-right">{r.customer.name}</span></div>}
           </div>
           <div className="mb-4">
             <h3 className="font-bold text-sm mb-2">Productos vendidos:</h3>

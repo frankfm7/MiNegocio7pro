@@ -8,7 +8,8 @@ import { openAccount, openModal, setState, useStore, type ModalId } from '../sto
 import { navigate, openAdminModal, openBarcodeScanner, openTeam, showWelcome, toggleDarkMode, toggleSound } from '../actions';
 import { roleLabel, signOut } from '../lib/session';
 import { refreshData } from '../lib/db';
-import { customerBalance, getLowStockProducts, getOutOfStockProducts } from '../lib/selectors';
+import { customerBalance } from '../lib/selectors';
+import { useStockAlerts } from '../lib/stockAlerts';
 import { installApp } from './InstallPrompt';
 import { APP_VERSION } from '../lib/constants';
 import Brand from './Brand';
@@ -27,6 +28,7 @@ function Badge({ count, color }: { count: number; color: string }) {
 }
 
 export default function Sidebar() {
+  const stock = useStockAlerts();
   const open = useStore(s => s.sidebarOpen);
   const currentView = useStore(s => s.currentView);
   const currentCatalogId = useStore(s => s.currentCatalogId);
@@ -34,10 +36,8 @@ export default function Sidebar() {
   const mode = useStore(s => s.mode);
   const store = useStore(s => s.activeStore);
   const authUser = useStore(s => s.authUser);
-  const records = useStore(s => s.records);
   const customers = useStore(s => s.customers);
   const movements = useStore(s => s.movements);
-  const lowDefault = useStore(s => s.lowStockDefault);
   const debtors = customers.filter(c => customerBalance(movements, c.id) > 0).length;
   const cartQty = useStore(s => s.cart.reduce((a, x) => a + x.qty, 0));
   const isOnline = useStore(s => s.isOnline);
@@ -137,8 +137,8 @@ export default function Sidebar() {
           <Item active={isActive('daily-sales')} onClick={() => go('daily-sales')}><TrendingUp className={icon} /> Ventas del día</Item>
           <Item active={isActive('cash-close')} onClick={() => go('cash-close')}><Wallet className={icon} /> Cierre de caja</Item>
           <Item active={isActive('customers')} onClick={() => go('customers')}><Contact className={icon} /> Clientes y fiados <Badge count={debtors} color="bg-[#a43658]" /></Item>
-          <Item active={isActive('out-of-stock')} onClick={() => go('out-of-stock')}><AlertTriangle className={icon} /> Agotados <Badge count={getOutOfStockProducts(records).length} color="bg-[#a43658]" /></Item>
-          <Item active={isActive('low-stock')} onClick={() => go('low-stock')}><AlertCircle className={icon} /> Stock bajo <Badge count={getLowStockProducts(records, lowDefault).length} color="bg-[#d97706]" /></Item>
+          <Item active={isActive('out-of-stock')} onClick={() => go('out-of-stock')}><AlertTriangle className={icon} /> Agotados <Badge count={stock.outNew} color="bg-[#a43658]" /></Item>
+          <Item active={isActive('low-stock')} onClick={() => go('low-stock')}><AlertCircle className={icon} /> Stock bajo <Badge count={stock.lowNew} color="bg-[#d97706]" /></Item>
           <Item onClick={() => { close(); openModal('cart-modal'); }}><ShoppingCart className={icon} /> Pedido actual <Badge count={cartQty} color="bg-[#c54571]" /></Item>
 
           <p className="text-[10px] uppercase tracking-[.15em] font-bold text-[#756c7e] px-3 py-2 mt-4">Herramientas</p>

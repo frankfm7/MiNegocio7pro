@@ -3,6 +3,7 @@ import type { Product } from '../types';
 import { cardImage, formatContent, formatUSD } from '../lib/format';
 import { fallback } from '../lib/constants';
 import { addCart, openDetail } from '../actions';
+import { useImageBg } from '../lib/imageBg';
 
 /**
  * Tarjeta de producto. Orden: foto → nombre → detalle (marca, contenido, precios) → botones.
@@ -17,10 +18,11 @@ export default function ProductCard({ r }: { r: Product }) {
   const showCatalog = catalog > sale + 0.004;
   const savePct = showCatalog ? Math.round((1 - sale / catalog) * 100) : 0;
   const details = [r.brand, content].filter(Boolean).join(' · ');
+  const photoBg = useImageBg(r.image_url);
   return (
     <article className={`product-card flex flex-col ${stateCls}`} data-id={r.id} onClick={() => openDetail(r)}>
       <div className="relative">
-        <img className="product-image" src={cardImage(r)} alt={r.name} loading="lazy" onError={e => { e.currentTarget.src = fallback; }} />
+        <img className={`product-image ${photoBg ? 'solid-bg' : ''}`} style={photoBg ? { background: photoBg } : undefined} src={cardImage(r)} alt={r.name} loading="lazy" onError={e => { e.currentTarget.src = fallback; }} />
         <span className={`card-stock absolute top-2 right-2 text-[10px] rounded-full px-2 py-0.5 font-bold shadow-sm ${stock < 1 ? 'bg-[#a43658] text-white' : stock <= 3 ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-white/95 text-[#5f3291]'}`}>
           {stock < 1 ? 'Agotado' : `${r.stock} u.`}
         </span>

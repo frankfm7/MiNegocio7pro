@@ -36,6 +36,8 @@ export interface InvoiceResult {
   totals: string[];
 }
 
+import { fixNameWords, isKnownWord, nameScore } from './invoiceWords';
+
 // ---------- utilidades de texto ----------
 const MATERIAL_RE = /\b(CATALOGO|CATÁLOGO|REVISTA|FLYER|BOLETIN|BOLETÍN|CARTILLA|FLETE|ENVIO|ENVÍO|KIT INICIO|BOLSA|FOLLETO|MUESTRARIO)\b/i;
 const GIFT_RE = /\b(DEMO|DEMOSTRADOR|PROB|PROBADOR|MUESTRA|TESTER|INICIO GANADOR)\b/i;
@@ -43,6 +45,7 @@ const GIFT_RE = /\b(DEMO|DEMOSTRADOR|PROB|PROBADOR|MUESTRA|TESTER|INICIO GANADOR
 /** Arregla errores típicos del OCR en montos: "93 00" → "93.00", "25 00%" → quitado */
 function cleanLine(line: string) {
   return line
+    .replace(/\$(\d)(?=\s?(G|GR|ML)\b)/gi, '5$1')               // "$0G" → "50G" (el 5 leído como $)
     .replace(/[|\[\]{}“”"'`´~_*©®°»«¡!]/g, ' ')
     .replace(/\b\d{1,3}(?:[ .,]\d{1,2})?\s?%/g, ' ')        // porcentajes de descuento
     .replace(/\b(\d{2,4}) (\d{2})\b(?!\s*%)/g, '$1.$2')    // "93 00" → "93.00"
@@ -99,12 +102,16 @@ export function prettyName(raw: string): string {
   }).join(' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Marca según el prefijo de Belcorp: ES = Ésika, LB = L'Bel, CZ/CY = Cyzone */
+/** Marca según el prefijo de Belcorp: ES = Ésika, LB = L'Bel, CZ/CY = Cyzone (puede tener basura antes) */
 function belcorpBrand(words: string[]): { brand: string; rest: string[] } {
-  const p = (words[0] || '').toUpperCase();
-  if (/^(ES|E5|FS|E8)$/.test(p)) return { brand: 'Ésika', rest: words.slice(1) };
-  if (/^(LB|LE|L8|LBEL)$/.test(p)) return { brand: "L'Bel", rest: words.slice(1) };
-  if (/^(CZ|C2|CY|CZY)$/.test(p)) return { brand: 'Cyzone', rest: words.slice(1) };
+  for (let i = 0; i < Math.min(3, words.length - 1); i++) {
+    // Solo se salta basura antes del prefijo, no palabras reales ("CATALOGO ESIKA ...")
+    if (i > 0 && isKnownWord(words[i - 1])) break;
+    const p = (words[i] || '').toUpperCase();
+    if (/^(ES|E5|FS|E8|ESIKA|ÉSIKA)$/.test(p)) return { brand: 'Ésika', rest: words.slice(i + 1) };
+    if (/^(LB|LE|L8|LS|LBEL)$/.test(p)) return { brand: "L'Bel", rest: words.slice(i + 1) };
+    if (/^(CZ|C2|CY|CZY|CYZONE)$/.test(p)) return { brand: 'Cyzone', rest: words.slice(i + 1) };
+  }
   return { brand: '', rest: words };
 }
 
@@ -122,6 +129,8 @@ function parseBelcorp(lines: string[]): InvoiceItem[] {
     if (/SUB\s*-?\s*TOTAL|TOTAL GENERAL|C[OÓ]DIGO|PRODUCTO\s+CANTIDAD|OBSERVACIONES|CANTIDAD\s+PRECIO/i.test(raw)) { pendingName = null; continue; }
     const line = cleanLine(raw);
     const toks = line.split(' ');
+    // % de descuento adicional (ej. 14.50%): sirve para comprobar lo que se paga
+    const pcts = [...raw.matchAll(/\b(\d{1,2})[ .,](\d{2})\s?%/g)].map(m => parseFloat(m[1] + '.' + m[2])).filter(p => p > 0 && p < 80);
     // Código al inicio (4 a 6 dígitos)
     let code = '';
     let i = 0;
@@ -147,7 +156,9 @@ function parseBelcorp(lines: string[]): InvoiceItem[] {
     const nums = rest.slice(q + 1).filter(isMoneyTok).map(money).filter(n => !isNaN(n));
     const qty = quantity(rest[q]) || 1;
     // Si la línea anterior tenía el nombre limpio (negrita), usamos ese
-    const useWords = pendingName && (nameWords.length < 2 || pendingName.words.length >= nameWords.length - 1) ? pendingName.words : nameWords;
+    const cand = pendingName ? [pendingName.words, nameWords] : [nameWords];
+    const score = (ws: string[]) => (ws.length < 2 ? -1 : nameScore(fixNameWords(belcorpBrand(ws).rest).join(' ')) + (belcorpBrand(ws).brand ? 0.2 : 0));
+    const useWords = cand.length > 1 && score(cand[1]) > score(cand[0]) + 0.15 ? cand[1] : cand[0];
     const useCode = pendingName?.code || code;
     pendingName = null;
     if (useWords.length === 0) continue;
@@ -157,21 +168,34 @@ function parseBelcorp(lines: string[]): InvoiceItem[] {
       // Precio para ti, compra total, valorizado (precio de catálogo), monto a pagar, ahorro
       catalogTotal = nums[2] > 0 ? nums[2] : nums[1];
       paid = nums.length >= 4 ? nums[3] : nums[nums.length - 1];
+      // Monto a pagar = compra total − % adicional. Si el número leído no cuadra, se usa la cuenta.
+      const compra = nums[1] || nums[0] * qty;
+      const pct = pcts[pcts.length - 1];
+      if (pct && compra > 0) {
+        const expected = Math.floor(compra * (1 - pct / 100) * 100 + 0.5001) / 100;
+        if (!(Math.abs(paid - expected) <= Math.max(0.02, expected * 0.02))) paid = expected;
+      }
     } else {
       // Precio unitario catálogo, compra total, monto a pagar, ahorro
       catalogTotal = nums[1] || nums[0] * qty;
       paid = nums.length >= 3 ? nums[2] : nums[nums.length - 1];
+      // Monto a pagar = compra total × (1 − % escala − % adicional)
+      if (pcts.length >= 2 && catalogTotal > 0) {
+        const off = pcts.slice(-2).reduce((a, b) => a + b, 0);
+        const expected = Math.round(catalogTotal * (1 - off / 100) * 100) / 100;
+        if (off < 90 && !(Math.abs(paid - expected) <= Math.max(0.03, expected * 0.02))) paid = expected;
+      }
     }
     if (paid > catalogTotal && nums.length >= 3) paid = Math.min(...nums.slice(1).filter(n => n > 0));
     const { brand, rest: nameRest } = belcorpBrand(useWords);
-    const name = nameRest.join(' ');
+    const name = fixNameWords(nameRest).join(' ');
     const catalogUnit = round2(catalogTotal / qty);
     const costUnit = round2(paid / qty);
     out.push({
       code: useCode, name: prettyName(name), brand, qty,
       catalogUnit, costUnit,
       isMaterial: MATERIAL_RE.test(name), isGift: (costUnit === 0 || GIFT_RE.test(name)) && !MATERIAL_RE.test(name),
-      check: costUnit > catalogUnit * 1.05 || catalogUnit === 0 || (costUnit > 0 && costUnit < catalogUnit * 0.2),
+      check: !MATERIAL_RE.test(name) && (costUnit > catalogUnit * 1.05 || catalogUnit === 0 || (costUnit > 0 && costUnit < catalogUnit * 0.2)),
     });
   }
   return out;
@@ -250,7 +274,7 @@ function parseYanbal(lines: string[]): InvoiceItem[] {
     // Quitar repeticiones (el OCR a veces lee dos veces el nombre)
     const dedup: string[] = [];
     for (const w of words) if (!dedup.includes(w) || /^\d+$/.test(w)) dedup.push(w);
-    const name = dedup.join(' ');
+    const name = fixNameWords(dedup).join(' ');
     if (!name) continue;
     const costUnit = round2((ok ? subtotal : unit * qty - disc) / qty);
     out.push({
@@ -280,6 +304,34 @@ function detectRate(lines: string[]): number | null {
   return round2(ratios[Math.floor(ratios.length / 2)]);
 }
 
+/** Calidad de una lectura: filas que cuadran y nombres limpios */
+export function resultScore(r: InvoiceResult): number {
+  return r.items.reduce((a, i) => a + (i.check ? 0.3 : 1) + nameScore(i.name) * 0.5, 0);
+}
+
+/**
+ * Junta dos lecturas de la misma foto (con distinta limpieza): los números salen de
+ * `primary` salvo que esa fila no cuadre y la otra sí; el nombre es el más limpio de los dos.
+ */
+export function mergeResults(primary: InvoiceResult, secondary: InvoiceResult): InvoiceResult {
+  const key = (i: InvoiceItem) => i.code.replace(/\D/g, '');
+  const norm = (n: string) => n.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const used = new Set<InvoiceItem>();
+  const items = primary.items.map(it => {
+    const twin = secondary.items.find(o => !used.has(o) && ((key(o) && key(o) === key(it)) || (norm(o.name) && norm(o.name) === norm(it.name))));
+    if (!twin) return it;
+    used.add(twin);
+    const merged = { ...it };
+    if (it.check && !twin.check) Object.assign(merged, { qty: twin.qty, catalogUnit: twin.catalogUnit, costUnit: twin.costUnit, check: false });
+    // Las dos lecturas no coinciden en el precio: se deja marcado para revisar
+    else if (!it.check && !twin.check && twin.catalogUnit > 0 && Math.abs(twin.catalogUnit - it.catalogUnit) > Math.max(0.05, it.catalogUnit * 0.05)) merged.check = true;
+    if (nameScore(twin.name) > nameScore(it.name) + 0.1) merged.name = twin.name;
+    if (!merged.brand && twin.brand) merged.brand = twin.brand;
+    return merged;
+  });
+  return { ...primary, rate: primary.rate ?? secondary.rate, currency: primary.currency ?? secondary.currency, items };
+}
+
 export function parseInvoiceText(text: string): InvoiceResult {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const all = lines.join('\n');
@@ -297,50 +349,79 @@ export function parseInvoiceText(text: string): InvoiceResult {
 }
 
 // ---------- Limpieza de la foto antes del OCR ----------
+export interface PrepOptions {
+  /** Ancho objetivo en píxeles (letras más grandes = mejor lectura) */
+  width?: number;
+  /** Qué tan oscuro (respecto al entorno) debe ser un punto para contar como tinta. 0.92 = más sensible */
+  k?: number;
+  /** Radio fijo de la zona de comparación (la limpieza clásica usa 25) */
+  r?: number;
+  /** Escalado suave de alta calidad */
+  smooth?: boolean;
+}
+
 /**
  * Escala de grises, umbral adaptativo (quita sombras de la foto) y borrado de
  * las líneas largas de la tabla, que confunden al lector.
+ * Usa sumas por filas/columnas para no gastar mucha memoria en el celular.
  */
-export async function prepareInvoiceImage(file: Blob): Promise<HTMLCanvasElement> {
+export async function prepareInvoiceImage(file: Blob, opts: PrepOptions = {}): Promise<HTMLCanvasElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = url; });
-    const scale = Math.min(3, Math.max(1, 2400 / img.width));
+    const target = opts.width ?? 3400;
+    // Máximo ~10 millones de píxeles (unos 100 MB de memoria en total)
+    let scale = Math.min(opts.width && opts.width <= 2400 ? 3 : 2.6, Math.max(1, target / img.width));
+    if (img.width * img.height * scale * scale > 10e6) scale = Math.max(1, Math.sqrt(10e6 / (img.width * img.height)));
     const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d', { willReadFrequently: true })!;
+    if (opts.smooth !== false) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; }
     ctx.drawImage(img, 0, 0, W, H);
     const px = ctx.getImageData(0, 0, W, H);
     const d = px.data;
-    const gray = new Float32Array(W * H);
-    for (let i = 0, p = 0; p < W * H; p++, i += 4) gray[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    // Imagen integral para la media local
-    const ii = new Float64Array((W + 1) * (H + 1));
-    for (let y = 1; y <= H; y++) {
-      let row = 0;
-      for (let x = 1; x <= W; x++) { row += gray[(y - 1) * W + (x - 1)]; ii[y * (W + 1) + x] = ii[(y - 1) * (W + 1) + x] + row; }
-    }
-    const R = 25;
-    const dark = new Uint8Array(W * H);
+    const N = W * H;
+    // Limpieza clásica (r fijo): cálculo con decimales, idéntico al de versiones anteriores
+    const exact = opts.r !== undefined;
+    const gray = exact ? new Float32Array(N) : new Uint8Array(N);
+    for (let i = 0, p = 0; p < N; p++, i += 4) gray[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    // Media local en una ventana de (2R+1)², con sumas horizontales y luego verticales
+    const R = opts.r ?? Math.max(12, Math.round(14 * scale));
+    const k = opts.k ?? 0.92;
+    const hsum = exact ? new Float32Array(N) : new Uint16Array(N);
     for (let y = 0; y < H; y++) {
-      const y0 = Math.max(0, y - R), y1 = Math.min(H, y + R + 1);
+      const o = y * W;
+      let acc = 0;
+      for (let x = 0; x < Math.min(R, W); x++) acc += gray[o + x];
       for (let x = 0; x < W; x++) {
-        const x0 = Math.max(0, x - R), x1 = Math.min(W, x + R + 1);
-        const sum = ii[y1 * (W + 1) + x1] - ii[y0 * (W + 1) + x1] - ii[y1 * (W + 1) + x0] + ii[y0 * (W + 1) + x0];
-        const mean = sum / ((y1 - y0) * (x1 - x0));
-        dark[y * W + x] = gray[y * W + x] < mean * 0.85 ? 1 : 0;
+        if (x + R < W) acc += gray[o + x + R];
+        if (x - R - 1 >= 0) acc -= gray[o + x - R - 1];
+        hsum[o + x] = acc;
       }
     }
-    // Líneas largas horizontales (≥12% del ancho) y verticales (≥6% del alto)
-    const line = new Uint8Array(W * H);
+    const col = new Float64Array(W);
+    for (let y = 0; y < Math.min(R, H); y++) for (let x = 0; x < W; x++) col[x] += hsum[y * W + x];
+    const dark = new Uint8Array(N);
+    for (let y = 0; y < H; y++) {
+      if (y + R < H) { const o = (y + R) * W; for (let x = 0; x < W; x++) col[x] += hsum[o + x]; }
+      if (y - R - 1 >= 0) { const o = (y - R - 1) * W; for (let x = 0; x < W; x++) col[x] -= hsum[o + x]; }
+      const rows = Math.min(H, y + R + 1) - Math.max(0, y - R);
+      for (let x = 0; x < W; x++) {
+        const cols = Math.min(W, x + R + 1) - Math.max(0, x - R);
+        dark[y * W + x] = gray[y * W + x] < (col[x] / (rows * cols)) * k ? 1 : 0;
+      }
+    }
+    // Líneas largas horizontales (≥12% del ancho) y verticales (≥6% del alto): se reutiliza "gray"
+    const line = gray;
+    line.fill(0);
     const minH = Math.round(W * 0.12), minV = Math.round(H * 0.06);
     for (let y = 0; y < H; y++) {
       let start = -1;
       for (let x = 0; x <= W; x++) {
         const on = x < W && dark[y * W + x];
         if (on && start < 0) start = x;
-        if (!on && start >= 0) { if (x - start >= minH) for (let k = start; k < x; k++) line[y * W + k] = 1; start = -1; }
+        if (!on && start >= 0) { if (x - start >= minH) for (let q = start; q < x; q++) line[y * W + q] = 1; start = -1; }
       }
     }
     for (let x = 0; x < W; x++) {
@@ -348,15 +429,17 @@ export async function prepareInvoiceImage(file: Blob): Promise<HTMLCanvasElement
       for (let y = 0; y <= H; y++) {
         const on = y < H && dark[y * W + x];
         if (on && start < 0) start = y;
-        if (!on && start >= 0) { if (y - start >= minV) for (let k = start; k < y; k++) line[k * W + x] = 1; start = -1; }
+        if (!on && start >= 0) { if (y - start >= minV) for (let q = start; q < y; q++) line[q * W + x] = 1; start = -1; }
       }
     }
     for (let y = 0, p = 0; y < H; y++) {
       for (let x = 0; x < W; x++, p++) {
         let isLine = false;
-        for (let dy = -1; dy <= 1 && !isLine; dy++) for (let dx = -1; dx <= 1; dx++) {
-          const yy = y + dy, xx = x + dx;
-          if (yy >= 0 && yy < H && xx >= 0 && xx < W && line[yy * W + xx]) { isLine = true; break; }
+        if (dark[p]) {
+          for (let dy = -1; dy <= 1 && !isLine; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const yy = y + dy, xx = x + dx;
+            if (yy >= 0 && yy < H && xx >= 0 && xx < W && line[yy * W + xx]) { isLine = true; break; }
+          }
         }
         const v = dark[p] && !isLine ? 0 : 255;
         d[p * 4] = d[p * 4 + 1] = d[p * 4 + 2] = v; d[p * 4 + 3] = 255;

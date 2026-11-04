@@ -4,7 +4,7 @@ import { getState, openModal, setState, toast, useStore } from './store';
 import { closeForm, navigate, openBarcodeScanner, openProductFromLink, startQuickScanMode } from './actions';
 import { DB, refreshData, syncPendingChanges } from './lib/db';
 import { initSession } from './lib/session';
-import { getLowStockProducts, getOutOfStockProducts } from './lib/selectors';
+import { useStockAlerts as useStockAlertCounts } from './lib/stockAlerts';
 
 import WelcomeScreen from './components/WelcomeScreen';
 import AccountScreen from './components/AccountScreen';
@@ -12,6 +12,7 @@ import { InstallHelpModal, useInstallEvents } from './components/InstallPrompt';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
+import ImageEditor from './components/ImageEditor';
 import ProductFormDrawer from './components/ProductFormDrawer';
 import { ProductImageLightbox, QrLightbox } from './components/ImageLightboxes';
 import CatalogsScreen from './screens/CatalogsScreen';
@@ -65,24 +66,24 @@ function useConnection() {
   }, []);
 }
 
-/** Al abrir la app avisa (una vez) si hay productos por reponer */
+/** Al abrir la app avisa (una sola vez por producto) si hay productos por reponer.
+ *  Los productos ya avisados u ocultados no vuelven a avisar hasta que se repongan y bajen otra vez. */
 function useStockAlerts() {
   const ready = useStore(s => s.dataReady);
   const welcome = useStore(s => s.welcomeVisible);
-  const low = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length);
-  const out = useStore(s => getOutOfStockProducts(s.records).length);
+  const { lowNew, outNew } = useStockAlertCounts();
   const told = useRef(false);
   useEffect(() => {
-    if (!ready || welcome || told.current || (!low && !out)) return;
+    if (!ready || welcome || told.current || (!lowNew && !outNew)) return;
     told.current = true;
-    const msg = `${low ? `${low} con stock bajo` : ''}${low && out ? ' y ' : ''}${out ? `${out} agotado${out === 1 ? '' : 's'}` : ''}`;
+    const msg = `${lowNew ? `${lowNew} con stock bajo` : ''}${lowNew && outNew ? ' y ' : ''}${outNew ? `${outNew} agotado${outNew === 1 ? '' : 's'}` : ''}`;
     toast(`⚠️ Por reponer: ${msg}`, 4500);
     try {
       if (localStorage.getItem('mc7_notif') === 'true' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         navigator.serviceWorker?.ready.then(reg => reg.showNotification('Stock por reponer', { body: msg, icon: '/icon-192.png', tag: 'stock' })).catch(() => {});
       }
     } catch { /* sin permiso */ }
-  }, [ready, welcome, low, out]);
+  }, [ready, welcome, lowNew, outNew]);
 }
 
 function useEscapeKey() {
@@ -233,6 +234,7 @@ export default function App() {
 
       <QrLightbox />
       <ProductImageLightbox />
+      <ImageEditor />
       <Toast />
     </>
   );

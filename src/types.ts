@@ -158,12 +158,14 @@ export interface ReceiptData {
   subtotal: number;
   discount: number;
   total: number;
+  /** true cuando el recibo se genera después, desde el historial de ventas */
+  reprint?: boolean;
 }
 
 export type PendingAction =
   | 'createProduct' | 'updateProduct' | 'deleteProduct'
   | 'createCatalog' | 'updateCatalog' | 'deleteCatalog'
-  | 'addSale' | 'createQR' | 'updateQR' | 'deleteQR'
+  | 'addSale' | 'deleteSales' | 'createQR' | 'updateQR' | 'deleteQR'
   | 'upsertCustomer' | 'deleteCustomer' | 'addMovement' | 'deleteMovement';
 
 export interface PendingChange {

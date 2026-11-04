@@ -968,3 +968,16 @@ body:not(.dark-mode) .product-image, body:not(.dark-mode) #detail-image { mix-bl
   box-shadow: 0 4px 14px rgba(124,67,186,.35); flex-shrink: 0; white-space: nowrap;
 }
 .login-pill:hover { background: #6d389f; }
+
+/* ===== Cuadros de resumen: los montos grandes ("12,345.00 Bs") ya no empujan la pantalla hacia la derecha ===== */
+.stat-card { min-width: 0; overflow: hidden; }
+.stat-card > p.font-bold { font-size: clamp(15px, 4.4vw, 20px); line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.sale-row { min-width: 0; }
+#daily-sales-list, #sales-list { width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; }
+.sales-actionbar { bottom: calc(76px + env(safe-area-inset-bottom)); }
+@media (min-width:1024px) { .sales-actionbar { bottom: 24px; } }
+body.dark-mode .sales-actionbar { background:#2a1f35; border-color:#3d2f4d; }
+
+/* Fotos con fondo liso (blanco, negro o de color): el marco toma ese color, sin mezclas */
+.product-image.solid-bg, #detail-image.solid-bg { mix-blend-mode: normal !important; padding: 0 !important; }
+body.dark-mode .product-image.solid-bg, body.dark-mode #detail-image.solid-bg { mix-blend-mode: normal !important; }

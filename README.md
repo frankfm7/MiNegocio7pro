@@ -1,4 +1,4 @@
-# MiNegocio7pro · v1.0
+# MiNegocio7pro · v1.2
 
 App de catálogos, stock y ventas en **React + TypeScript + Tailwind CSS + Vite**.
 Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin internet.
@@ -74,7 +74,29 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.0
+## 4a. Novedades v1.2 · Editor de fotos de producto
+
+Al elegir una foto (o con **Ajustar foto** sobre la imagen en *Editar producto*) se abre el editor:
+- **Encuadre**: vertical, cuadrada u horizontal; zoom; mover con el dedo (pellizcar para acercar); girar, espejo y *Centrar* automático.
+- **Fondo**: original, **blanco**, **negro** o cualquier color. *Quitar el fondo* lo separa del producto
+  (mejor con pared, mesa o papel de un solo color), con *Sensibilidad*, pincel **Borrar / Recuperar**, *Deshacer* y sombra suave.
+- **Luz y color**: auto-mejorar, brillo, contraste, color y nitidez.
+- Recuerda el último estilo (ej. fondo blanco) para la siguiente foto. Todo funciona sin internet.
+- Las tarjetas y el detalle usan el mismo color del fondo de la foto, para que se vea de borde a borde.
+
+## 4a·0. Novedades v1.1
+
+- **Mejor lectura de nombres en facturas**: foto procesada con más detalle, segunda lectura para Belcorp,
+  diccionario de perfumería que corrige letras confundidas (O/0, S/5, I/1...), separa palabras pegadas
+  ("PERFUMADOROLLON" → "Perfumado Rollon") y quita restos de columnas ("UNIDAD (BIENES)").
+  En Belcorp el costo se comprueba con los % de descuento de la misma fila.
+- **Ventas con selección múltiple** (Ventas del día e Informes): toca las ventas → **Recibo** (imagen o WhatsApp),
+  **Copiar**, **Compartir** o **Eliminar** (solo administradores; pregunta si se devuelven las unidades al stock).
+- **Avisos de agotados y stock bajo que se pueden ocultar**: botón *Ocultar* en el aviso de inicio y
+  *Ya lo vi* en cada lista. Vuelven a avisar solo si otro producto se agota o baja de stock.
+- Los cuadros de resumen ya no se cortan a la derecha con montos grandes.
+
+## 4a·1. Novedades v1.0
 
 - **Importar desde foto de factura, recibo o detalle de pedido** (Datos → Importar → *Foto de factura…*).
   Reconoce Belcorp (Ésika, L'Bel, Cyzone; en dólares con su tipo de cambio) y Yanbal (en Bs), el código

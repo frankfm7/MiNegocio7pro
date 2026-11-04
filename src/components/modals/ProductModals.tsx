@@ -11,6 +11,7 @@ import { APP_NAME, fallback } from '../../lib/constants';
 import { generateProductQRImage, printProductQR } from '../../lib/qr';
 import { SoundEffects } from '../../lib/sound';
 import { downloadDataUrl } from '../../lib/image';
+import { useImageBg } from '../../lib/imageBg';
 import PaymentPicker from '../PaymentPicker';
 
 // ==========================================
@@ -21,6 +22,7 @@ export function DetailModal() {
   // Siempre mostrar la versión más reciente del producto (stock, etc.)
   const r = useStore(s => (s.detail ? s.records.find(x => x.id === s.detail!.id) || s.detail : null));
   const [menuOpen, setMenuOpen] = useState(false);
+  const photoBg = useImageBg(r?.image_url);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -50,7 +52,8 @@ export function DetailModal() {
         <div className="relative">
           <img
             id="detail-image" src={img} alt={r.name}
-            className="w-full h-72 sm:h-80 object-contain p-3 product-photo-frame zoomable-image"
+            className={`w-full h-72 sm:h-80 object-contain p-3 product-photo-frame zoomable-image ${photoBg ? 'solid-bg' : ''}`}
+            style={photoBg ? { background: photoBg } : undefined}
             onError={e => { e.currentTarget.src = fallback; }}
             onClick={() => setState({ imageLightbox: { src: img, alt: r.name } })}
             title="Toca para ver la imagen en grande"

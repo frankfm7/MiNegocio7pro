@@ -108,6 +108,17 @@ async function registerSaleRemote(sale: Sale, sid: string) {
   return supabaseClient!.rpc('register_sale', { p_sale: saleRow(sale, sid) });
 }
 
+/** Borra ventas (y sus cargos de fiado) en la nube y, si se pidió, devuelve el stock */
+async function deleteSalesRemote(ids: string[], restock: Product[], sid: string) {
+  const c = supabaseClient!;
+  const m = await c.from('customer_movements').delete().in('sale_id', ids).eq('store_id', sid);
+  if (m.error && !/customer_movements|schema cache|does not exist/i.test(m.error.message || '')) return m;
+  const r = await c.from('sales').delete().in('id', ids).eq('store_id', sid);
+  if (r.error) return r;
+  if (restock.length) return upsertProducts(restock, sid);
+  return r;
+}
+
 /** Ejecuta una operación en la nube; si falla, la deja pendiente para sincronizar luego */
 async function remote(action: PendingAction, data: unknown, run: (sid: string) => PromiseLike<{ error: unknown }>) {
   if (getState().mode !== 'cloud') return;
@@ -135,6 +146,7 @@ async function runPending(change: PendingChange, sid: string) {
       return c.from('catalogs').delete().eq('id', change.data.id).eq('store_id', sid);
     }
     case 'addSale': return registerSaleRemote(change.data, sid);
+    case 'deleteSales': return deleteSalesRemote(change.data.ids, change.data.restock || [], sid);
     case 'createQR': return c.from('qrs').upsert([{ ...change.data, store_id: sid }]);
     case 'updateQR': return c.from('qrs').update(change.data.updates).eq('id', change.data.id);
     case 'deleteQR': return c.from('qrs').delete().eq('id', change.data);
@@ -368,6 +380,33 @@ export const DB = {
     saveLocal();
     await remote('addSale', sale, sid => registerSaleRemote(sale, sid));
     return sale;
+  },
+
+  /** Elimina ventas. Con restoreStock = true las unidades vuelven al producto. */
+  async deleteSales(ids: string[], restoreStock: boolean) {
+    const s = getState();
+    const gone = s.sales.filter(x => ids.includes(x.id));
+    const back = new Map<string, number>();
+    if (restoreStock) gone.forEach(x => back.set(x.product_id, (back.get(x.product_id) || 0) + Number(x.quantity || 1)));
+    const restock: Product[] = [];
+    const records = s.records.map(r => {
+      const n = back.get(r.id);
+      if (!n) return r;
+      const u = { ...r, stock: Number(r.stock) + n };
+      restock.push(u);
+      return u;
+    });
+    setState({
+      sales: s.sales.filter(x => !ids.includes(x.id)),
+      movements: s.movements.filter(m => !m.sale_id || !ids.includes(m.sale_id)),
+      records,
+    });
+    saveLocal();
+    // Ventas que aún no subieron a la nube: basta con quitarlas de la cola
+    const pend = getState().pendingChanges;
+    if (pend.some(c => c.action === 'addSale' && ids.includes(c.data?.id))) await savePending(pend.filter(c => !(c.action === 'addSale' && ids.includes(c.data?.id))));
+    await remote('deleteSales', { ids, restock }, sid => deleteSalesRemote(ids, restock, sid));
+    return { deleted: gone.length, restocked: restock.length };
   },
 
   // ---------- Clientes y fiados ----------

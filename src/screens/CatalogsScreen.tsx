@@ -5,7 +5,8 @@ import { navigate, openAdminModal, openBarcodeScanner, openCatalog, openCatalogF
 import { InstallBanner } from '../components/InstallPrompt';
 import { DB } from '../lib/db';
 import { coverFor, fallbackCover } from '../lib/constants';
-import { getLowStockProducts, getOutOfStockProducts, searchProducts } from '../lib/selectors';
+import { searchProducts } from '../lib/selectors';
+import { hideStockAlerts, useStockAlerts } from '../lib/stockAlerts';
 import { captureFromCamera } from '../lib/camera';
 import ProductCard from '../components/ProductCard';
 import AccountButton from '../components/AccountButton';
@@ -13,7 +14,7 @@ import type { Catalog } from '../types';
 import { searchByImage } from '../lib/imageSearch';
 
 export function TopbarMenuButton() {
-  const alerts = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length + getOutOfStockProducts(s.records).length);
+  const alerts = useStockAlerts().newTotal;
   return (
     <button className="open-sidebar-btn menu-btn relative" aria-label="Abrir menú" onClick={() => setState({ sidebarOpen: true })}>
       <Menu className="w-5 h-5" />
@@ -24,15 +25,19 @@ export function TopbarMenuButton() {
 
 /** Aviso en la pantalla principal cuando hay productos por reponer */
 export function StockAlertBanner() {
-  const low = useStore(s => getLowStockProducts(s.records, s.lowStockDefault).length);
-  const out = useStore(s => getOutOfStockProducts(s.records).length);
-  if (!low && !out) return null;
+  const { low, out, lowNew, outNew } = useStockAlerts();
+  if (!lowNew && !outNew) return null;
   return (
-    <button type="button" onClick={() => navigate(out && !low ? 'out-of-stock' : 'low-stock')} className="w-full mb-4 p-3 rounded-2xl bg-[#fffbeb] border border-[#fde68a] flex items-center gap-3 text-left">
-      <AlertTriangle className="w-5 h-5 text-[#d97706] flex-shrink-0" />
-      <p className="text-sm text-[#92400e] flex-1"><b>Por reponer:</b> {low > 0 && `${low} con stock bajo`}{low > 0 && out > 0 && ' · '}{out > 0 && `${out} agotado${out === 1 ? '' : 's'}`}</p>
-      <ArrowRight className="w-4 h-4 text-[#d97706]" />
-    </button>
+    <div className="stock-alert-banner w-full mb-4 rounded-2xl bg-[#fffbeb] border border-[#fde68a] flex items-stretch">
+      <button type="button" onClick={() => navigate(outNew && !lowNew ? 'out-of-stock' : 'low-stock')} className="flex-1 min-w-0 p-3 flex items-center gap-3 text-left">
+        <AlertTriangle className="w-5 h-5 text-[#d97706] flex-shrink-0" />
+        <p className="text-sm text-[#92400e] flex-1 min-w-0"><b>Por reponer:</b> {low > 0 && `${low} con stock bajo`}{low > 0 && out > 0 && ' · '}{out > 0 && `${out} agotado${out === 1 ? '' : 's'}`}</p>
+        <ArrowRight className="w-4 h-4 text-[#d97706] flex-shrink-0" />
+      </button>
+      <button type="button" onClick={() => hideStockAlerts()} className="hide-stock-alert px-3 border-l border-[#fde68a] text-[#92400e] flex flex-col items-center justify-center text-[10px] font-bold gap-0.5" title="Ocultar este aviso" aria-label="Ocultar aviso">
+        <X className="w-4 h-4" /> Ocultar
+      </button>
+    </div>
   );
 }
 

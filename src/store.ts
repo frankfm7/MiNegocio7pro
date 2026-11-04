@@ -62,6 +62,8 @@ interface State {
   saleCustomerId: string;
   /** Mínimo general de stock para avisar (por dispositivo) */
   lowStockDefault: number;
+  /** Productos cuyo aviso de agotado / stock bajo ya se ocultó (vuelve a avisar si se repone y baja otra vez) */
+  stockHidden: { out: string[]; low: string[] };
 
   // UI
   modals: Partial<Record<ModalId, boolean>>;
@@ -174,6 +176,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   selectedPaymentMethod: 'Efec.',
   saleCustomerId: '',
   lowStockDefault: Math.max(0, parseInt(localStorage.getItem('mc7_low_default') || '3', 10) || 0),
+  stockHidden: readJSON<{ out: string[]; low: string[] }>('mn7_stock_hidden', { out: [], low: [] }),
 
   modals: {},
   sidebarOpen: false,

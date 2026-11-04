@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, Download, Image as ImageIcon, Printer, ScanLine, X } from 'lucide-react';
+import { Camera, Download, Image as ImageIcon, Printer, ScanLine, SlidersHorizontal, X } from 'lucide-react';
 import { getState, setState, toast, useStore } from '../store';
 import { closeForm, openBarcodeScanner } from '../actions';
 import { DB } from '../lib/db';
@@ -8,7 +8,8 @@ import { generateProductQRImage, printProductQR } from '../lib/qr';
 import { downloadDataUrl } from '../lib/image';
 import { autoFrameProduct, compressImage } from '../lib/image';
 import { captureFromCamera } from '../lib/camera';
-import { CONTENT_UNITS } from '../lib/constants';
+import { editProductImage } from './ImageEditor';
+import { CONTENT_UNITS, fallback } from '../lib/constants';
 import type { Product } from '../types';
 
 const empty = {
@@ -41,6 +42,7 @@ export default function ProductFormDrawer() {
   const [draftId, setDraftId] = useState('');
   const [qrImage, setQrImage] = useState('');
   const [autoFrame, setAutoFrame] = useState(() => localStorage.getItem('mc7_autoframe') !== 'false');
+  const [editAfter, setEditAfter] = useState(() => localStorage.getItem('mn7_edit_after') !== 'false');
 
   useEffect(() => {
     if (!open) return;
@@ -74,10 +76,23 @@ export default function ProductFormDrawer() {
 
   const applyImage = async (file: Blob, msg: string, frame = autoFrame) => {
     try {
+      const raw = await compressImage(file, 1600, 0.9);
+      // Abrir el editor para dejar la foto como se quiere (fondo, encuadre, luz)
+      if (editAfter) {
+        const edited = await editProductImage(raw);
+        if (edited) { setPendingImage(edited); setPreview(edited); toast('Foto lista ✓'); return; }
+      }
       let data = await compressImage(file);
       if (frame) data = await autoFrameProduct(data);
       setPendingImage(data); setPreview(data); toast(msg);
     } catch { toast('Error al cargar imagen'); }
+  };
+
+  /** Ajustar la foto que ya tiene el producto */
+  const adjustCurrent = async () => {
+    if (!preview) return;
+    const edited = await editProductImage(preview);
+    if (edited) { setPendingImage(edited); setPreview(edited); toast('Foto ajustada ✓'); }
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -184,6 +199,10 @@ export default function ProductFormDrawer() {
               </div>
             </div>
             <label className="flex items-start gap-2 text-xs text-[#756c7e] cursor-pointer -mt-1">
+              <input type="checkbox" checked={editAfter} onChange={e => { setEditAfter(e.target.checked); localStorage.setItem('mn7_edit_after', String(e.target.checked)); }} className="mt-0.5 accent-[#7c43ba]" />
+              <span>Abrir el editor al elegir una foto (fondo blanco o negro, encuadre, brillo y nitidez)</span>
+            </label>
+            <label className="flex items-start gap-2 text-xs text-[#756c7e] cursor-pointer -mt-1">
               <input type="checkbox" checked={autoFrame} onChange={e => { setAutoFrame(e.target.checked); localStorage.setItem('mc7_autoframe', String(e.target.checked)); }} className="mt-0.5 accent-[#7c43ba]" />
               <span>Encuadrar automáticamente las fotos de galería (recorta el fondo vacío para que perfumes y botellas se vean grandes)</span>
             </label>
@@ -191,6 +210,7 @@ export default function ProductFormDrawer() {
               <div className="relative">
                 <img src={preview} className="image-preview !h-56" style={{ display: 'block' }} alt="" />
                 <button type="button" onClick={() => { setPreview(null); setPendingImage(''); }} className="absolute top-4 right-2 px-3 py-1.5 rounded-full bg-white/90 text-[#a43658] text-xs font-bold shadow">Quitar foto</button>
+                {preview !== fallback && <button type="button" onClick={adjustCurrent} className="adjust-photo absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-[#7c43ba] text-white text-xs font-bold shadow-lg flex items-center gap-1.5"><SlidersHorizontal className="w-4 h-4" /> Ajustar foto</button>}
               </div>
             )}
             <div className="p-4 rounded-2xl bg-[#f6f1f8] flex gap-4 items-center">

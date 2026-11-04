@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, AlertTriangle, CheckCircle, CreditCard, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
+  AlertCircle, AlertTriangle, BellOff, Check, CheckCircle, CheckSquare, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
 } from 'lucide-react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 import { setState, toast, useStore } from '../store';
-import { generateDailyCloseImage, navigate, openDetail } from '../actions';
+import { copySales, deleteSalesWithConfirm, generateDailyCloseImage, navigate, openDetail, salesReceipt, shareSales } from '../actions';
 import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../lib/format';
 import { fallback } from '../lib/constants';
 import { getLowStockProducts, getOutOfStockProducts, getTodaySales, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
 import Avatar from '../components/Avatar';
 import { exportOutOfStock, exportSalesCSV, exportSalesXLSX } from '../lib/exporters';
 import { TopbarMenuButton } from './CatalogsScreen';
+import { hideStockAlerts, showStockAlertsAgain, useStockAlerts } from '../lib/stockAlerts';
 import type { Product, Sale } from '../types';
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
@@ -37,11 +38,76 @@ function Empty({ id, icon, title, text }: { id: string; icon: React.ReactNode; t
 const sumBy = (list: Sale[], key: 'actual_price' | 'profit') => list.reduce((a, s) => a + Number(s[key] || 0), 0);
 
 // ==========================================
+// LISTA DE VENTAS CON SELECCIÓN MÚLTIPLE
+// ==========================================
+function SalesList({ id, title, list, showDate }: { id: string; title: string; list: Sale[]; showDate: boolean }) {
+  const team = useStore(s => s.team);
+  const isAdmin = useStore(s => s.isAdmin());
+  const [mode, setMode] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+  // Si una venta desaparece (se eliminó o se sincronizó), sale de la selección
+  useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); return next.size === prev.size ? prev : next; }); }, [list]);
+  const chosen = list.filter(s => sel.has(s.id));
+  const toggle = (sid: string) => { setMode(true); setSel(prev => { const n = new Set(prev); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; }); };
+  const exit = () => { setMode(false); setSel(new Set()); };
+  const all = chosen.length === list.length && list.length > 0;
+  const remove = async () => { if (await deleteSalesWithConfirm(chosen)) exit(); };
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <h2 className="font-bold text-lg hero-title mr-auto">{title}</h2>
+        {list.length > 0 && (mode ? (
+          <>
+            <button type="button" onClick={() => setSel(all ? new Set() : new Set(list.map(s => s.id)))} className="px-3 py-1.5 rounded-full btn-ghost text-xs font-bold">{all ? 'Ninguna' : 'Todas'}</button>
+            <button type="button" onClick={exit} className="px-3 py-1.5 rounded-full bg-[#201728] text-white text-xs font-bold flex items-center gap-1"><X className="w-3.5 h-3.5" /> Listo</button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setMode(true)} className="sales-select-btn px-3 py-1.5 rounded-full btn-ghost text-xs font-bold flex items-center gap-1"><CheckSquare className="w-3.5 h-3.5" /> Seleccionar</button>
+        ))}
+      </div>
+      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Toca una venta para seleccionarla y generar su recibo, copiarla, compartirla o eliminarla.</p>}
+      <div id={id} className={`space-y-2 ${mode ? 'pb-36' : ''}`}>
+        {list.map(s => {
+          const on = sel.has(s.id);
+          const date = new Date(s.date);
+          return (
+            <button type="button" key={s.id} onClick={() => toggle(s.id)} aria-pressed={on}
+              className={`sale-row w-full text-left rounded-xl p-3 flex items-center gap-3 shadow-sm bg-white transition ${on ? 'ring-2 ring-[#7c43ba] bg-[#f6f1f8]' : ''}`}>
+              {mode && <span className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${on ? 'bg-[#7c43ba] border-[#7c43ba] text-white' : 'border-[#cbbdd6] bg-white'}`}>{on && <Check className="w-3.5 h-3.5" />}</span>}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm leading-snug line-clamp-2">{s.product_name}{Number(s.quantity) > 1 && <span className="text-[11px] text-[#756c7e] font-bold"> ×{s.quantity}</span>}</p>
+                {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1 mt-0.5 min-w-0"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} /><span className="truncate">{s.seller_name}</span></p>}
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {s.payment_method && <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.payment_method === 'QR' ? 'bg-[#f6f1f8] text-[#7c43ba]' : s.payment_method === 'Fiado' ? 'bg-[#fff0f3] text-[#a43658]' : 'bg-[#f0fdf4] text-[#166534]'} font-bold max-w-full truncate`}>{s.payment_method}{s.customer_name ? ` · ${s.customer_name}` : ''}</span>}
+                  <span className="text-xs text-[#756c7e]">{showDate ? date.toLocaleDateString('es', { day: '2-digit', month: 'short' }) + ' ' : ''}{date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0 max-w-[45%]"><p className="font-bold text-sm text-[#7c43ba] whitespace-nowrap">{formatUSD(s.actual_price)}</p><p className="sensitive-data text-xs text-[#166534] font-bold whitespace-nowrap">+{formatUSD(s.profit)}</p></div>
+            </button>
+          );
+        })}
+      </div>
+      {mode && (
+        <div className="sales-actionbar fixed z-40 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-md rounded-2xl bg-white shadow-2xl border border-[#ede7f0] p-2.5">
+          <p className="text-xs font-bold text-center mb-2">{chosen.length ? <>{chosen.length} {chosen.length === 1 ? 'venta' : 'ventas'} · <span className="text-[#7c43ba]">{formatUSD(chosen.reduce((a, x) => a + Number(x.actual_price || 0), 0))}</span></> : 'Toca las ventas que quieras elegir'}</p>
+          <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
+            <button type="button" disabled={!chosen.length} onClick={() => salesReceipt(chosen)} className="py-2 rounded-xl btn-primary text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Receipt className="w-4 h-4" /> Recibo</button>
+            <button type="button" disabled={!chosen.length} onClick={() => copySales(chosen)} className="py-2 rounded-xl btn-ghost text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Copy className="w-4 h-4" /> Copiar</button>
+            <button type="button" disabled={!chosen.length} onClick={() => shareSales(chosen)} className="py-2 rounded-xl btn-ghost text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Share2 className="w-4 h-4" /> Compartir</button>
+            {isAdmin && <button type="button" disabled={!chosen.length} onClick={remove} className="py-2 rounded-xl bg-[#fff0f3] text-[#a43658] text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Trash2 className="w-4 h-4" /> Eliminar</button>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ==========================================
 // VENTAS DEL DÍA
 // ==========================================
 export function DailySalesScreen() {
   const sales = useStore(s => s.sales);
-  const team = useStore(s => s.team);
   const today = useMemo(() => sortByDateDesc(getTodaySales(sales)), [sales]);
   const cash = sumBy(today.filter(s => s.payment_method === 'Efec.'), 'actual_price');
   const qr = sumBy(today.filter(s => s.payment_method === 'QR'), 'actual_price');
@@ -65,22 +131,7 @@ export function DailySalesScreen() {
           <button onClick={() => navigate('cash-close')} className="py-3 rounded-xl bg-[#23805d] text-white font-bold flex items-center justify-center gap-2"><Wallet className="w-4 h-4" /> Cierre de caja</button>
           <button onClick={() => generateDailyCloseImage()} className="py-3 rounded-xl bg-[#7c43ba] text-white font-bold flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Tabla de cierre</button>
         </div>
-        <h2 className="font-bold text-lg mb-3 hero-title">Historial de hoy</h2>
-        <div id="daily-sales-list" className="space-y-2">
-          {today.map(s => (
-            <div key={s.id} className="sale-row rounded-xl p-3 flex items-center gap-3 shadow-sm bg-white">
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm truncate">{s.product_name} {s.quantity > 1 && <span className="text-[10px] text-[#756c7e]">x{s.quantity}</span>}</p>
-                {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} />{s.seller_name}</p>}
-                <div className="flex items-center gap-1 mt-1">
-                  {s.payment_method && <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.payment_method === 'QR' ? 'bg-[#f6f1f8] text-[#7c43ba]' : s.payment_method === 'Fiado' ? 'bg-[#fff0f3] text-[#a43658]' : 'bg-[#f0fdf4] text-[#166534]'} font-bold`}>{s.payment_method}{s.customer_name ? ` · ${s.customer_name}` : ''}</span>}
-                  <p className="text-xs text-[#756c7e]">{new Date(s.date).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0"><p className="font-bold text-sm text-[#7c43ba]">{formatUSD(s.actual_price)}</p><p className="text-xs text-[#166534] font-bold">+{formatUSD(s.profit)}</p></div>
-            </div>
-          ))}
-        </div>
+        <SalesList id="daily-sales-list" title="Historial de hoy" list={today} showDate={false} />
         {today.length === 0 && <Empty id="no-daily-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas hoy" text="Las ventas de hoy aparecerán aquí" />}
       </div>
     </section>
@@ -90,6 +141,17 @@ export function DailySalesScreen() {
 // ==========================================
 // STOCK BAJO / AGOTADOS
 // ==========================================
+/** Ocultar / volver a mostrar el aviso (la lista se sigue viendo completa) */
+function AlertToggle({ kind }: { kind: 'out' | 'low' }) {
+  const a = useStockAlerts();
+  const total = kind === 'out' ? a.out : a.low;
+  const fresh = kind === 'out' ? a.outNew : a.lowNew;
+  if (!total) return null;
+  return fresh > 0
+    ? <button type="button" onClick={() => hideStockAlerts([kind])} className="hide-stock-alert mb-4 w-full py-2.5 rounded-xl btn-ghost text-xs font-bold flex items-center justify-center gap-2"><BellOff className="w-4 h-4" /> Ya lo vi · ocultar el aviso ({fresh} {fresh === 1 ? 'producto' : 'productos'})</button>
+    : <p className="mb-4 text-[11px] text-[#756c7e] text-center">🔕 Aviso oculto. Te avisaremos si otro producto {kind === 'out' ? 'se agota' : 'baja de stock'}. <button type="button" onClick={() => showStockAlertsAgain([kind])} className="font-bold text-[#7c43ba] underline">Mostrar aviso otra vez</button></p>;
+}
+
 function StockRow({ r, children }: { r: Product; children: React.ReactNode }) {
   return (
     <div className="out-of-stock-card rounded-2xl p-4 flex items-center gap-3 shadow-sm cursor-pointer hover:shadow-md transition" onClick={() => openDetail(r)}>
@@ -149,6 +211,7 @@ export function LowStockScreen() {
           </div>
           <button type="button" onClick={toggleNotif} className="mt-3 text-xs font-bold text-[#7c43ba] hover:underline">{notif ? '🔔 Avisos del sistema activados (tocar para desactivar)' : '🔕 Activar avisos del sistema al abrir la app'}</button>
         </div>
+        <AlertToggle kind="low" />
         <div className="space-y-3">
           {products.map(r => (
             <StockRow key={r.id} r={r}>
@@ -174,6 +237,7 @@ export function OutOfStockScreen() {
           <AlertTriangle className="w-5 h-5 text-[#a43658] flex-shrink-0 mt-0.5" />
           <div><p className="font-bold text-sm text-[#a43658]">Lista de reposición</p><p className="text-xs text-[#756c7e] mt-1">Productos sin stock que necesitas volver a comprar.</p></div>
         </div>
+        <AlertToggle kind="out" />
         <div className="space-y-3">
           {products.map(r => (
             <StockRow key={r.id} r={r}>
@@ -209,7 +273,7 @@ function SalesChart({ sales }: { sales: Sale[] }) {
       options: {
         responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Ingresos: ${formatUSD(ctx.raw)} (${days[ctx.dataIndex].count} ventas)` } } },
-        scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v }, grid: { color: 'rgba(0, 0, 0, 0.05)' } }, x: { grid: { display: false } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('en-US') }, grid: { color: 'rgba(0, 0, 0, 0.05)' } }, x: { grid: { display: false } } },
         layout: { padding: 10 },
       },
     });
@@ -220,7 +284,6 @@ function SalesChart({ sales }: { sales: Sale[] }) {
 
 export function ReportsScreen() {
   const allSales = useStore(s => s.sales);
-  const team = useStore(s => s.team);
   const sales = useMemo(() => sortByDateDesc(allSales), [allSales]);
   const profit = sumBy(sales, 'profit');
   return (
@@ -237,23 +300,7 @@ export function ReportsScreen() {
           <h3 className="font-bold text-sm mb-3">Ventas de los últimos 7 días</h3>
           <SalesChart sales={allSales} />
         </div>
-        <h2 className="font-bold text-lg mb-3 hero-title">Historial de ventas</h2>
-        <div id="sales-list" className="space-y-2">
-          {sales.map(s => {
-            const date = new Date(s.date);
-            return (
-              <div key={s.id} className="sale-row rounded-xl p-3 flex items-center gap-3 shadow-sm">
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">{s.product_name}</p>
-                  {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} />Vendido por: {s.seller_name}</p>}
-                  {s.payment_method && <p className="text-[10px] text-[#23805d] font-bold">{s.payment_method}</p>}
-                  <p className="text-xs text-[#756c7e]">{date.toLocaleDateString('es', { day: '2-digit', month: 'short' })} {date.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
-                <div className="text-right flex-shrink-0"><p className="font-bold text-sm text-[#7c43ba]">{formatUSD(s.actual_price)}</p><p className="text-xs text-[#166534] font-bold">+{formatUSD(s.profit)}</p></div>
-              </div>
-            );
-          })}
-        </div>
+        <SalesList id="sales-list" title="Historial de ventas" list={sales} showDate />
         {sales.length === 0 && <Empty id="no-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas aún" text="Registra ventas desde el detalle de cada producto" />}
         <div className="mt-6 flex gap-2 flex-wrap">
           <button onClick={exportSalesXLSX} className="btn-ghost px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> Exportar Excel</button>

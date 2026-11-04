@@ -12,6 +12,7 @@ import { autoFrameProduct, compressImage, downloadBlob, readFileAsBase64 } from 
 import { DB } from './db';
 import { APP_NAME, fallback, fallbackCover } from './constants';
 import { normalize } from './search';
+import type { InvoiceResult } from './invoice';
 
 type Scope = { catalogs: Catalog[]; records: Product[]; label: string };
 
@@ -616,15 +617,34 @@ export async function importInvoiceImages(files: File[]) {
   const list = files.filter(f => f.type.startsWith('image/'));
   if (!list.length) return;
   try {
-    const { prepareInvoiceImage, parseInvoiceText } = await import('./invoice');
+    const { prepareInvoiceImage, parseInvoiceText, mergeResults, resultScore } = await import('./invoice');
     let text = '';
+    const pages: InvoiceResult[] = [];
     for (let i = 0; i < list.length; i++) {
-      toast(`Leyendo ${list.length > 1 ? `foto ${i + 1} de ${list.length}` : 'la foto'}... (puede tardar unos segundos)`, 15000);
-      text += '\n' + await readTextFromImage(await prepareInvoiceImage(list[i]), true);
+      const which = list.length > 1 ? `foto ${i + 1} de ${list.length}` : 'la foto';
+      toast(`Leyendo ${which}... (puede tardar unos segundos)`, 20000);
+      // 1ª lectura: limpieza clásica (lee bien los números de casi cualquier factura)
+      const textB = await readTextFromImage(await prepareInvoiceImage(list[i], { width: 2400, k: 0.85, r: 25, smooth: false }), true);
+      let res = parseInvoiceText(textB);
+      let pageText = textB;
+      // 2ª lectura para Belcorp (o si no se encontró nada): más resolución y más sensible,
+      // lee mucho mejor los nombres en letra pequeña
+      if (res.vendor === 'Belcorp' || !res.items.length) {
+        toast(`Afinando los nombres de ${which}...`, 20000);
+        const textA = await readTextFromImage(await prepareInvoiceImage(list[i], { width: 3400, k: 0.92 }), true);
+        const resA = parseInvoiceText(textA);
+        if (resA.vendor === 'Belcorp') {
+          res = { ...mergeResults(resA, res.vendor === 'Belcorp' ? res : { ...resA, items: [] }), rate: res.rate ?? resA.rate };
+          pageText = textA;
+        } else if (resultScore(resA) > resultScore(res)) { res = resA; pageText = textA; }
+      }
+      text += '\n' + pageText;
+      pages.push(res);
     }
     // Queda disponible para revisar en la consola si una factura no se lee bien
     (window as unknown as { __mn7UltimoTexto?: string }).__mn7UltimoTexto = text;
-    const inv = parseInvoiceText(text);
+    if (!pages.length) return;
+    const inv: InvoiceResult = pages.reduce((a, r) => ({ ...a, rate: a.rate ?? r.rate, currency: a.currency ?? r.currency, items: [...a.items, ...r.items], totals: [...a.totals, ...r.totals] }));
     let items: DraftProduct[] = [];
     if (inv.items.length) {
       // Juntar filas repetidas (mismo código y nombre)

@@ -1,4 +1,4 @@
-import type { Product, ReceiptData, View } from './types';
+import type { Product, ReceiptData, Sale, View } from './types';
 import { closeModal, getState, openAccount, openModal, setState, toast, type ModalId } from './store';
 import { SoundEffects } from './lib/sound';
 import { DB, syncPendingChanges } from './lib/db';
@@ -438,7 +438,7 @@ export async function generateReceiptImage() {
         <div style="font-size:12px;color:#666;">${esc(i.product.brand)}${formatContent(i.product) ? ' · ' + esc(formatContent(i.product)) : ''} · ${i.quantity} x ${formatUSD(i.price)}</div></div>
         <div style="font-weight:bold;color:#7c43ba;">${formatUSD(i.price * i.quantity)}</div></div>`).join('');
     const html = `
-      <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">🧾 RECIBO DE VENTA</h1><p style="color:#666;margin:5px 0;">¡Venta Exitosa!</p></div>
+      <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#7c43ba;margin:0;font-size:24px;">🧾 RECIBO DE VENTA</h1><p style="color:#444;margin:5px 0;font-weight:bold;">${esc(businessName())}</p></div>
       <div style="background:#f6f1f8;padding:15px;border-radius:12px;margin-bottom:20px;">${row('Fecha:', esc(r.date))}${row('Vendedor:', esc(r.seller))}${row('Método de pago:', esc(r.payment))}${r.customer ? row('Cliente:', esc(r.customer.name)) : ''}</div>
       <h2 style="font-size:16px;margin-bottom:10px;color:#201728;">Productos vendidos:</h2>${items}
       <div style="margin-top:20px;padding-top:15px;border-top:2px solid #e8dfec;">${row('Subtotal:', formatUSD(r.subtotal))}${row('Descuento:', r.discount > 0 ? '-' + formatUSD(r.discount) : 'Sin descuento', '#d97706')}
@@ -480,4 +480,76 @@ export async function generateDailyCloseImage(dateKey = todayKey()) {
     console.error('Error al generar imagen:', e);
     toast('Error al generar la imagen del cierre');
   }
+}
+
+// ==========================================
+// HISTORIAL DE VENTAS: SELECCIÓN MÚLTIPLE
+// ==========================================
+const fmtDate = (iso: string) => new Date(iso).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** Recibo (el mismo de "Venta exitosa") armado con las ventas elegidas */
+export function salesReceipt(list: Sale[]) {
+  if (!list.length) return;
+  const { records, customers } = getState();
+  const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+  const items = sorted.map(s => {
+    const qty = Number(s.quantity || 1);
+    const price = Number(s.unit_price) || Number(s.actual_price) / qty;
+    const product = records.find(r => r.id === s.product_id) || ({ id: s.product_id || s.id, name: s.product_name, brand: s.brand || '' } as Product);
+    return { product: { ...product, id: s.id, name: s.product_name || product.name }, quantity: qty, price };
+  });
+  const total = sorted.reduce((a, s) => a + Number(s.actual_price || 0), 0);
+  const uniq = (v: (string | null | undefined)[]) => [...new Set(v.filter(Boolean))].join(', ');
+  const customerName = uniq(sorted.map(s => s.customer_name));
+  const cust = customers.find(c => c.id === sorted.find(s => s.customer_id)?.customer_id);
+  const first = new Date(sorted[0].date), last = new Date(sorted[sorted.length - 1].date);
+  const date = first.toDateString() === last.toDateString()
+    ? first.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' })
+    : `${first.toLocaleDateString('es')} – ${last.toLocaleDateString('es')}`;
+  setState({
+    receiptData: {
+      date, seller: uniq(sorted.map(s => s.seller_name)) || '—', payment: uniq(sorted.map(s => s.payment_method)) || 'Efec.',
+      customer: customerName ? { name: customerName, phone: cust?.phone || '' } : null,
+      items, subtotal: total, discount: 0, total, reprint: true,
+    },
+  });
+  openModal('sale-receipt-modal');
+}
+
+/** Texto de las ventas elegidas (para copiar o compartir) */
+export function salesText(list: Sale[], withProfit = getState().isAdmin()) {
+  const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+  const total = sorted.reduce((a, s) => a + Number(s.actual_price || 0), 0);
+  const profit = sorted.reduce((a, s) => a + Number(s.profit || 0), 0);
+  const lines = [`🧾 *${businessName()}* · Ventas (${sorted.length})`, ''];
+  sorted.forEach(s => lines.push(`• ${fmtDate(s.date)} · ${s.quantity || 1} x ${s.product_name} — ${formatUSD(s.actual_price)} (${s.payment_method || 'Efec.'}${s.customer_name ? ' · ' + s.customer_name : ''}${s.seller_name ? ' · ' + s.seller_name : ''})`));
+  lines.push('', `*TOTAL: ${formatUSD(total)}*`);
+  if (withProfit) lines.push(`Ganancia: ${formatUSD(profit)}`);
+  return lines.join('\n');
+}
+
+export async function copySales(list: Sale[]) {
+  try { await navigator.clipboard.writeText(salesText(list)); toast(`📋 ${list.length} ventas copiadas`); }
+  catch { toast('No se pudo copiar'); }
+}
+
+export async function shareSales(list: Sale[]) {
+  const text = salesText(list, false);
+  if (navigator.share) {
+    try { await navigator.share({ title: 'Ventas', text }); return; }
+    catch (e) { if ((e as Error).name === 'AbortError') return; }
+  }
+  openWhatsApp('', text);
+}
+
+/** Elimina ventas del historial (solo administradores). Devuelve true si se borraron. */
+export async function deleteSalesWithConfirm(list: Sale[]) {
+  if (!list.length || !requireAdmin()) return false;
+  const units = list.reduce((a, s) => a + Number(s.quantity || 1), 0);
+  if (!confirm(`¿Eliminar ${list.length} ${list.length === 1 ? 'venta' : 'ventas'} del historial?\n\nTambién se quitan de Informes, del cierre de caja y de los fiados.`)) return false;
+  const restore = confirm(`¿Devolver las ${units} unidades al stock?\n\nAceptar = sí (la venta se anuló o hubo devolución)\nCancelar = no (solo borrar el registro)`);
+  const r = await DB.deleteSales(list.map(s => s.id), restore);
+  toast(`🗑️ ${r.deleted} ${r.deleted === 1 ? 'venta eliminada' : 'ventas eliminadas'}${restore ? ` · ${units} u. devueltas al stock` : ''}`);
+  SoundEffects.play('success');
+  return true;
 }
