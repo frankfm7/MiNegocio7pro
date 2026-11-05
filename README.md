@@ -74,7 +74,23 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v1.9
+## 4a. Novedades v2.0
+
+1. **Detalle del producto**: se quitó el cuadro repetido "Costo mínimo de venta" (el mínimo queda en el cuadro grande
+   del precio). *Costo de adquisición* y *Precio de catálogo* van en una fila más baja; *Ganancia estimada* ocupa todo
+   el ancho en una sola línea. Para cerrar tocando la zona de detalles hay que tocar **dos veces** (tocar fuera o la ✕
+   sigue cerrando con un toque).
+2. **Productos repetidos**: al importar factura (foto/PDF) se busca primero por **código del producto** y luego por
+   nombre, pero **solo si la presentación coincide** (50 ml ≠ 100 ml; 1 L = 1000 ml). Al crear un producto a mano,
+   si el nombre, código o código de barras ya existe sale *"¿Es ese producto?"* → abrir el existente o "es otro producto".
+3. **QR del producto**: verificado que se actualiza en vivo al cambiar nombre, marca, contenido, precio u oferta.
+   Los costos **no** van en el QR a propósito (el cliente que lo escanea no debe verlos).
+4. **Selección múltiple en el catálogo**: barra con **Eliminar · Duplicar · Compartir · Nota de venta** en una línea.
+5. **Quitar fondo con IA**: modelo U²-Net-p (Apache 2.0) con onnxruntime-web, corre en el celular (sin servidor).
+   La 1ª vez descarga ~15 MB (`public/ai/`), luego funciona sin internet. Control *Recorte*. Se mantiene el modo
+   "Por color del fondo". Sin cambios en Supabase.
+
+## 4b. Novedades v1.9
 
 1. **Recibo por WhatsApp**: campo para el número del cliente + *Enviar por WhatsApp* (abre `wa.me/NUMERO?text=...` con el
    detalle). Si no tiene código de país se usa el configurado o el de la moneda (Bs → 591). Opciones: compartir imagen +

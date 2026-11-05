@@ -18,6 +18,10 @@ export interface EditState {
   saturation: number;   // -100..100
   sharpen: number;      // 0..100
   removeBg: boolean;
+  /** Cómo se quita el fondo: con IA (reconoce el producto) o por color del fondo */
+  bgMethod: 'ai' | 'color';
+  /** Recorte de la IA: 0 = conserva más, 100 = recorta más */
+  aiCut: number;
   tolerance: number;    // 5..90
   bg: string;           // 'original' o color '#rrggbb'
   shadow: boolean;
@@ -29,7 +33,7 @@ export interface EditState {
 
 export const DEFAULT_EDIT: EditState = {
   rotate: 0, flipX: false, auto: false, brightness: 0, contrast: 0, saturation: 0, sharpen: 0,
-  removeBg: false, tolerance: 32, bg: 'original', shadow: false, aspect: '3:4', zoom: 1, offX: 0, offY: 0,
+  removeBg: false, bgMethod: 'ai', aiCut: 20, tolerance: 32, bg: 'original', shadow: false, aspect: '3:4', zoom: 1, offX: 0, offY: 0,
 };
 
 export const ASPECTS: Record<Aspect, number> = { '3:4': 3 / 4, '1:1': 1, '4:3': 4 / 3 };

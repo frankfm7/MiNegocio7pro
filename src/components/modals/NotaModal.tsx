@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, FileText, Minus, Plus, Save, ShoppingBag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Copy, FileText, Minus, Plus, Save, Share2, ShoppingBag, Trash2, X } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import NumField from '../NumField';
 import PaymentPicker from '../PaymentPicker';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
-import { processNota } from '../../actions';
+import { deleteSelectedProducts, duplicateSelectedProducts, processNota, shareSelectedProducts } from '../../actions';
 import { computeNota, floorOf, type DiscType, type NotaGlobal, type NotaLine } from '../../lib/nota';
 import { datasetId } from '../../lib/db';
 import { cardImage, formatUSD } from '../../lib/format';
@@ -22,13 +22,22 @@ const saveDrafts = (d: Draft[]) => { try { localStorage.setItem(draftsKey(), JSO
 export function NotaBar() {
   const sel = useStore(s => s.notaSel);
   const open = useStore(s => !!s.modals['nota-modal']);
+  const isAdmin = useStore(s => s.isAdmin());
   if (!sel.length || open) return null;
+  const btn = 'py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5';
   return (
-    <div id="nota-bar" className="nota-bar fixed z-[46] left-3 right-3 mx-auto max-w-md rounded-2xl bg-[#201728] text-white shadow-2xl flex items-center gap-2 p-2 pl-3">
-      <ShoppingBag className="w-5 h-5 flex-shrink-0" />
-      <p className="flex-1 min-w-0 text-sm font-bold">{sel.length} {sel.length === 1 ? 'producto' : 'productos'}<span className="block text-[10px] font-normal opacity-75">Toca más productos para agregarlos o quitarlos</span></p>
-      <button type="button" onClick={() => openModal('nota-modal')} className="px-3 py-2 rounded-xl bg-[#7c43ba] font-bold text-sm flex items-center gap-1.5 flex-shrink-0"><FileText className="w-4 h-4" /> Nota de venta</button>
-      <button type="button" onClick={() => setState({ notaSel: [] })} className="w-8 h-8 rounded-full bg-white/15 grid place-items-center flex-shrink-0" aria-label="Quitar selección"><X className="w-4 h-4" /></button>
+    <div id="nota-bar" className="nota-bar fixed z-[46] left-3 right-3 mx-auto max-w-md rounded-2xl bg-[#201728] text-white shadow-2xl p-2">
+      <div className="flex items-center gap-2 px-1 pb-2">
+        <ShoppingBag className="w-4 h-4 flex-shrink-0" />
+        <p className="flex-1 min-w-0 text-xs font-bold">{sel.length} {sel.length === 1 ? 'producto elegido' : 'productos elegidos'}<span className="font-normal opacity-75"> · toca otros para agregar o quitar</span></p>
+        <button type="button" onClick={() => setState({ notaSel: [] })} className="w-7 h-7 rounded-full bg-white/15 grid place-items-center flex-shrink-0" aria-label="Quitar selección"><X className="w-4 h-4" /></button>
+      </div>
+      <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-2'} gap-1.5`}>
+        {isAdmin && <button type="button" onClick={deleteSelectedProducts} className={`${btn} bg-[#a43658]`}><Trash2 className="w-4 h-4" /> Eliminar</button>}
+        {isAdmin && <button type="button" onClick={duplicateSelectedProducts} className={`${btn} bg-white/15`}><Copy className="w-4 h-4" /> Duplicar</button>}
+        <button type="button" onClick={shareSelectedProducts} className={`${btn} bg-white/15`}><Share2 className="w-4 h-4" /> Compartir</button>
+        <button type="button" onClick={() => openModal('nota-modal')} className={`${btn} bg-[#7c43ba]`}><FileText className="w-4 h-4" /> Nota de venta</button>
+      </div>
     </div>
   );
 }

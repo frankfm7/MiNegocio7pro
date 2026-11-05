@@ -3,7 +3,8 @@ import { Camera, Download, Image as ImageIcon, Printer, ScanLine, SlidersHorizon
 import { getState, setState, toast, useStore } from '../store';
 import { closeForm, openBarcodeScanner } from '../actions';
 import { DB } from '../lib/db';
-import { currency, cardImage, formatUSD, newId } from '../lib/format';
+import { currency, cardImage, formatContent, formatUSD, newId } from '../lib/format';
+import { findDuplicate } from '../lib/io';
 import { generateProductQRImage, printProductQR } from '../lib/qr';
 import { downloadDataUrl } from '../lib/image';
 import { autoFrameProduct, compressImage } from '../lib/image';
@@ -106,9 +107,23 @@ export default function ProductFormDrawer() {
     if (edited) { setPendingImage(edited); setPreview(edited); toast('Foto ajustada ✓'); }
   };
 
+  // ¿El producto que se está creando ya existe? (código, código de barras o nombre + presentación)
+  const [dupIgnored, setDupIgnored] = useState<string[]>([]);
+  const [dup, setDup] = useState<{ product: Product; reason: string } | null>(null);
+  useEffect(() => { if (open) setDupIgnored([]); }, [open]);
+  useEffect(() => {
+    if (!open || editing) { setDup(null); return; }
+    const t = setTimeout(() => {
+      const d = findDuplicate({ name: f.name, sku: f.sku, barcode: f.barcode, content_value: f.content_value, content_unit: f.content_unit, brand: f.brand }, draftId);
+      setDup(d && !dupIgnored.includes(d.product.id) ? d : null);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [open, editing, f.name, f.sku, f.barcode, f.content_value, f.content_unit, f.brand, dupIgnored, draftId]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!f.catalog_id) { toast('Selecciona un catálogo'); return; }
+    if (dup && !confirm(`Ya existe "${dup.product.name}" (${dup.reason}). ¿Crear igual un producto nuevo?`)) return;
     if (f.sale_price === '' || f.cost_price === '') { toast('Escribe el costo de factura y el precio de venta'); return; }
     if (f.min_price !== '' && Number(f.sale_price) < Number(f.min_price) && !confirm('El precio de venta está por debajo del costo mínimo de venta. ¿Guardar igual?')) return;
     setSaving(true);
@@ -140,6 +155,18 @@ export default function ProductFormDrawer() {
           </div>
           <div className="space-y-4">
             <div><label className="block font-bold text-sm mb-1.5">Nombre *</label><input value={f.name} onChange={set('name')} required maxLength={80} className="w-full input-field rounded-xl p-3" type="text" /></div>
+            {dup && (
+              <div id="dup-alert" className="p-3 rounded-2xl bg-[#fffbeb] border-2 border-[#fcd34d]">
+                <p className="text-xs font-bold text-[#92400e]">⚠ Este producto parece que ya existe ({dup.reason}):</p>
+                <p className="text-sm font-bold text-[#201728] mt-1">{dup.product.name}{formatContent(dup.product) ? ` · ${formatContent(dup.product)}` : ''}</p>
+                <p className="text-[11px] text-[#756c7e]">{[dup.product.brand, dup.product.sku ? `Cód. ${dup.product.sku}` : '', `stock ${dup.product.stock}`, formatUSD(dup.product.sale_price)].filter(Boolean).join(' · ')}</p>
+                <p className="text-xs font-bold mt-2">¿Es ese producto?</p>
+                <div className="grid grid-cols-2 gap-2 mt-1.5">
+                  <button type="button" onClick={() => { const p = dup.product; setState({ editing: p }); toast(`Abriendo "${p.name}" para trabajar sobre el que ya existe`); }} className="py-2 rounded-xl btn-primary text-xs font-bold">Sí, abrir el que existe</button>
+                  <button type="button" onClick={() => setDupIgnored(l => [...l, dup.product.id])} className="py-2 rounded-xl btn-ghost text-xs font-bold">No, es otro producto</button>
+                </div>
+              </div>
+            )}
             <div>
               <label className="block font-bold text-sm mb-1.5">Nombre común <span className="font-normal text-[#756c7e]">(se ve debajo del nombre y ayuda a buscar)</span></label>
               <div className="flex gap-2">

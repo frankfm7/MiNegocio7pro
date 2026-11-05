@@ -67,16 +67,34 @@ function EditorInner({ src }: { src: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [baseData, levels, st.auto, st.brightness, st.contrast, st.saturation, st.sharpen]);
   // 3) Máscara automática del fondo
-  const auto = useMemo(() => (baseData && st.removeBg ? autoMask(baseData, st.tolerance) : null), [baseData, st.removeBg, st.tolerance]);
+  //    a) con IA: el modelo reconoce el producto (se calcula una vez por foto)
+  const [aiAlpha, setAiAlpha] = useState<Uint8Array | null>(null);
+  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [aiCutFn, setAiCutFn] = useState<((p: Uint8Array, c: number) => Uint8Array) | null>(null);
+  useEffect(() => { setAiAlpha(null); setAiStatus('idle'); }, [baseData]);
+  useEffect(() => {
+    if (!baseData || !st.removeBg || st.bgMethod !== 'ai' || aiAlpha || aiStatus !== 'idle') return;
+    let live = true;
+    setAiStatus('loading');
+    import('../lib/aiBackground').then(async m => { const a = await m.aiMask(baseData); if (live) { setAiCutFn(() => m.applyCut); setAiAlpha(a); setAiStatus('idle'); } })
+      .catch(e => { console.error('IA fondo', e); if (live) { setAiStatus('error'); toast('No se pudo usar la IA en este equipo; se usa el modo por color'); setSt(prev => ({ ...prev, bgMethod: 'color' })); } });
+    return () => { live = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseData, st.removeBg, st.bgMethod, aiAlpha]);
+  //    b) por color: se "inunda" el fondo desde los bordes
+  const auto = useMemo(() => (baseData && st.removeBg && st.bgMethod === 'color' ? autoMask(baseData, st.tolerance) : null), [baseData, st.removeBg, st.bgMethod, st.tolerance]);
   // 4) Máscara final (automática + pincel) con borde suave
   const alpha = useMemo(() => {
-    if (!baseData || !st.removeBg || !auto) return null;
+    if (!baseData || !st.removeBg) return null;
+    const src = st.bgMethod === 'ai' ? (aiAlpha && aiCutFn ? aiCutFn(aiAlpha, st.aiCut) : null) : auto;
+    if (!src) return null;
     const layer = brushLayer.current;
-    const m = new Uint8Array(auto);
+    const m = new Uint8Array(src);
     if (layer) for (let p = 0; p < m.length; p++) if (layer[p]) m[p] = layer[p] === 1 ? 255 : 0;
-    return feather(m, baseData.width, baseData.height);
+    // La IA ya entrega bordes suaves; el modo por color se suaviza aquí
+    return st.bgMethod === 'ai' ? m : feather(m, baseData.width, baseData.height);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseData, auto, st.removeBg, maskVer]);
+  }, [baseData, auto, aiAlpha, aiCutFn, st.aiCut, st.removeBg, st.bgMethod, maskVer]);
   const cut = useMemo(() => (adjusted ? cutout(adjusted, alpha) : null), [adjusted, alpha]);
 
   // Encuadre automático la primera vez (si el fondo es liso)
@@ -272,11 +290,22 @@ function EditorInner({ src }: { src: string }) {
             </div>
             <label className="flex items-start gap-2 p-2.5 rounded-xl bg-[#f6f1f8] cursor-pointer">
               <input type="checkbox" checked={st.removeBg} onChange={e => { set({ removeBg: e.target.checked, ...(e.target.checked && st.bg === 'original' ? { bg: '#ffffff' } : {}) }); if (!e.target.checked) setTool('move'); }} className="mt-0.5 accent-[#7c43ba]" />
-              <span className="text-xs"><b>Quitar el fondo de la foto</b><br /><span className="text-[#756c7e]">Funciona mejor si la foto se tomó sobre una pared, mesa o papel de un solo color.</span></span>
+              <span className="text-xs"><b>Quitar el fondo de la foto</b><br /><span className="text-[#756c7e]">Con IA reconoce el producto; "por color" funciona con fondos de un solo color.</span></span>
             </label>
             {st.removeBg && (
               <>
-                <Slider label="Sensibilidad" min={6} max={90} step={1} value={st.tolerance} onChange={v => set({ tolerance: v })} fmt={v => (v < 25 ? 'Poca' : v < 55 ? 'Media' : 'Mucha')} />
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" onClick={() => set({ bgMethod: 'ai' })} className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 ${st.bgMethod === 'ai' ? 'bg-[#7c43ba] text-white' : 'bg-[#f3eef6] text-[#5f3291]'}`}><Sparkles className="w-4 h-4" /> Inteligente (IA)</button>
+                  <button type="button" onClick={() => set({ bgMethod: 'color' })} className={`py-2 rounded-xl text-xs font-bold ${st.bgMethod === 'color' ? 'bg-[#7c43ba] text-white' : 'bg-[#f3eef6] text-[#5f3291]'}`}>Por color del fondo</button>
+                </div>
+                {st.bgMethod === 'ai' && (
+                  <p id="ai-status" className="text-[11px] text-[#756c7e]">
+                    {aiStatus === 'loading' ? <span className="inline-flex items-center gap-1.5 font-bold text-[#7c43ba]"><Loader className="w-3.5 h-3.5 animate-spin" /> Reconociendo el producto con IA… (la 1ª vez descarga ~15 MB)</span>
+                      : aiAlpha ? '✨ Fondo quitado con IA. Si quedó algo, corrígelo con el pincel Borrar / Recuperar.' : 'La IA reconoce el producto aunque el fondo tenga colores o sombras.'}
+                  </p>
+                )}
+                {st.bgMethod === 'ai' && aiAlpha && <Slider label="Recorte" min={0} max={100} step={1} value={st.aiCut} onChange={v => set({ aiCut: v })} fmt={v => (v < 25 ? 'Conserva más' : v < 60 ? 'Normal' : 'Recorta más')} />}
+                {st.bgMethod === 'color' && <Slider label="Sensibilidad" min={6} max={90} step={1} value={st.tolerance} onChange={v => set({ tolerance: v })} fmt={v => (v < 25 ? 'Poca' : v < 55 ? 'Media' : 'Mucha')} />}
                 <div className="grid grid-cols-4 gap-1.5">
                   <ToolBtn onClick={() => setTool('move')} icon={<Hand className="w-4 h-4" />} label="Mover" active={tool === 'move'} />
                   <ToolBtn onClick={() => setTool('erase')} icon={<Eraser className="w-4 h-4" />} label="Borrar" active={tool === 'erase'} />

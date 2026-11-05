@@ -830,3 +830,52 @@ export async function processNota(res: NotaResult): Promise<boolean> {
   }
   return sold;
 }
+
+// ==========================================
+// CATÁLOGO: ACCIONES CON VARIOS PRODUCTOS ELEGIDOS
+// ==========================================
+const chosenProducts = () => { const { notaSel, records } = getState(); return records.filter(r => notaSel.includes(r.id)); };
+
+/** Elimina por lote los productos elegidos (solo administradores) */
+export async function deleteSelectedProducts() {
+  if (!requireAdmin()) return;
+  const list = chosenProducts();
+  if (!list.length) return;
+  if (!confirm(`¿Eliminar ${list.length} ${list.length === 1 ? 'producto' : 'productos'}?\n\n${list.slice(0, 8).map(r => '• ' + r.name).join('\n')}${list.length > 8 ? '\n…' : ''}\n\nNo se puede deshacer.`)) return;
+  await DB.deleteMultipleRecords(list.map(r => r.id));
+  setState({ notaSel: [] });
+  toast(`🗑️ ${list.length} ${list.length === 1 ? 'producto eliminado' : 'productos eliminados'}`);
+  SoundEffects.play('success');
+}
+
+/** Duplica los productos elegidos (quedan con "(copia)" en el nombre) */
+export async function duplicateSelectedProducts() {
+  if (!requireAdmin()) return;
+  const list = chosenProducts();
+  if (!list.length) return;
+  for (const r of list) {
+    const { id: _omit, ...rest } = r;
+    void _omit;
+    await DB.createRecord({ ...rest, name: r.name + ' (copia)', sku: '', barcode: '' });
+  }
+  setState({ notaSel: [] });
+  toast(`📄 ${list.length} ${list.length === 1 ? 'producto duplicado' : 'productos duplicados'} (sin código, para no confundirlos)`);
+}
+
+/** Comparte la lista de productos elegidos (nombre, presentación y precio) */
+export async function shareSelectedProducts() {
+  const list = chosenProducts();
+  if (!list.length) return;
+  const lines = [`🛍️ *${businessName()}*`, ''];
+  list.forEach(r => {
+    const c = formatContent(r);
+    const cat = Number(r.catalog_price) > Number(r.sale_price) ? ` ~${formatUSD(r.catalog_price)}~` : '';
+    lines.push(`• ${r.name}${c ? ` (${c})` : ''} — *${formatUSD(r.sale_price)}*${cat}${Number(r.stock) < 1 ? ' (agotado)' : ''}`);
+  });
+  lines.push('', '¡Pídelo por aquí! 📲');
+  const text = lines.join('\n');
+  if (navigator.share) {
+    try { await navigator.share({ title: businessName(), text }); return; } catch (e) { if ((e as Error).name === 'AbortError') return; }
+  }
+  openWhatsApp('', text);
+}

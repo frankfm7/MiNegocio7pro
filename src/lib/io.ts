@@ -740,14 +740,30 @@ export function suggestExisting(code: string, name: string): { product: Product;
 /** Mismo código salvo un dígito (el lector confundió 5/6, 8/3...) */
 const codeNear = (a: string, b: string) => a.length === b.length && a.length >= 4 && [...a].filter((c, i) => c !== b[i]).length <= 1;
 
+/** Tamaño/presentación normalizado ("100 ml" → "100ml"); vacío si no se sabe */
+function sizeKey(value: unknown, unit: unknown): string {
+  const v = String(value ?? '').replace(',', '.').trim();
+  if (!v) return '';
+  let n = parseFloat(v), u = String(unit ?? '').toLowerCase().trim();
+  if (!Number.isFinite(n)) return '';
+  if (u === 'l' || u === 'lt') { n *= 1000; u = 'ml'; }
+  if (u === 'kg') { n *= 1000; u = 'g'; }
+  if (u === 'gr') u = 'g';
+  return `${Math.round(n * 100) / 100}${u}`;
+}
+const sizeOfName = (name: string) => { const sp = splitContent(name); return sp ? sizeKey(sp.value, sp.unit) : ''; };
+const sizeOfProduct = (r: Product) => sizeKey(r.content_value, r.content_unit) || sizeOfName(r.name || '');
+/** Mismo tamaño, o no se sabe el de alguno de los dos */
+const sameSize = (a: string, b: string) => !a || !b || a === b;
+
 /**
- * Producto existente para una fila de factura:
- *  1) mismo código de empresa o de barras;
+ * Producto existente para una fila de factura o un producto nuevo:
+ *  1) mismo código de empresa o de barras (lo más seguro);
  *  2) código casi igual (un dígito distinto) y nombre parecido;
- *  3) nombre muy parecido (aunque el lector haya cambiado alguna letra).
+ *  3) nombre muy parecido Y la misma presentación (100 ml ≠ 50 ml: son productos distintos).
  */
-export function findExisting(code: string, name: string, brand = ''): Product | undefined {
-  const { records } = getState();
+export function findExisting(code: string, name: string, brand = '', size = '', excludeId = ''): Product | undefined {
+  const records = getState().records.filter(r => r.id !== excludeId);
   const c = code.replace(/\s/g, '');
   const digits = productCode(c).replace(/\D/g, '');
   if (c) {
@@ -755,13 +771,16 @@ export function findExisting(code: string, name: string, brand = ''): Product | 
     const byCode = records.find(r => (r.sku && (r.sku.replace(/\s/g, '') === c || productCode(r.sku) === pc)) || (r.barcode && r.barcode.replace(/\s/g, '') === c));
     if (byCode) return byCode;
   }
+  // size puede venir como "100 ml", "1 L" o "100ml"
+  const mySize = (size ? sizeOfName('x ' + size) || size.replace(/\s/g, '').toLowerCase() : '') || sizeOfName(name);
   const n = normalize(name);
   if (n.length >= 6) {
-    const exact = records.find(r => normalize(r.name) === n);
+    const exact = records.find(r => normalize(r.name) === n && sameSize(mySize, sizeOfProduct(r)));
     if (exact) return exact;
   }
   let best: Product | undefined, bestScore = 0;
   for (const r of records) {
+    if (!sameSize(mySize, sizeOfProduct(r))) continue;
     const sim = nameSimilarity(name, r.name);
     const sameBrand = !brand || !r.brand || normalize(r.brand) === normalize(brand);
     const nearCode = digits && r.sku ? codeNear(digits, productCode(r.sku).replace(/\D/g, '')) : false;
@@ -770,6 +789,27 @@ export function findExisting(code: string, name: string, brand = ''): Product | 
     if (ok && score > bestScore) { best = r; bestScore = score; }
   }
   return best;
+}
+
+/**
+ * Al crear un producto a mano: ¿ya existe? Busca por código de empresa, código de barras o
+ * nombre parecido con la misma presentación. Devuelve el producto y el motivo.
+ */
+export function findDuplicate(d: { name?: string; sku?: string; barcode?: string; content_value?: string; content_unit?: string; brand?: string }, excludeId = ''): { product: Product; reason: string } | null {
+  const records = getState().records.filter(r => r.id !== excludeId);
+  const sku = String(d.sku || '').trim(), bc = String(d.barcode || '').trim();
+  if (bc) { const r = records.find(x => x.barcode && x.barcode.trim() === bc); if (r) return { product: r, reason: 'mismo código de barras' }; }
+  if (sku) { const pc = productCode(sku); const r = records.find(x => x.sku && productCode(x.sku) === pc); if (r) return { product: r, reason: 'mismo código de producto' }; }
+  const name = String(d.name || '').trim();
+  if (normalize(name).length < 5) return null;
+  const size = sizeKey(d.content_value, d.content_unit) || sizeOfName(name);
+  let best: Product | null = null, bs = 0;
+  for (const r of records) {
+    if (!sameSize(size, sizeOfProduct(r))) continue;
+    const sim = normalize(r.name) === normalize(name) ? 1 : nameSimilarity(name, r.name);
+    if (sim > bs) { bs = sim; best = r; }
+  }
+  return best && bs >= 0.8 ? { product: best, reason: size && sizeOfProduct(best) ? 'mismo nombre y presentación' : 'nombre muy parecido' } : null;
 }
 
 /** Elige el catálogo donde guardar según la marca/tipo; '' = preguntar */

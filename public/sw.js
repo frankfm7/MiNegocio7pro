@@ -1,7 +1,7 @@
 // Service Worker de MiNegocio7pro
 // - Hace que la app sea instalable (PWA) en Android, iPhone y computadora.
 // - Permite abrirla y usarla sin internet.
-const VERSION = 'n7p-v1.9.0';
+const VERSION = 'n7p-v2.0.0';
 const APP_CACHE = `${VERSION}-app`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const OFFLINE_URL = '/index.html';

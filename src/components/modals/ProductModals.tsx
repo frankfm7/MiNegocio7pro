@@ -25,6 +25,7 @@ export function DetailModal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const photoBg = useImageBg(r?.image_url);
   const [showMin, setShowMin] = useState(false);
+  const lastDetailTap = useRef(0);
   const clientMode = useStore(s => s.clientMode);
   const taps = useRef<number[]>([]);
   /** 3 toques en menos de 1 segundo sobre el precio de venta */
@@ -59,13 +60,16 @@ export function DetailModal() {
 
   return (
     <Modal id="detail-modal">
-      <article className="modal-card w-full max-w-lg bg-white rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto"
+      <article className="modal-card w-full max-w-lg bg-white rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto" style={{ touchAction: "manipulation" }}
         onClick={e => {
           // Tocar la zona de detalles cierra; los botones, la foto, el precio y el menú no
           const t = e.target as HTMLElement;
           if (menuOpen || showMin || t.closest('button, a, input, select, textarea, label, img, summary, details, [data-keep-open], #detail-sale-price, .dropdown-item')) return;
           if (window.getSelection()?.toString()) return;
-          closeModal('detail-modal');
+          // Doble toque en la zona de detalles para cerrar (un toque suelto no cierra: evita salir por error)
+          const now = Date.now();
+          if (now - lastDetailTap.current < 400) { lastDetailTap.current = 0; closeModal('detail-modal'); }
+          else lastDetailTap.current = now;
         }}>
         <div className="relative">
           <img
@@ -136,24 +140,19 @@ export function DetailModal() {
             </div>
           )}
           {/* Desglose completo (no se ve en modo cliente) */}
-          <div id="detail-breakdown" className="grid grid-cols-2 gap-2 sm:gap-3 mt-3 sensitive-data">
-            <div className="rounded-2xl bg-white border border-[#ede7f0] p-3 text-center shadow-sm">
-              <p className="text-[10px] text-[#746d7d] uppercase tracking-wide font-bold">Costo de adquisición</p>
-              <p id="detail-cost-price" className="font-bold mt-1 text-lg">{formatUSD(r.cost_price)}</p>
+          <div id="detail-breakdown" className="grid grid-cols-2 gap-2 mt-3 sensitive-data">
+            <div className="rounded-xl bg-white border border-[#ede7f0] px-3 py-2 text-center shadow-sm">
+              <p className="text-[10px] text-[#746d7d] uppercase tracking-wide font-bold leading-tight">Costo de adquisición</p>
+              <p id="detail-cost-price" className="font-bold text-base leading-tight mt-0.5">{formatUSD(r.cost_price)}</p>
             </div>
-            <div className="rounded-2xl bg-white border border-[#ede7f0] p-3 text-center shadow-sm">
-              <p className="text-[10px] text-[#a43658] uppercase tracking-wide font-bold">Costo mínimo de venta</p>
-              <p id="detail-min-cost" className="font-bold mt-1 text-lg text-[#a43658]">{formatUSD(r.min_price || 0)}</p>
+            <div className="rounded-xl bg-white border border-[#ede7f0] px-3 py-2 text-center shadow-sm">
+              <p className="text-[10px] text-[#704397] uppercase tracking-wide font-bold leading-tight">Precio de catálogo</p>
+              <p className="font-bold text-base leading-tight mt-0.5 text-[#7c43ba]">{formatUSD(r.sale_price)}</p>
             </div>
-            <div className="rounded-2xl bg-white border border-[#ede7f0] p-3 text-center shadow-sm">
-              <p className="text-[10px] text-[#704397] uppercase tracking-wide font-bold">Precio de catálogo</p>
-              <p className="font-bold mt-1 text-lg text-[#7c43ba]">{formatUSD(r.sale_price)}</p>
-            </div>
-            <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0] p-3 text-center shadow-sm">
-              <p className="text-[10px] text-[#166534] uppercase tracking-wide font-bold">Ganancia estimada</p>
-              <p className="font-bold mt-1 text-lg text-[#166534]">{formatUSD(Number(r.sale_price) - Number(r.cost_price))}</p>
-              {Number(r.cost_price) > 0 && <p className="text-[11px] font-bold text-[#166534]">{Math.round(((Number(r.sale_price) - Number(r.cost_price)) / Number(r.cost_price)) * 100)}% sobre el costo</p>}
-              {Number(r.min_price) > 0 && <p className="text-[10px] text-[#4a3f55]">Con precio mínimo: {formatUSD(Number(r.min_price) - Number(r.cost_price))}</p>}
+            <div id="detail-profit-box" className="col-span-2 rounded-xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] border border-[#bbf7d0] px-3 py-2 flex items-center gap-3 shadow-sm">
+              <p className="text-[10px] text-[#166534] uppercase tracking-wide font-bold leading-tight">Ganancia<br />estimada</p>
+              <p className="font-bold text-lg text-[#166534] whitespace-nowrap">{formatUSD(Number(r.sale_price) - Number(r.cost_price))}{Number(r.cost_price) > 0 && <span className="text-xs ml-1">({Math.round(((Number(r.sale_price) - Number(r.cost_price)) / Number(r.cost_price)) * 100)}%)</span>}</p>
+              {Number(r.min_price) > 0 && <p className="ml-auto text-[11px] text-[#4a3f55] text-right leading-tight">con el mínimo:<br /><b className="text-[#166534]">{formatUSD(Number(r.min_price) - Number(r.cost_price))}</b></p>}
             </div>
           </div>
           <div className="flex gap-2 mt-6">

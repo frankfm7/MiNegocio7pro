@@ -120,7 +120,7 @@ export function ImportPreviewModal() {
       const cur = getState().importPreview;
       const it = cur?.items.find(x => x._key === key);
       if (!cur || !it) return;
-      const ex = findExisting(String(it.sku || ''), String(it._matchId ? (it._readName || '') : (it.name || '')), String(it.brand || ''));
+      const ex = findExisting(String(it.sku || ''), String(it._matchId ? (it._readName || '') : (it.name || '')), String(it.brand || ''), it._matchId ? '' : [it.content_value, it.content_unit].filter(Boolean).join(' '));
       if ((ex?.id || null) === (it._matchId || null)) return;
       setState({ importPreview: { ...cur, items: cur.items.map(x => (x._key === key ? (ex
         ? { ...x, _matchId: ex.id, _readName: x._matchId ? x._readName : String(x.name || x._readName || '') }
