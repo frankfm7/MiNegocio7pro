@@ -3,7 +3,7 @@ import { closeModal, getState, openAccount, openModal, setState, toast, type Mod
 import { SoundEffects } from './lib/sound';
 import { DB, attachReceipt, issueReceipt, syncPendingChanges } from './lib/db';
 import { formatContent, formatUSD } from './lib/format';
-import { decodeProductQR, publicFromParams } from './lib/qr';
+import { decodeProductQR, findByShortCode, publicFromParams, shortFromParams } from './lib/qr';
 import { openStore } from './lib/session';
 import { businessName, openWhatsApp } from './lib/whatsapp';
 import { esc, htmlToImage } from './lib/htmlImage';
@@ -272,8 +272,10 @@ export function findProductByCode(code: string) {
   const qr = decodeProductQR(text);
   let product = qr?.id ? records.find(r => r.id === qr.id) : undefined;
   if (!product) product = records.find(r => r.barcode && r.barcode.trim() === text);
+  // Código de barras corto de las etiquetas (8 dígitos)
+  if (!product) product = findByShortCode(records, text);
   // QR de otro dispositivo/tienda: intentar por nombre
-  if (!product && qr?.public.n) {
+  if (!product && qr?.public.n && !qr.short) {
     const hits = searchProducts(records, [qr.public.n, qr.public.b, qr.public.cv].filter(Boolean).join(' '));
     if (hits.length === 1) product = hits[0];
   }
@@ -303,6 +305,8 @@ export function handleBarcodeScanned(code: string): boolean {
   if (product) {
     toast(`Producto: ${product.name}`);
     openDetail(product);
+  } else if (qr?.short) {
+    toast('Este QR es de un producto de otra tienda (o de un producto que ya se borró)', 3500);
   } else if (qr) {
     // QR de un producto que no está en esta tienda: mostrar su información pública
     setState({ publicProduct: qr.public });
@@ -321,6 +325,19 @@ export function handleBarcodeScanned(code: string): boolean {
  * - Si no tienes acceso, muestra la ficha pública que viene en el enlace.
  */
 export async function openProductFromLink(q: URLSearchParams) {
+  const short = shortFromParams(q);
+  if (short) {
+    setState({ welcomeVisible: false, currentView: 'catalogs', currentCatalogId: null });
+    let product = findByShortCode(getState().records, short.code);
+    const s = getState();
+    if (!product && short.store && !s.activeStore?.store_id.replace(/-/g, '').startsWith(short.store)) {
+      const m = s.memberships.find(x => x.store_id.replace(/-/g, '').startsWith(short.store!) && x.status !== 'blocked');
+      if (m) { await openStore(m); product = findByShortCode(getState().records, short.code); }
+    }
+    if (product) openDetail(product);
+    else toast('No encontramos este producto. Es de una tienda a la que no tienes acceso o ya se borró.', 4500);
+    return;
+  }
   const pub = publicFromParams(q);
   if (!pub?.id) return;
   setState({ welcomeVisible: false, currentView: 'catalogs', currentCatalogId: null });
@@ -643,7 +660,7 @@ export async function generateDailyCloseImage(dateKey = todayKey()) {
   const methods = sum.byMethod.map(m => row(`${m.method === 'Efec.' ? '💵' : m.method === 'QR' ? '📱' : m.method === 'Fiado' ? '📒' : '•'} ${m.method === 'Fiado' ? 'Fiado (por cobrar)' : esc(m.method)} (${m.count}):`, formatUSD(m.total), m.method === 'Fiado' ? '#a43658' : '#7c43ba')).join('');
   const sellers = sum.bySeller.map(v => row(esc(v.name) + ` (${v.count}):`, formatUSD(v.total))).join('');
   const items = day.map(s => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
-      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}${s.customer_name ? ' - ' + esc(s.customer_name) : ''} - ${esc(s.seller_name || '')}${s.receipt_no ? ' · N° ' + esc(s.receipt_no) : ''}</div></div>
+      <div style="flex:1;"><div style="font-weight:bold;font-size:14px;">${esc(s.product_name)}</div><div style="font-size:12px;color:#666;">x${s.quantity || 1} - ${esc(s.payment_method || 'Efec.')}${s.customer_name ? ' - ' + esc(s.customer_name) : ''} - ${esc(s.seller_name || '')}${s.receipt_no ? ' · N° ' + esc(s.receipt_no) : ''}</div>${s.note ? `<div style="font-size:11px;color:#92400e;">📝 ${esc(s.note)}</div>` : ''}</div>
       <div style="font-weight:bold;color:#7c43ba;">${formatUSD(s.actual_price)}</div></div>`).join('');
   const number = await closeNumber(dateKey);
   const st = receiptStore();

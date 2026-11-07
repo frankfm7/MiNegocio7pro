@@ -15,7 +15,7 @@ Se instala como app (PWA) en Android, iPhone y computadora, y funciona sin inter
    (tablas, tiendas, invitaciones y seguridad RLS). `2-mover-mis-datos.sql` solo se usa si
    vienes de la app anterior con datos; en un proyecto nuevo se omite.
    Luego ejecuta, en consultas nuevas, `supabase/5-mejoras.sql`, `supabase/6-precio-catalogo.sql`,
-   luego `supabase/7-nombre-comun.sql`, `supabase/8-recibos-numerados.sql`, `supabase/9-documentos-numerados.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK).
+   luego `supabase/7-nombre-comun.sql`, `supabase/8-recibos-numerados.sql`, `supabase/9-documentos-numerados.sql`, `supabase/10-mensajes-revistas-roles.sql` y por último `supabase/4-verificar.sql` (todo debe decir OK, 84 revisiones).
 4. **Authentication → URL Configuration**: *Site URL* = la dirección de tu app en Vercel
    (ej. `https://minegocio7pro.vercel.app`) y agrégala también en *Redirect URLs*
    (agrega además `http://localhost:5173` para probar en tu computadora).
@@ -74,7 +74,36 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v2.0
+## 4a. Novedades v2.1
+
+1. **Ventas de días anteriores**: en *Ventas del día* hay calendario, flechas y botones *Ayer / Anteayer* (y los últimos
+   días con ventas). El *Cierre de caja* y la *Tabla de cierre* salen del día elegido. Las ventas quedan guardadas siempre.
+2. **Venta olvidada**: se registra en el día y hora reales, con motivo; queda la observación 📝 en la lista, en la tabla
+   de cierre y en los informes (columna *Observación*). Opción de no descontar stock si ya se corrigió.
+3. **Informe personalizado**: en *Informes*, al seleccionar ventas aparece el botón **Informe** (numerado, solo con esas ventas).
+4. **QR compacto** (como el de las revistas): el QR lleva solo `?q=<código de 8 números>`, por eso tiene 33 cuadritos por
+   lado en vez de 53 (puntos 1,6× más grandes) y abre siempre la ficha actual del producto. Los QR viejos siguen
+   funcionando. **Código de barras** corto (8 números, CODE128) de barras gruesas (0,33 mm). Probado con un lector ZXing.
+5. **Etiquetas**: ventana para elegir producto por producto y cuántas de cada uno, marca ✓ de impresas y botón
+   *Sin imprimir*; nuevas hojas A4 de 40 (48,5 × 25,4 mm) y 65 (38 × 21 mm) etiquetas.
+6. **Cámara de los invitados**: si el navegador no deja usar la cámara (enlace abierto desde WhatsApp/Facebook, o permiso
+   negado), se ofrece *Abrir la cámara del teléfono* / *Elegir de la galería* (sin permisos). Igual en el escáner.
+   Además, el enlace de invitación ya no queda tapado por la pantalla de bienvenida.
+7. **Menú Datos**: *Importar archivo* muestra solo importar y *Exportar datos* solo exportar.
+8. **Tarjetas de producto**: la foto llena todo el ancho en formato 4:5 (~64 % de la tarjeta) y los textos son más compactos.
+9. **Roles**: Dueño · Administrador · Supervisor · Vendedor · **Vendedor eventual** (acceso de 1 a 30 días que vence solo).
+   El **QR de cobro del dueño** lo ve todo el equipo (antes los administradores no lo veían).
+10. **WhatsApp del catálogo público**: acepta `+591 71101154`, `71101154` (agrega el código del país) o un enlace wa.me,
+    muestra a qué número llegarán los pedidos y tiene botón *Probar*. Antes, un número sin código de país no funcionaba.
+11. **Mensajes y pedidos** (💬): chat del equipo con fotos, videos y notas de voz; los clientes pueden mandar el pedido
+    **a la app** sin WhatsApp (llega a *Pedidos* con estados Nuevo → Preparando → Listo → Entregado).
+12. **Revistas para pedidos**: sube la revista de Ésika, L'Bel, Cyzone, Yanbal… (PDF o fotos); los clientes la hojean en
+    el catálogo público, piden por código y página, y ven el tiempo estimado de llegada y los datos de la tienda.
+13. Requiere ejecutar `supabase/10-mensajes-revistas-roles.sql` (y luego `4-verificar.sql`: 84 revisiones OK).
+    Sin ese archivo, los puntos 1–8 funcionan igual (la observación de una venta olvidada queda solo en el celular
+    que la registró) y los puntos 9–12 avisan que falta ejecutarlo.
+
+## 4b. Novedades v2.0
 
 1. **Detalle del producto**: se quitó el cuadro repetido "Costo mínimo de venta" (el mínimo queda en el cuadro grande
    del precio). *Costo de adquisición* y *Precio de catálogo* van en una fila más baja; *Ganancia estimada* ocupa todo
@@ -90,7 +119,7 @@ Archivos de la PWA:
    La 1ª vez descarga ~15 MB (`public/ai/`), luego funciona sin internet. Control *Recorte*. Se mantiene el modo
    "Por color del fondo". Sin cambios en Supabase.
 
-## 4b. Novedades v1.9
+## 4c. Novedades v1.9
 
 1. **Recibo por WhatsApp**: campo para el número del cliente + *Enviar por WhatsApp* (abre `wa.me/NUMERO?text=...` con el
    detalle). Si no tiene código de país se usa el configurado o el de la moneda (Bs → 591). Opciones: compartir imagen +

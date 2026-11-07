@@ -2,7 +2,8 @@ import { supabaseClient } from './supabase';
 import { getState } from '../store';
 
 export interface PublicShopData {
-  store: { name: string; whatsapp: string | null };
+  store: { name: string; whatsapp: string | null; info?: { address?: string; hours?: string; delivery?: string; eta_days?: number | string | null; about?: string; phone?: string } };
+  magazines?: { id: string; brand: string; title: string; pages: string[]; valid_until: string | null; eta_days: number | null }[];
   catalogs: { id: string; name: string; label: string | null; color: string | null }[];
   products: {
     id: string; name: string; brand: string | null; type: string | null; category: string | null; price: number; stock: number;
@@ -50,3 +51,16 @@ export async function saveShopSettings(s: ShopSettings) {
     throw new Error(error.message);
   }
 }
+
+/** Pedido directo a la app de la tienda (llega a Mensajes → Pedidos), sin WhatsApp */
+export async function sendOrderToStore(slug: string, name: string, phone: string, body: string, order: unknown) {
+  if (!supabaseClient) throw new Error('Tienda no conectada');
+  const { error } = await supabaseClient.rpc('send_public_order', { p_slug: slug, p_name: name, p_phone: phone, p_body: body, p_order: order });
+  if (error) {
+    if (/send_public_order|schema cache|Could not find/i.test(error.message)) throw new Error('La tienda aún no activó los pedidos por la app. Envíalo por WhatsApp.');
+    throw new Error(error.message);
+  }
+}
+
+/** Página de una revista (Storage público "revistas") */
+export const magPageUrl = (path: string) => (supabaseClient ? supabaseClient.storage.from('revistas').getPublicUrl(path).data.publicUrl : '');

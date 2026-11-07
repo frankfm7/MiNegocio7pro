@@ -37,11 +37,18 @@ Ejecútalos **en este orden** (cada uno en una consulta nueva: *New query → pe
    (nunca se repiten aunque vendan varios a la vez), código de la tienda y datos del recibo (teléfono, dirección, NIT).
 6. `supabase/9-documentos-numerados.sql` → **nuevo en la v1.7**: cierres de caja (ANA-C-000001) e informes (ANA-I-000001)
    numerados, historial para revisar y reenviar recibos/cierres, y las ventas a fiado guardan el cliente en la nube.
-   ⚠️ Si alguna vez vuelves a ejecutar el archivo 1, ejecuta después otra vez el 9.
+   ⚠️ Si alguna vez vuelves a ejecutar el archivo 1, ejecuta después otra vez el 9 y el 10.
+   `supabase/10-mensajes-revistas-roles.sql` → **nuevo en la v2.1**: mensajes dentro de la app (chat del equipo con
+   fotos, videos y audios + pedidos de clientes sin WhatsApp), revistas de la empresa para pedidos, datos de la tienda
+   para el catálogo público, rol **vendedor eventual** (acceso por días), QR de cobro del dueño visible para todo el
+   equipo y ventas olvidadas con observación. Crea solo los espacios de archivos **mensajes** (privado) y **revistas**
+   (público) en *Storage*; no hace falta crearlos a mano. Para que los mensajes lleguen al instante, en
+   *Database → Replication* debe estar activo **supabase_realtime** (viene activo por defecto); si no, igual se
+   actualizan cada 30 segundos.
 7. **Solo Ruta B**, y solo después del paso 7: `supabase/2-mover-mis-datos.sql`
    (cambia `TU_CORREO@ejemplo.com` por el correo con el que creaste tu tienda).
-8. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 76 revisiones; las que dicen FALTA salen primero).
-   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6, el 7, el 8 y el 9.
+8. `supabase/4-verificar.sql` → debe mostrar **OK en todas las filas** (son 84 revisiones; las que dicen FALTA salen primero).
+   Si alguna dice FALTA, vuelve a ejecutar el 1, luego el 5, el 6, el 7, el 8, el 9 y el 10.
 
 > Si NO ejecutas el 8, los recibos de la tienda salen con número provisional y la app te avisa.
 > Si NO ejecutas el 7, el nombre común solo queda en el dispositivo (en la nube se muestra el sugerido).

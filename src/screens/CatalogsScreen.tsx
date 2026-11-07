@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Camera, Cloud, FileUp, Menu, Plus, ScanLine, Search, ShoppingCart, Sparkles, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Camera, Cloud, FileUp, Menu, MessageSquare, Plus, ScanLine, Search, ShoppingCart, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { getState, openAccount, openModal, setState, toast, useStore } from '../store';
 import { navigate, openAdminModal, openBarcodeScanner, openCatalog, openCatalogForm } from '../actions';
@@ -139,6 +139,7 @@ export default function CatalogsScreen() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <MessagesButton />
             <button id="open-cart-from-catalogs" type="button" onClick={() => openModal('cart-modal')} className="relative w-11 h-11 grid place-items-center rounded-full bg-[#f0e8f7] text-[#7442a4] hover:bg-[#e0d4f0] transition flex-shrink-0 shadow-sm" aria-label="Abrir pedido">
               <ShoppingCart className="w-5 h-5" />
               <CartBadge id="cart-badge-a" />
@@ -194,5 +195,18 @@ export default function CatalogsScreen() {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Acceso a Mensajes con el número de no leídos (solo con tienda en la nube) */
+export function MessagesButton() {
+  const cloud = useStore(s => s.mode === 'cloud' && !!s.activeStore);
+  const n = useStore(s => s.unread.equipo + s.unread.pedidos);
+  if (!cloud) return null;
+  return (
+    <button id="open-messages" type="button" onClick={() => navigate('messages')} className="relative w-11 h-11 grid place-items-center rounded-full bg-[#f0e8f7] text-[#7442a4] hover:bg-[#e0d4f0] transition flex-shrink-0 shadow-sm" aria-label="Mensajes y pedidos">
+      <MessageSquare className="w-5 h-5" />
+      {n > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#be416d] text-white text-[11px] font-bold grid place-items-center">{n > 99 ? '99+' : n}</span>}
+    </button>
   );
 }

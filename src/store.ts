@@ -7,7 +7,7 @@ import { readJSON } from './lib/format';
 
 export type ModalId =
   | 'detail-modal' | 'sale-modal' | 'cart-modal' | 'create-catalog-modal' | 'catalog-modal'
-  | 'import-export-modal' | 'backup-modal' | 'qr-modal' | 'qr-item-menu-modal' | 'image-search-modal'
+  | 'import-export-modal' | 'forgotten-sale-modal' | 'magazines-modal' | 'shop-info-modal' | 'backup-modal' | 'qr-modal' | 'qr-item-menu-modal' | 'image-search-modal'
   | 'barcode-scanner-modal' | 'barcode-print-modal' | 'share-catalog-modal' | 'team-modal'
   | 'invite-modal' | 'team-user-menu-modal' | 'team-change-role-modal' | 'change-password-modal'
   | 'user-profile-modal' | 'help-modal' | 'contacts-modal' | 'product-qr-modal' | 'quick-scan-modal'
@@ -96,6 +96,13 @@ interface State {
   docsQuery: string;
   /** Productos elegidos (pulsación larga) para la Nota de venta */
   notaSel: string[];
+  /** Día que se ve en Ventas del día y Cierre de caja (AAAA-MM-DD) */
+  salesDay: string;
+  /** Qué muestra la ventana Importar / Exportar */
+  ieMode: 'both' | 'import' | 'export';
+  /** Mensajes sin leer por canal */
+  unread: { equipo: number; pedidos: number };
+  chatChannel: 'equipo' | 'pedidos';
   /** Código y datos de la tienda para los recibos */
   receiptSettings: ReceiptSettings;
   previewImage: { dataUrl: string; filename: string } | null;
@@ -212,6 +219,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   receiptCarry: null,
   docsQuery: '',
   notaSel: [],
+  salesDay: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
+  ieMode: 'both',
+  unread: { equipo: 0, pedidos: 0 },
+  chatChannel: 'equipo',
   receiptSettings: readJSON<ReceiptSettings>('mn7_receipt_cfg_local', { prefix: '' }),
   previewImage: null,
   barcodeScanTarget: null,

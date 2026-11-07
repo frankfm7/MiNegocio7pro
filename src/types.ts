@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'coadmin' | 'supervisor' | 'vendedor';
+export type Role = 'admin' | 'coadmin' | 'supervisor' | 'vendedor' | 'eventual';
 
 export interface Product {
   id: string;
@@ -60,6 +60,10 @@ export interface Sale {
   customer_name?: string | null;
   /** Número del recibo en el que salió esta venta */
   receipt_no?: string | null;
+  /** Observación (ej. "Venta olvidada: ...") */
+  note?: string | null;
+  /** Venta registrada después que no descuenta stock */
+  skip_stock?: boolean;
 }
 
 export interface Customer {
@@ -223,7 +227,7 @@ export interface PendingChange {
   timestamp: string;
 }
 
-export type View = 'catalogs' | 'products' | 'daily-sales' | 'out-of-stock' | 'low-stock' | 'reports' | 'cash-close' | 'customers';
+export type View = 'catalogs' | 'products' | 'daily-sales' | 'out-of-stock' | 'low-stock' | 'reports' | 'cash-close' | 'customers' | 'messages';
 
 /** Tienda en la nube a la que pertenece el usuario */
 export interface StoreMembership {
@@ -245,6 +249,8 @@ export interface StoreMember {
   joined_at: string;
   last_seen: string | null;
   avatar_url?: string | null;
+  /** Vendedor eventual: el acceso vence en esta fecha */
+  access_until?: string | null;
 }
 
 export interface StoreInvite {

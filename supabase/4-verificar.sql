@@ -16,7 +16,7 @@ select * from (
   -- Tablas
   select 1 as orden, 'Tabla ' || t as revision,
          case when to_regclass('public.' || t) is not null then 'OK' else 'FALTA' end as estado
-  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts','store_documents','store_doc_counters']) t
+  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts','store_documents','store_doc_counters','store_messages','store_magazines']) t
 
   union all
   -- Columnas que usa la app
@@ -40,20 +40,21 @@ select * from (
   select 3, 'Seguridad (RLS) en ' || t,
          case when coalesce((select rowsecurity from pg_tables where schemaname = 'public' and tablename = t), false)
               then 'OK' else 'FALTA' end
-  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts','store_documents','store_doc_counters']) t
+  from unnest(array['catalogs','products','sales','qrs','stores','store_members','store_invites','customers','customer_movements','price_history','store_backups','store_receipts','store_documents','store_doc_counters','store_messages','store_magazines']) t
 
   union all
   -- Funciones que llama la app
   select 4, 'Función ' || f,
          case when to_regprocedure('public.' || f) is not null then 'OK' else 'FALTA' end
   from unnest(array[
-    'create_store(text,text)','create_invite(uuid,text,integer,integer)','join_store(text,text)',
+    'create_store(text,text)','create_invite(uuid,text,integer,integer,integer)','join_store(text,text)',
     'register_sale(jsonb)','touch_member(uuid)','update_my_member_name(uuid,text)',
     'my_store_role(uuid)','is_store_member(uuid)','is_store_manager(uuid)',
     'set_my_avatar(text)','set_public_shop(uuid,boolean,text,text)','get_public_shop(text)','get_public_images(text,text[])',
     'backup_store(uuid,text)','restore_store_backup(uuid)','log_price_change()',
     'issue_receipt(uuid,text[],numeric,text)','attach_receipt_sales(uuid,text,text[],numeric)','set_receipt_settings(uuid,text,bigint,jsonb)',
-    'issue_document(uuid,text,text,jsonb,numeric,text)','save_receipt_data(uuid,text,jsonb)'
+    'issue_document(uuid,text,text,jsonb,numeric,text)','save_receipt_data(uuid,text,jsonb)',
+    'owner_payment_qr(uuid)','mark_messages_read(uuid,text)','send_public_order(text,text,text,text,jsonb)','set_public_info(uuid,jsonb)'
   ]) f
 
   union all

@@ -52,17 +52,17 @@ export default function ProductCard({ r }: { r: Product }) {
         {selecting && <span className={`card-check absolute bottom-2 left-2 w-7 h-7 rounded-full grid place-items-center shadow ${selected ? 'bg-[#7c43ba] text-white' : 'bg-white/90 border-2 border-[#cbbdd6]'}`}>{selected && <Check className="w-4 h-4" />}</span>}
         {showCatalog && savePct >= 1 && <span className="absolute top-2 left-2 text-[10px] rounded-full px-2 py-0.5 font-bold bg-[#be416d] text-white shadow-sm">-{savePct}%</span>}
       </div>
-      <div className="p-3 sm:p-4 flex flex-col flex-1">
-        <h3 className="card-name font-bold leading-snug line-clamp-2 text-[15px] text-[#201728]" title={r.name}>{r.name}</h3>
-        {common && <p className="card-common text-[12px] italic text-[#5c5266] leading-tight truncate mt-0.5" title={common}>{common}</p>}
-        {details && <p className="card-brand text-[11px] font-bold text-[#7b43a8] mt-1 truncate" title={details}>{details}</p>}
-        {(r.type || r.category) && <p className="card-category text-[11px] text-[#756c7e] truncate">{[r.type, r.category].filter(Boolean).join(' · ')}</p>}
-        {r.offer_text && <div className="card-offer mt-1.5 self-start px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] text-[11px] font-bold truncate max-w-full">{r.offer_text}</div>}
+      <div className="px-2.5 pt-2 pb-2.5 sm:px-3.5 sm:pt-3 sm:pb-3.5 flex flex-col flex-1">
+        <h3 className="card-name font-bold leading-tight line-clamp-2 text-[14px] text-[#201728]" title={r.name}>{r.name}</h3>
+        {common && <p className="card-common text-[11px] italic text-[#5c5266] leading-tight truncate" title={common}>{common}</p>}
+        {details && <p className="card-brand text-[10.5px] font-bold text-[#7b43a8] mt-0.5 truncate" title={details}>{details}</p>}
+        {(r.type || r.category) && <p className="card-category text-[10px] text-[#756c7e] truncate leading-tight">{[r.type, r.category].filter(Boolean).join(' · ')}</p>}
+        {r.offer_text && <div className="card-offer mt-1 self-start px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] text-[10px] font-bold truncate max-w-full">{r.offer_text}</div>}
 
-        <div className="mt-auto pt-3">
-          {showCatalog && <p className="text-[11px] text-[#9b8fa5]">Catálogo <span className="line-through">{formatUSD(catalog)}</span></p>}
-          <p className="card-price text-lg font-bold text-[#6d389f] hero-title leading-tight">{formatUSD(sale)}</p>
-          {Number(r.min_price) > 0 && <p className="card-min sensitive-data text-[11px] text-[#756c7e] mt-0.5">Mínimo <b className="text-[#a43658]">{formatUSD(r.min_price)}</b></p>}
+        <div className="mt-auto pt-1.5">
+          {showCatalog && <p className="text-[10px] text-[#9b8fa5] leading-tight">Catálogo <span className="line-through">{formatUSD(catalog)}</span></p>}
+          <p className="card-price text-base font-bold text-[#6d389f] hero-title leading-tight">{formatUSD(sale)}</p>
+          {Number(r.min_price) > 0 && <p className="card-min sensitive-data text-[10px] text-[#756c7e] leading-tight">Mínimo <b className="text-[#a43658]">{formatUSD(r.min_price)}</b></p>}
         </div>
       </div>
     </article>

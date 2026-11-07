@@ -33,6 +33,11 @@ function FileRow({ icon, color, title, text, accept, multiple, onFiles }: { icon
 }
 
 export function ImportExportModal() {
+  const open = useStore(s => !!s.modals['import-export-modal']);
+  const mode = useStore(s => s.ieMode);
+  // Al cerrarse vuelve a mostrar las dos partes (desde el menú lateral se ven juntas)
+  useEffect(() => { if (!open) setState({ ieMode: 'both' }); }, [open]);
+  const showExport = mode !== 'import', showImport = mode !== 'export';
   const currentCatalogId = useStore(s => s.currentCatalogId);
   const catalogs = useStore(s => s.catalogs);
   const records = useStore(s => s.records);
@@ -48,10 +53,11 @@ export function ImportExportModal() {
     <Modal id="import-export-modal">
       <article className="modal-card w-full max-w-lg bg-white rounded-3xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
-          <div><h2 className="font-bold text-xl hero-title">Importar / Exportar</h2><p className="text-xs text-[#756c7e] mt-1">Todos los datos del producto, con sus fotos</p></div>
+          <div><h2 id="ie-title" className="font-bold text-xl hero-title">{mode === 'import' ? 'Importar' : mode === 'export' ? 'Exportar' : 'Importar / Exportar'}</h2><p className="text-xs text-[#756c7e] mt-1">{mode === 'import' ? 'Agrega productos desde un archivo, fotos o una factura' : mode === 'export' ? 'Descarga tus productos con sus fotos' : 'Todos los datos del producto, con sus fotos'}</p></div>
           <CloseButton onClick={() => closeModal('import-export-modal')} />
         </div>
 
+        {showExport && (<div id="ie-export">
         <h3 className="font-bold text-sm text-[#23805d] mb-2 flex items-center gap-2"><Download className="w-4 h-4" /> Exportar</h3>
         <label className="block text-xs font-bold text-[#756c7e] mb-1">¿Qué quieres exportar?</label>
         <select value={sel} onChange={e => setScopeId(e.target.value)} className="w-full input-field rounded-xl p-2.5 text-sm mb-1">
@@ -68,6 +74,8 @@ export function ImportExportModal() {
           <Row icon={<FileText className="w-4 h-4" />} color="#d97706" title="CSV" text="Texto simple (sin fotos)" onClick={run(() => exportCSV(catId))} />
         </div>
 
+        </div>)}
+        {showImport && (<div id="ie-import">
         <h3 className="font-bold text-sm text-[#7c43ba] mb-2 flex items-center gap-2"><Upload className="w-4 h-4" /> Importar</h3>
         <div className="space-y-2">
           <FileRow icon={<Upload className="w-4 h-4" />} color="#7c43ba" title="Archivo" text="Excel (con fotos), PDF, CSV o JSON" accept=".xlsx,.xls,.ods,.csv,.txt,.json,.pdf" onFiles={runFiles(f => importAnyFile(f[0]))} />
@@ -76,6 +84,7 @@ export function ImportExportModal() {
           <FileRow icon={<ScanText className="w-4 h-4" />} color="#d97706" title="Foto de una lista de precios" text="Lee el texto de la imagen (nombre y precio)" accept="image/*" onFiles={runFiles(f => importPriceListImage(f[0]))} />
         </div>
         <p className="text-[11px] text-[#756c7e] mt-3">Antes de guardar verás la lista para revisar nombres, precios y el catálogo de destino.</p>
+        </div>)}
       </article>
     </Modal>
   );

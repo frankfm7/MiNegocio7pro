@@ -32,7 +32,8 @@ export function QrModal() {
     if (!u) { setQrs([]); return; }
     const all: QrCodeItem[] = [];
     try {
-      if (u.role === 'vendedor' || u.role === 'supervisor') {
+      // El QR de cobro del dueño lo ve todo el equipo (administradores, supervisores, vendedores)
+      if (u.role !== 'admin') {
         const owner = await loadOwnerPrimaryQR();
         if (owner) all.push({ ...owner, _isOwnerQR: true });
       }
@@ -71,7 +72,7 @@ export function QrModal() {
             const canEdit = !qr._isOwnerQR;
             const headerLabel = qr._isOwnerQR
               ? <span className="text-[10px] uppercase tracking-wider font-bold text-[#7c43ba]">QR del Negocio</span>
-              : user?.role === 'vendedor'
+              : user?.role === 'vendedor' || user?.role === 'eventual'
                 ? <span className="text-[10px] uppercase tracking-wider font-bold text-[#23805d]">Mi QR Personal</span>
                 : <span className="text-[10px] uppercase tracking-wider font-bold text-[#756c7e]">Mi QR</span>;
             return (

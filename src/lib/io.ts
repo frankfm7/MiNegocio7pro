@@ -427,7 +427,7 @@ async function parseExcelFile(file: File) {
 }
 
 // ---------- PDF ----------
-async function loadPdfJs() {
+export async function loadPdfJs() {
   const pdfjs = await import('pdfjs-dist');
   const worker = (await import('pdfjs-dist/build/pdf.worker.min.js?url')).default;
   pdfjs.GlobalWorkerOptions.workerSrc = worker;

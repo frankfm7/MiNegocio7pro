@@ -31,12 +31,19 @@ export default function PublicShopModal() {
   }, [open, store, contact]);
 
   const link = savedSlug ? shopLink(savedSlug) : '';
+  /** Número listo para WhatsApp: acepta +591 7..., 591 7..., 7... (agrega el código del país) o un enlace wa.me */
+  const normalized = (() => {
+    const t = whatsapp.trim();
+    const fromLink = /wa\.me\/(\+?\d+)/i.exec(t)?.[1] || /phone=(\+?\d+)/i.exec(t)?.[1];
+    return waNumber(fromLink ? (fromLink.startsWith('+') ? fromLink : '+' + fromLink) : t);
+  })();
   useEffect(() => { if (link) QRCode.toDataURL(link, { width: 240, margin: 2 }).then(setQr).catch(() => setQr('')); else setQr(''); }, [link]);
 
   const save = async () => {
     setSaving(true);
     try {
-      await saveShopSettings({ enabled, slug: slugify(slug), whatsapp });
+      await saveShopSettings({ enabled, slug: slugify(slug), whatsapp: normalized });
+      setWhatsapp(normalized ? '+' + normalized : '');
       setSlug(slugify(slug)); setSavedSlug(enabled ? slugify(slug) : '');
       toast(enabled ? 'Catálogo público activado ✓' : 'Catálogo público desactivado');
     } catch (e) { toast((e as Error).message, 4500); }
@@ -65,8 +72,16 @@ export default function PublicShopModal() {
             </div>
             <div>
               <label className="block font-bold text-sm mb-1.5">WhatsApp que recibe los pedidos</label>
-              <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} type="tel" className="w-full input-field rounded-xl p-3" placeholder="Con código de país, ej: 59170000000" />
+              <input id="shop-whatsapp" value={whatsapp} onChange={e => setWhatsapp(e.target.value.replace(/[^0-9+ ()\-a-zA-Z/.:?=]/g, ''))} type="text" inputMode="tel" autoComplete="tel" className="w-full input-field rounded-xl p-3" placeholder="Ej: +591 71101154 o 71101154" />
+              <p className="text-[11px] text-[#756c7e] mt-1">Puedes escribir el número solo (71101154), con <b>+</b> y código de país (+591 71101154) o pegar un enlace <b>wa.me</b>. Si no pones el código, se agrega el de tu país.</p>
+              {normalized && (
+                <div id="shop-whatsapp-preview" className="mt-2 p-2.5 rounded-xl bg-[#f0fdf4] border border-[#bbf7d0] flex items-center gap-2">
+                  <span className="text-xs flex-1">Los pedidos llegarán a <b>+{normalized}</b></span>
+                  <a href={`https://wa.me/${normalized}?text=${encodeURIComponent('Prueba del catálogo en línea ✅')}`} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-[#25D366] text-white">Probar</a>
+                </div>
+              )}
             </div>
+            <p className="text-[11px] text-[#756c7e] -mt-2">Además de WhatsApp, el cliente puede <b>enviar el pedido directo a la app</b> (llega a <b>Mensajes → Pedidos</b>), por si no tiene WhatsApp.</p>
             <button type="button" disabled={saving} onClick={save} className="w-full py-3 rounded-xl btn-primary font-bold">{saving ? 'Guardando...' : 'Guardar'}</button>
             {link && (
               <div className="p-4 rounded-2xl bg-[#f0fdf4] border border-[#bbf7d0] text-center">

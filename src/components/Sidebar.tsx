@@ -3,7 +3,7 @@ import {
   AlertCircle, AlertTriangle, BarChart3, BookOpen, Wallet, Contact, Globe, Tag, Cloud, Download, FileUp, HelpCircle, Key, LogOut, Moon, MoreVertical,
   Package, Phone, QrCode, RefreshCw, Scan, ScanLine, ShieldCheck, ShoppingCart, Smartphone, Store, Sun, TrendingUp, Tv2, User, Users,
   Volume2, VolumeX, X,
-  FileText,
+  FileText, MessageSquare, Newspaper,
 } from 'lucide-react';
 import { openAccount, openModal, setState, useStore, type ModalId } from '../store';
 import { navigate, openAdminModal, openBarcodeScanner, openTeam, showWelcome, toggleDarkMode, toggleSound } from '../actions';
@@ -30,6 +30,7 @@ function Badge({ count, color }: { count: number; color: string }) {
 
 export default function Sidebar() {
   const stock = useStockAlerts();
+  const unread = useStore(s => s.unread);
   const open = useStore(s => s.sidebarOpen);
   const currentView = useStore(s => s.currentView);
   const currentCatalogId = useStore(s => s.currentCatalogId);
@@ -135,6 +136,7 @@ export default function Sidebar() {
           <p className="text-[10px] uppercase tracking-[.15em] font-bold text-[#756c7e] px-3 py-2">Principal</p>
           <Item active={isActive('catalogs')} onClick={() => go('catalogs')}><BookOpen className={icon} /> Catálogos</Item>
           <Item active={isActive('products', true)} onClick={() => go('products')}><Package className={icon} /> Todos los productos</Item>
+          <Item active={isActive('messages')} onClick={() => go('messages')}><MessageSquare className={icon} /> Mensajes y pedidos <Badge count={unread.equipo + unread.pedidos} color="bg-[#be416d]" /></Item>
           <Item active={isActive('daily-sales')} onClick={() => go('daily-sales')}><TrendingUp className={icon} /> Ventas del día</Item>
           <Item active={isActive('cash-close')} onClick={() => go('cash-close')}><Wallet className={icon} /> Cierre de caja</Item>
           <Item onClick={() => later(() => openModal('documents-modal'))}><FileText className={icon} /> Recibos y cierres</Item>
@@ -149,6 +151,7 @@ export default function Sidebar() {
           <Item onClick={() => later(() => openBarcodeScanner())}><ScanLine className={icon} /> Escanear código / QR</Item>
           <Item className="admin-only" onClick={() => later(() => { setState({ labelProductId: null }); openModal('labels-modal'); })}><Tag className={icon} /> Etiquetas (QR + barras)</Item>
           <Item className="admin-only" onClick={() => later(() => { if (cloud) openModal('public-shop-modal'); else openAccount('El catálogo público necesita tu tienda en la nube'); })}><Globe className={icon} /> Catálogo público</Item>
+          <Item className="admin-only" onClick={() => later(() => { if (cloud) openModal('magazines-modal'); else openAccount('Las revistas para pedidos necesitan tu tienda en la nube'); })}><Newspaper className={icon} /> Revistas para pedidos</Item>
           <Item className="admin-only" onClick={() => admin('import-export-modal')}><FileUp className={icon} /> Importar / Exportar</Item>
           <Item className="admin-only" onClick={() => admin('backup-modal')}><ShieldCheck className={icon} /> Respaldo de datos</Item>
           <Item className="admin-only" onClick={() => later(openTeam)}><Users className={icon} /> Equipo e invitaciones</Item>

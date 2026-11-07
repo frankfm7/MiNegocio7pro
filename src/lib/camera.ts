@@ -25,7 +25,7 @@ export async function captureFromCamera(opts: CaptureOptions | string = {}): Pro
   const o: CaptureOptions = typeof opts === 'string' ? { filename: opts } : opts;
   const guide = o.guide ?? 'portrait';
   const crop = o.cropToGuide ?? guide !== 'none';
-  if (!navigator.mediaDevices?.getUserMedia) { toast('Este navegador no permite usar la cámara'); return null; }
+  if (!navigator.mediaDevices?.getUserMedia) return nativeCapture(o, 'unsupported');
 
   let facing: 'environment' | 'user' = 'environment';
   let stream: MediaStream;
@@ -35,9 +35,10 @@ export async function captureFromCamera(opts: CaptureOptions | string = {}): Pro
   try {
     stream = await open(facing);
   } catch (err) {
-    console.error('Error accediendo a la cámara:', err);
-    toast('No se pudo acceder a la cámara. Verifica los permisos.');
-    return null;
+    // Sin permiso o navegador que no deja (WhatsApp, Facebook, permiso negado una vez...):
+    // se usa la cámara propia del teléfono, que no necesita ese permiso.
+    console.warn('Cámara del navegador no disponible, se usa la del teléfono:', err);
+    return nativeCapture(o, (err as Error)?.name === 'NotAllowedError' ? 'denied' : 'error');
   }
 
   return new Promise(resolve => {
@@ -129,5 +130,57 @@ export async function captureFromCamera(opts: CaptureOptions | string = {}): Pro
       root.classList.add('flash');
       canvas.toBlob(blob => cleanup(blob ? new File([blob], o.filename || 'foto.jpg', { type: 'image/jpeg' }) : null), 'image/jpeg', 0.92);
     };
+  });
+}
+
+/** ¿Se abrió dentro de WhatsApp, Facebook, Instagram u otra app (no en Chrome/Safari)? */
+export function inAppBrowser(): string | null {
+  const ua = navigator.userAgent || '';
+  if (/WhatsApp/i.test(ua)) return 'WhatsApp';
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return 'Facebook';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/TikTok|musical_ly|Bytedance/i.test(ua)) return 'TikTok';
+  if (/; wv\)/.test(ua)) return 'otra app';
+  return null;
+}
+
+/**
+ * Plan B: la cámara del teléfono (la app de cámara de siempre) mediante un selector de archivo.
+ * Funciona aunque el navegador no tenga permiso de cámara. Se muestra un botón porque el
+ * teléfono solo deja abrir la cámara cuando la persona toca algo.
+ */
+function nativeCapture(o: CaptureOptions, why: 'denied' | 'error' | 'unsupported'): Promise<File | null> {
+  const app = inAppBrowser();
+  const reason = app
+    ? `Abriste la app desde ${app}, que no deja usar la cámara dentro de la página.`
+    : why === 'denied' ? 'El navegador no tiene permiso para usar la cámara.' : 'La cámara del navegador no está disponible.';
+  return new Promise(resolve => {
+    const root = document.createElement('div');
+    root.className = 'cam-fallback';
+    root.innerHTML = `
+      <div class="cam-fallback-card">
+        <p class="cam-fallback-title">${o.title || 'Tomar foto'}</p>
+        <p class="cam-fallback-text">${reason} Usa la cámara de tu teléfono: es igual de buena.</p>
+        <button type="button" class="cam-fb-btn cam-fb-camera">📷 Abrir la cámara del teléfono</button>
+        <button type="button" class="cam-fb-btn cam-fb-gallery">🖼️ Elegir de la galería</button>
+        <button type="button" class="cam-fb-cancel">Cancelar</button>
+        <p class="cam-fallback-help">${app ? `Para usar la cámara dentro de la app, toca ⋮ y elige <b>“Abrir en Chrome”</b> (o en Safari).` : 'Para volver a usar la cámara dentro de la app: toca el candado 🔒 junto a la dirección → Permisos → Cámara → Permitir. Si la app está instalada: mantén presionado su ícono → Información de la app → Permisos → Cámara.'}</p>
+      </div>`;
+    document.body.appendChild(root);
+    const done = (f: File | null) => { root.remove(); resolve(f); };
+    const pick = (camera: boolean) => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      if (camera) input.setAttribute('capture', 'environment');
+      input.onchange = () => {
+        const f = input.files?.[0] || null;
+        done(f ? new File([f], o.filename || f.name || 'foto.jpg', { type: f.type || 'image/jpeg' }) : null);
+      };
+      input.click();
+    };
+    root.querySelector<HTMLButtonElement>('.cam-fb-camera')!.onclick = () => pick(true);
+    root.querySelector<HTMLButtonElement>('.cam-fb-gallery')!.onclick = () => pick(false);
+    root.querySelector<HTMLButtonElement>('.cam-fb-cancel')!.onclick = () => done(null);
+    if (why === 'unsupported') toast('Usando la cámara del teléfono');
   });
 }

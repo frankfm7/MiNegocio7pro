@@ -22,6 +22,8 @@ import CatalogsScreen from './screens/CatalogsScreen';
 import ProductsScreen from './screens/ProductsScreen';
 import { DailySalesScreen, LowStockScreen, OutOfStockScreen, ReportsScreen } from './screens/SalesScreens';
 import CashCloseScreen from './screens/CashCloseScreen';
+import MessagesScreen from './screens/MessagesScreen';
+import { refreshUnread, watchMessages } from './lib/messages';
 import CustomersScreen from './screens/CustomersScreen';
 import PriceHistoryModal from './components/modals/PriceHistoryModal';
 import LabelsModal from './components/modals/LabelsModal';
@@ -31,6 +33,8 @@ import { BarcodePrintModal, DetailModal, ProductQrModal, PublicProductModal, Sal
 import CartModal from './components/modals/CartModal';
 import { CatalogFormModal, CreateCatalogModal, ShareCatalogModal } from './components/modals/CatalogModals';
 import { BackupModal, ImportExportModal, ImportPreviewModal } from './components/modals/DataModals';
+import ForgottenSaleModal from './components/modals/ForgottenSaleModal';
+import MagazinesModal from './components/modals/MagazinesModal';
 import { QrItemMenuModal, QrModal } from './components/modals/QrModals';
 import { BarcodeScannerModal, ImagePreviewModal, ImageSearchModal, QuickScanManualModal, QuickScanModal, SaleReceiptModal } from './components/modals/ScanModals';
 import { InviteModal, TeamChangeRoleModal, TeamModal, TeamUserMenuModal } from './components/modals/TeamModals';
@@ -45,7 +49,7 @@ function useBodyClasses() {
     b.toggle('dark-mode', darkMode);
     b.toggle('client-mode', clientMode);
     b.toggle('not-admin', role !== 'admin' && role !== 'coadmin');
-    b.toggle('modo-vendedor', role === 'vendedor');
+    b.toggle('modo-vendedor', role === 'vendedor' || role === 'eventual');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkMode ? '#1a1420' : '#7c43ba');
   }, [darkMode, clientMode, role]);
 }
@@ -124,6 +128,20 @@ function useBackButton() {
   }, []);
 }
 
+/** Mensajes: avisos al instante de la tienda activa y contador de no leídos */
+function useMessagesWatch() {
+  const storeId = useStore(s => (s.mode === 'cloud' ? s.activeStore?.store_id : null));
+  const online = useStore(s => s.isOnline);
+  const uid = useStore(s => s.authUser?.id);
+  useEffect(() => {
+    watchMessages();
+    if (!storeId || !online || !uid) return;
+    refreshUnread().catch(() => {});
+    const t = setInterval(() => { if (document.visibilityState === 'visible') refreshUnread().catch(() => {}); }, 120000);
+    return () => clearInterval(t);
+  }, [storeId, online, uid]);
+}
+
 function CurrentScreen() {
   const view = useStore(s => s.currentView);
   const welcome = useStore(s => s.welcomeVisible);
@@ -136,6 +154,7 @@ function CurrentScreen() {
     case 'reports': return <ReportsScreen />;
     case 'cash-close': return <CashCloseScreen />;
     case 'customers': return <CustomersScreen />;
+    case 'messages': return <MessagesScreen />;
     default: return <CatalogsScreen />;
   }
 }
@@ -151,12 +170,13 @@ export default function App() {
   useEscapeKey();
   useBackButton();
   useStockAlerts();
+  useMessagesWatch();
 
   useEffect(() => {
     initSession().then(() => {
       // Accesos directos del ícono de la app (manifest "shortcuts")
       const params = new URLSearchParams(location.search);
-      if (params.get('p')) {
+      if (params.get('p') || params.get('q')) {
         openProductFromLink(params);
         history.replaceState(null, '', location.pathname);
         return;
@@ -226,6 +246,8 @@ export default function App() {
       <ImagePreviewModal />
       <DocumentsModal />
       <NotaModal />
+      <ForgottenSaleModal />
+      <MagazinesModal />
       <NotaBar />
       <SaleReceiptModal />
       <PublicProductModal />

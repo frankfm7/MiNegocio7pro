@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { inAppBrowser } from '../../lib/camera';
 import { BookOpen, Camera, CheckCircle, Download, PlusCircle, Receipt as ReceiptIcon, Image as ImageIcon, Loader, MessageCircle, Plus, ScanLine, Share2 } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, getState, openModal, setState, toast, useStore } from '../../store';
@@ -20,6 +21,7 @@ import PaymentPicker from '../PaymentPicker';
 export function BarcodeScannerModal() {
   const open = useStore(s => !!s.modals['barcode-scanner-modal']);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [camErr, setCamErr] = useState(false);
   const [running, setRunning] = useState(false);
 
   const stop = async () => {
@@ -60,9 +62,9 @@ export function BarcodeScannerModal() {
         fps: 12,
         qrbox: (w, h) => { const side = Math.floor(Math.min(w, h) * 0.75); return { width: Math.max(180, Math.floor(Math.min(w * 0.85, side * 1.25))), height: Math.max(150, side) }; },
       }, onDecoded, () => {});
-      setRunning(true);
+      setRunning(true); setCamErr(false);
     } catch {
-      toast('No se pudo acceder a la cámara. Puedes leer el código desde una foto.', 3500);
+      setCamErr(true);
     }
   };
 
@@ -94,7 +96,15 @@ export function BarcodeScannerModal() {
     <Modal id="barcode-scanner-modal" className="z-50 bg-[#1e1427]/90" onClose={stop}>
       <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6">
         <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Escanear código</h2><CloseButton onClick={close} /></div>
-        <div id="barcode-reader" className="rounded-xl overflow-hidden bg-black min-h-[260px]" />
+        {camErr && (
+          <div className="mb-3 p-3 rounded-xl bg-[#fffbeb] border border-[#fde68a] text-center">
+            <p className="text-xs text-[#92400e] mb-2">{inAppBrowser() ? `Abriste la app desde ${inAppBrowser()}, que no deja usar la cámara aquí.` : 'El navegador no tiene permiso para la cámara.'} Toma una foto del código con la cámara de tu teléfono:</p>
+            <label className="py-3 rounded-xl btn-primary font-bold text-sm flex items-center justify-center gap-2 cursor-pointer">📷 Tomar foto del código
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) fromPhoto(f); e.target.value = ''; }} />
+            </label>
+          </div>
+        )}
+        <div id="barcode-reader" className={`rounded-xl overflow-hidden bg-black ${camErr ? 'hidden' : 'min-h-[260px]'}`} />
         <div id="barcode-file-reader" className="hidden" />
         <p className="text-xs text-[#756c7e] mt-3 text-center">Apunta la cámara a un <b>código QR</b> o a un <b>código de barras</b></p>
         <div className="grid grid-cols-2 gap-2 mt-4">

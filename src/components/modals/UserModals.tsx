@@ -152,14 +152,17 @@ const GUIDE: Section[] = [
     '**Regla de oro**: ningún descuento puede dejar un producto por debajo de su **costo mínimo de venta**. Si pides más, la app lo limita al mínimo y te avisa en rojo.',
     '**Guardar borrador** deja la nota guardada para seguir después (Borradores guardados). **Procesar venta** registra la venta con esos precios, descuenta el stock y saca el recibo numerado con el descuento.',
   ] },
-  { icon: MessageCircle, title: 'Pedidos por WhatsApp (carrito)', steps: [
+  { icon: ShoppingCart, title: 'Pedidos por WhatsApp (carrito)', steps: [
     'En el detalle de un producto toca **+ Carrito** para armar un pedido.',
     'El ícono del carrito (arriba) muestra el pedido actual: cambia cantidades y toca **Enviar por WhatsApp**.',
     'Ideal para tomar pedidos de clientes y venderlos después.',
   ] },
   { icon: TrendingUp, title: 'Ventas, recibos e informes', steps: [
     '**Ventas** (barra de abajo) muestra lo vendido hoy por efectivo, QR y fiado; **Informes** muestra todo el historial y un gráfico de 7 días.',
+    '**Días anteriores**: en Ventas usa las flechas ‹ ›, el calendario o los botones **Ayer / Anteayer** (y los días con ventas). Así sacas el **cierre de caja** o la **tabla de cierre** de un día que olvidaste cerrar. Las ventas quedan guardadas siempre, no solo un mes.',
+    '**Venta olvidada**: en Ventas o Informes toca **Agregar una venta olvidada**: eliges el producto, el día y la hora en que se vendió y el motivo. Queda con la observación 📝 *Venta olvidada · registrada el … por …* para que el dueño sepa que se agregó después.',
     'Para seleccionar ventas: **mantén presionada** una venta (medio segundo). Luego toca o mantén presionadas otras para agregarlas o quitarlas. Cuando no queda ninguna seleccionada, la selección se cierra sola.',
+    'En **Informes**, con las ventas elegidas aparece **Informe**: un informe numerado solo con esas ventas (Excel, CSV o compartir), con la columna *Observación*.',
     'Con las ventas elegidas: **Recibo** (genera el recibo de venta con todas, para WhatsApp o imagen), **Copiar**, **Compartir** o **Eliminar** (solo administradores; te pregunta si devuelves las unidades al stock, por ejemplo si se anuló la venta).',
     '**Cierre de caja** (Ventas o menú ☰): total cobrado por efectivo, QR, fiado y por vendedor, más los abonos de fiados. Envíalo por WhatsApp, cópialo o guárdalo como imagen (**Tabla de cierre**).',
     'En Informes puedes **Exportar Excel o CSV** con todas las ventas.',
@@ -195,19 +198,28 @@ const GUIDE: Section[] = [
     'En modo cliente, para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita con el **Mínimo**. Ciérrala tocando fuera o en Cerrar.',
   ] },
   { icon: QrCode, title: 'QR, etiquetas y cobro', steps: [
-    'Cada producto tiene su **QR**. Con la app se abre el producto al instante; con otro lector solo se ven el nombre, el contenido y el precio (nunca los costos).',
-    'Menú ☰ → **Etiquetas (QR + barras)**: imprime etiquetas en A4 o en impresora térmica. También puedes imprimir todos los QR de un catálogo en PDF.',
-    'Menú ☰ → **QR de cobro**: sube el QR de tu banco o billetera para mostrarlo al cobrar.',
+    'Cada producto tiene su **QR compacto** (como los de las revistas): lleva solo el código del producto, por eso sus puntos son grandes y se lee bien aunque la etiqueta sea chica. Al escanearlo se abre la ficha **actual** del producto (con el precio al día, aunque la etiqueta sea vieja). Los QR antiguos siguen funcionando.',
+    'El **código de barras** de la etiqueta es corto (8 números) y de barras gruesas; si el producto tiene su propio código de barras, se usa ese.',
+    'Menú ☰ → **Etiquetas (QR + barras)**: elige de dónde (todos, un catálogo, stock bajo), luego **marca producto por producto** y cuántas etiquetas de cada uno. Los ya impresos quedan con ✓ y el botón **Sin imprimir** elige solo los nuevos. Hay hojas A4 de 24, 40 y 65 etiquetas y tamaños de impresora térmica.',
+    'Menú ☰ → **QR de cobro**: sube el QR de tu banco o billetera para mostrarlo al cobrar. El **QR del dueño** lo ven todos en el equipo (administradores, supervisores y vendedores) para cobrar a nombre de la tienda.',
   ] },
   { icon: Globe, title: 'Catálogo público', steps: [
-    'Menú ☰ → **Catálogo público**: actívalo, elige el nombre del enlace y el WhatsApp que recibe pedidos.',
-    'Comparte el enlace o su QR: tus clientes ven productos y precios (sin costos) y te piden por WhatsApp, sin instalar nada.',
+    'Menú ☰ → **Catálogo público**: actívalo, elige el nombre del enlace y el WhatsApp que recibe pedidos. El número se puede escribir solo (71101154), con **+** y código de país (+591 71101154) o pegando un enlace wa.me; abajo ves a qué número llegarán y el botón **Probar**.',
+    'Comparte el enlace o su QR: tus clientes ven productos y precios (sin costos) y te piden por WhatsApp o, si no tienen WhatsApp, con **Enviar a la tienda**: el pedido llega a **Mensajes → Pedidos**.',
+    'Menú ☰ → **Revistas para pedidos**: sube la revista de la campaña (PDF o fotos de las páginas) de Ésika, L\'Bel, Cyzone, Yanbal... con su fecha de vigencia y en cuántos días llega. Tus clientes la hojean, tocan **Pedir de esta página**, escriben el código y la cantidad, y te mandan el pedido. Ahí mismo pones los **datos de tu tienda** (dirección, horario, entrega y tiempo de llegada) que ven los clientes.',
   ] },
   { icon: Users, title: 'Equipo e invitaciones', steps: [
     'Menú ☰ → **Equipo e invitaciones → Invitar**: elige el rol y envía el código o enlace por WhatsApp.',
-    'Roles: **Administrador** (todo), **Co-administrador**, **Supervisor** y **Vendedor** (vende, pero no ve costos ni edita).',
+    'Roles: **Dueño** (todo), **Administrador** (productos y equipo), **Supervisor** (vende y ve informes), **Vendedor** (vende, no ve costos ni edita) y **Vendedor eventual**: como vendedor pero solo por unos días (1 a 30); al terminar su acceso se cierra solo. Puedes ampliarlo con **Cambiar rol**.',
+    'Si un invitado no puede abrir la cámara (por ejemplo abrió el enlace desde WhatsApp), la app le ofrece **Abrir la cámara del teléfono** o **Elegir de la galería**, que funcionan sin permisos especiales.',
     'En la lista ves a cada miembro con **En línea** (verde) si tiene la app abierta, o **Últ. vez ...** (negro) con su última conexión. Desde ⋮ puedes cambiar el rol, bloquear o quitar.',
     'Cada venta guarda quién la hizo (con su foto) y el cierre de caja separa por vendedor.',
+  ] },
+  { icon: MessageCircle, title: 'Mensajes y pedidos', steps: [
+    'Ícono 💬 arriba en Catálogos (o menú ☰ → **Mensajes y pedidos**). Necesita tu tienda en la nube.',
+    '**Equipo**: chat del dueño con su equipo. Manda texto, **fotos** (galería o cámara), **videos** y **notas de voz** (toca el micrófono, habla y toca *Enviar audio*).',
+    '**Pedidos**: los pedidos que los clientes mandan desde el catálogo público o las revistas. Cambia el estado (Nuevo, Preparando, Listo, Entregado), responde por WhatsApp, llama o copia el pedido.',
+    'Cuando llega un mensaje o pedido ves un aviso y el número rojo en el ícono.',
   ] },
   { icon: ShieldCheck, title: 'Respaldos y seguridad', steps: [
     'Menú ☰ → **Respaldo de datos**: crea copias de seguridad (en la nube si tienes tienda) y restáuralas si hace falta. La app hace una copia automática al abrirla (máximo una cada 20 horas).',

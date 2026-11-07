@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Copy, ImageDown, MessageCircle } from 'lucide-react';
-import { toast, useStore } from '../store';
+import { setState, toast, useStore } from '../store';
 import { formatUSD } from '../lib/format';
 import { buildCashSummary, cashSummaryText, dateKeyOf, todayKey } from '../lib/cashClose';
 import { openWhatsApp } from '../lib/whatsapp';
@@ -18,7 +18,8 @@ export default function CashCloseScreen() {
   const team = useStore(s => s.team);
   const isAdmin = useStore(s => s.isAdmin());
   const whatsapp = useStore(s => s.contactInfo?.whatsapp);
-  const [dateKey, setDateKey] = useState(todayKey());
+  const dateKey = useStore(s => s.salesDay);
+  const setDateKey = (k: string) => setState({ salesDay: k > todayKey() ? todayKey() : k });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const sum = useMemo(() => buildCashSummary(dateKey), [dateKey, sales, movements]);
   const [number, setNumber] = useState('');

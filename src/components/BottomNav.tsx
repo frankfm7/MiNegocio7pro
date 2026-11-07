@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart3, BookOpen, Database, Download, FolderPlus, PackagePlus, QrCode, Share2, ShoppingCart, TrendingUp, Upload } from 'lucide-react';
-import { getState, openModal, useStore } from '../store';
+import { getState, openModal, setState, useStore } from '../store';
 import { navigate, openAdminModal, openCatalogForm, openForm, shareCatalogByLink, startQuickScanMode } from '../actions';
 import { toast } from '../store';
 
@@ -40,10 +40,10 @@ export default function BottomNav() {
         <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2 border-b border-[#e8dfec]" onClick={pick(() => openForm())}>
           <PackagePlus className="w-4 h-4 text-[#23805d]" /> Añadir producto
         </button>
-        <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2 border-b border-[#e8dfec]" onClick={pick(() => openAdminModal('import-export-modal'))}>
+        <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2 border-b border-[#e8dfec]" onClick={pick(() => { setState({ ieMode: 'import' }); openAdminModal('import-export-modal'); })}>
           <Upload className="w-4 h-4 text-[#3875a5]" /> Importar archivo
         </button>
-        <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2 border-b border-[#e8dfec]" onClick={pick(() => openAdminModal('import-export-modal'))}>
+        <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2 border-b border-[#e8dfec]" onClick={pick(() => { setState({ ieMode: 'export' }); openAdminModal('import-export-modal'); })}>
           <Download className="w-4 h-4 text-[#d97706]" /> Exportar datos
         </button>
         <button className="w-full text-left px-4 py-2.5 hover:bg-[#f6f1f8] text-sm flex items-center gap-2" onClick={pick(() => {

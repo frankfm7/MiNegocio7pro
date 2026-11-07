@@ -4,7 +4,7 @@ import { cardImage } from './format';
 import { fallback } from './constants';
 import { embeddingsKey, idbGet, idbSet } from './storage';
 import { scoreProduct } from './search';
-import { decodeProductQR } from './qr';
+import { decodeProductQR, findByShortCode } from './qr';
 
 // ==========================================
 // BÚSQUEDA POR IMAGEN
@@ -139,7 +139,7 @@ export async function searchByImage(file: Blob) {
   const code = await decodeCodeInImage(file);
   if (code) {
     const qr = decodeProductQR(code);
-    const hit = records.find(r => (qr?.id && r.id === qr.id) || (r.barcode && r.barcode === code.trim()));
+    const hit = records.find(r => (qr?.id && r.id === qr.id) || (r.barcode && r.barcode === code.trim())) || findByShortCode(records, code);
     if (hit) {
       setState({ imageSearch: { preview: src, status: '', results: [{ record: hit, similarity: 100, reason: qr ? 'Código QR' : 'Código de barras' }] } });
       return;

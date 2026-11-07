@@ -56,7 +56,7 @@ export default function ProductsScreen() {
   if (!cat && currentCatalogId !== null) return null;
 
   const action = (fn: (id: string) => void) => () => { setMenuOpen(false); if (currentCatalogId) fn(currentCatalogId); };
-  const isVendedor = user?.role === 'vendedor';
+  const isVendedor = user?.role === 'vendedor' || user?.role === 'eventual';
 
   return (
     <section id="products-screen" className="screen active">

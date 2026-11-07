@@ -82,6 +82,7 @@ function saleRow(s: Sale, sid: string) {
     id: s.id, date: s.date, product_id: s.product_id, product_name: s.product_name, actual_price: s.actual_price,
     quantity: s.quantity, profit: s.profit, payment_method: s.payment_method, seller_name: s.seller_name, store_id: sid,
     customer_id: s.customer_id ?? null, customer_name: s.customer_name ?? null,
+    ...(s.note ? { note: s.note } : {}), ...(s.skip_stock ? { skip_stock: true } : {}),
   };
 }
 
@@ -462,10 +463,11 @@ export const DB = {
   },
 
   /** Registra la venta y descuenta el stock (en la nube se hace en un solo paso con register_sale) */
-  async addSale(data: Omit<Sale, 'id' | 'date'>) {
-    const sale: Sale = { ...data, id: 'sale_' + newId(), date: new Date().toISOString() };
+  async addSale(data: Omit<Sale, 'id' | 'date'> & { date?: string }) {
+    const sale: Sale = { ...data, id: 'sale_' + newId(), date: data.date || new Date().toISOString() };
     const s = getState();
-    const records = s.records.map(r => (r.id === sale.product_id ? { ...r, stock: Number(r.stock) - Number(sale.quantity || 1) } : r));
+    // Una venta olvidada puede no descontar stock (si ya se ajustó a mano)
+    const records = sale.skip_stock ? s.records : s.records.map(r => (r.id === sale.product_id ? { ...r, stock: Number(r.stock) - Number(sale.quantity || 1) } : r));
     setState({ sales: [sale, ...s.sales], records });
     saveLocal();
     await remote('addSale', sale, sid => registerSaleRemote(sale, sid));

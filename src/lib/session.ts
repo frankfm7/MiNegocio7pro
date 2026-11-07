@@ -13,9 +13,10 @@ const ACTIVE_KEY = 'mc7_active';
 const MEMBERSHIPS_KEY = 'mc7_memberships';
 
 export function roleLabel(role?: string) {
-  if (role === 'admin') return 'Administrador';
-  if (role === 'coadmin') return 'Co-Administrador';
+  if (role === 'admin') return 'Dueño';
+  if (role === 'coadmin') return 'Administrador';
   if (role === 'supervisor') return 'Supervisor';
+  if (role === 'eventual') return 'Vendedor eventual';
   return 'Vendedor';
 }
 
@@ -120,7 +121,8 @@ export async function initSession() {
   const cachedMemberships = readJSON<StoreMembership[]>(MEMBERSHIPS_KEY, []);
 
   const invite = new URLSearchParams(location.search).get('invite');
-  if (invite) setState({ pendingInviteCode: invite.toUpperCase() });
+  // Con un enlace de invitación se va directo a crear la cuenta / unirse (sin la bienvenida)
+  if (invite) setState({ pendingInviteCode: invite.toUpperCase(), welcomeVisible: false });
 
   let authUser: AuthUser | null = null;
   if (supabaseClient) {
@@ -238,15 +240,20 @@ export async function updateMyName(name: string) {
 export async function loadMemberships(): Promise<StoreMembership[]> {
   const u = getState().authUser;
   if (!supabaseClient || !u) return [];
-  const { data, error } = await supabaseClient
+  let { data, error } = await supabaseClient
     .from('store_members')
-    .select('store_id, role, status, name, stores(name, owner_id)')
+    .select('store_id, role, status, name, access_until, stores(name, owner_id)')
     .eq('user_id', u.id);
+  // Sin el archivo 10 (no existe access_until)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (error && /access_until/.test(error.message)) ({ data, error } = await supabaseClient.from('store_members').select('store_id, role, status, name, stores(name, owner_id)').eq('user_id', u.id) as any);
   if (error) throw friendly(error);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const list: StoreMembership[] = (data || []).map((r: any) => {
     const store = Array.isArray(r.stores) ? r.stores[0] : r.stores;
-    return { store_id: r.store_id, store_name: store?.name || 'Tienda', role: r.role, status: r.status, name: r.name || u.name, is_owner: store?.owner_id === u.id };
+    // Vendedor eventual con el acceso vencido: queda como bloqueado
+    const expired = r.access_until && new Date(r.access_until) < new Date();
+    return { store_id: r.store_id, store_name: store?.name || 'Tienda', role: r.role, status: expired ? 'blocked' : r.status, name: r.name || u.name, is_owner: store?.owner_id === u.id };
   });
   localStorage.setItem(MEMBERSHIPS_KEY, JSON.stringify(list));
   setState({ memberships: list });
@@ -299,7 +306,7 @@ export async function listMembers(): Promise<StoreMember[]> {
   return (data || []) as StoreMember[];
 }
 
-export async function updateMember(userId: string, patch: Partial<Pick<StoreMember, 'role' | 'status'>>) {
+export async function updateMember(userId: string, patch: Partial<Pick<StoreMember, 'role' | 'status' | 'access_until'>>) {
   const { data, error } = await supabaseClient!.from('store_members').update(patch).eq('store_id', sid()).eq('user_id', userId).select();
   if (error) throw friendly(error);
   if (!data || data.length === 0) throw new Error('No tienes permiso para cambiar a este usuario');
@@ -317,8 +324,13 @@ export async function listInvites(): Promise<StoreInvite[]> {
   return (data || []) as StoreInvite[];
 }
 
-export async function createInvite(role: Role, days: number, maxUses: number): Promise<string> {
-  const { data, error } = await supabaseClient!.rpc('create_invite', { p_store: sid(), p_role: role, p_days: days, p_max_uses: maxUses });
+export async function createInvite(role: Role, days: number, maxUses: number, accessDays = 3): Promise<string> {
+  let { data, error } = await supabaseClient!.rpc('create_invite', { p_store: sid(), p_role: role, p_days: days, p_max_uses: maxUses, p_access_days: role === 'eventual' ? accessDays : null });
+  // Sin el archivo 10 en Supabase: la función antigua (sin vendedor eventual)
+  if (error && /create_invite|schema cache|function/i.test(error.message) && role !== 'eventual') {
+    ({ data, error } = await supabaseClient!.rpc('create_invite', { p_store: sid(), p_role: role, p_days: days, p_max_uses: maxUses }));
+  }
+  if (error && role === 'eventual' && /create_invite|schema cache|function|Rol no v|check/i.test(error.message)) throw new Error('Para invitar vendedores eventuales ejecuta supabase/10-mensajes-revistas-roles.sql');
   if (error) throw friendly(error);
   return data as string;
 }

@@ -9,6 +9,7 @@ import { addCart, addToCurrentSale, startQuickScanMode, toggleClientMode, confir
 import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../../lib/format';
 import { APP_NAME, fallback } from '../../lib/constants';
 import { generateProductQRImage, printProductQR } from '../../lib/qr';
+import { labelBarcodeValue } from '../../lib/labels';
 import { SoundEffects } from '../../lib/sound';
 import { downloadDataUrl } from '../../lib/image';
 import { useImageBg } from '../../lib/imageBg';
@@ -348,8 +349,8 @@ export function BarcodePrintModal() {
 
   useEffect(() => {
     if (!open || !product || !svgRef.current) return;
-    const code = product.barcode || product.id;
-    try { JsBarcode(svgRef.current, code, { format: 'CODE128', width: 2, height: 80, displayValue: true, fontSize: 14, margin: 10 }); }
+    const code = labelBarcodeValue(product);
+    try { JsBarcode(svgRef.current, code, { format: 'CODE128', width: 3, height: 70, displayValue: true, fontSize: 18, margin: 10 }); }
     catch {
       try { JsBarcode(svgRef.current, code, { format: 'CODE39', width: 1.5, height: 60, displayValue: true, fontSize: 12, margin: 10 }); }
       catch { toast('No se pudo generar código'); closeModal('barcode-print-modal'); }

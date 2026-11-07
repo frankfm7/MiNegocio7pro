@@ -21,7 +21,36 @@ import { APP_NAME } from './constants';
 
 const appOrigin = () => ((import.meta.env.VITE_PUBLIC_URL as string | undefined) || location.origin).replace(/\/+$/, '');
 
+/**
+ * Código corto del producto (8 dígitos), sale siempre igual para el mismo producto.
+ * Va en el QR compacto y en el código de barras de las etiquetas cuando el producto
+ * no tiene código de barras propio. Con pocos datos, los puntos del QR y las barras salen grandes.
+ */
+export function productShortCode(p: Pick<Product, 'id'>): string {
+  let h = 2166136261;
+  for (let i = 0; i < p.id.length; i++) { h ^= p.id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return String((h >>> 0) % 100000000).padStart(8, '0');
+}
+
+/** Busca un producto por su código corto */
+export function findByShortCode(records: Product[], code: string) {
+  const c = code.trim();
+  return /^\d{8}$/.test(c) ? records.find(r => productShortCode(r) === c) : undefined;
+}
+
+/**
+ * QR compacto (como el de las revistas): solo un enlace corto con el código del producto,
+ * ej. https://minegocio7pro.vercel.app/?q=12345678.3f9a1c
+ * Al escanearlo se abre la ficha ACTUAL del producto (nombre y precio al día, aunque la
+ * etiqueta se haya impreso hace meses). Los QR antiguos (enlace largo) siguen funcionando.
+ */
 export function generateProductQRText(p: Product): string {
+  const st = getState().activeStore;
+  return `${appOrigin()}/?q=${productShortCode(p)}${st?.store_id ? '.' + st.store_id.replace(/-/g, '').slice(0, 6) : ''}`;
+}
+
+/** Enlace largo con los datos del producto (para compartir por mensaje, no para imprimir) */
+export function generateProductLinkFull(p: Product): string {
   const q = new URLSearchParams();
   q.set('p', p.id);
   q.set('n', p.name);
@@ -37,6 +66,12 @@ export function generateProductQRText(p: Product): string {
   return `${appOrigin()}/?${q.toString()}`;
 }
 
+/** Datos de un QR compacto (?q=12345678.3f9a1c) */
+export function shortFromParams(q: URLSearchParams): { code: string; store?: string } | null {
+  const m = /^(\d{8})(?:\.([0-9a-f]{4,12}))?$/i.exec(q.get('q') || '');
+  return m ? { code: m[1], store: m[2]?.toLowerCase() } : null;
+}
+
 const b64decode = (s: string) => {
   const raw = atob(s);
   try { return decodeURIComponent(escape(raw)); } catch { return raw; }
@@ -50,11 +85,16 @@ export function publicFromParams(q: URLSearchParams): PublicProductData | null {
 }
 
 /** Lee un QR de producto: enlace nuevo, texto con "Ref: MC7:" o el formato antiguo "CATPRO:" */
-export function decodeProductQR(text: string): { id: string | null; public: PublicProductData; storeId?: string } | null {
+export function decodeProductQR(text: string): { id: string | null; public: PublicProductData; storeId?: string; short?: string; storePrefix?: string } | null {
   const t = text.trim();
   if (/^https?:\/\//i.test(t)) {
     try {
       const u = new URL(t);
+      const sh = shortFromParams(u.searchParams);
+      if (sh) {
+        const hit = findByShortCode(getState().records, sh.code);
+        return { id: hit?.id || null, public: { id: hit?.id || '', n: hit?.name || 'Producto' }, short: sh.code, storePrefix: sh.store };
+      }
       const pub = publicFromParams(u.searchParams);
       if (pub && u.searchParams.get('n')) return { id: pub.id!, public: pub, storeId: u.searchParams.get('t') || undefined };
     } catch { /* no es un enlace válido */ }
@@ -78,7 +118,7 @@ export function decodeProductQR(text: string): { id: string | null; public: Publ
 }
 
 export async function generateProductQRImage(product: Product, size = 300) {
-  return QRCode.toDataURL(generateProductQRText(product), { width: size, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#201728', light: '#ffffff' } });
+  return QRCode.toDataURL(generateProductQRText(product), { width: size, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
 }
 
 const escapeHtml = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -170,8 +210,12 @@ export async function loadUserQRs(): Promise<QrCodeItem[]> {
 export async function loadOwnerPrimaryQR(): Promise<QrCodeItem | null> {
   if (!isCloud() || !getState().isOnline) return null;
   try {
+    const sid = getState().activeStore!.store_id;
+    // Con el archivo 10: el QR del dueño de verdad (no el de un administrador)
+    const rpc = await supabaseClient!.rpc('owner_payment_qr', { p_store: sid });
+    if (!rpc.error) return (rpc.data as QrCodeItem) || null;
     const { data } = await supabaseClient!.from(QR_TABLE).select('*')
-      .eq('store_id', getState().activeStore!.store_id).eq('role_owner', true).eq('is_primary', true).limit(1).maybeSingle();
+      .eq('store_id', sid).eq('role_owner', true).eq('is_primary', true).limit(1).maybeSingle();
     return (data as QrCodeItem) || null;
   } catch { return null; }
 }
@@ -180,7 +224,7 @@ export async function createQR(image: string, label: string, isPrimary: boolean)
   const { currentUser } = getState();
   const qr: QrCodeItem = {
     id: 'qr_' + newId(), user_id: currentUser.id, image, label: label || 'Mi QR', is_primary: isPrimary,
-    role_owner: currentUser.role === 'admin' || currentUser.role === 'coadmin',
+    role_owner: currentUser.role === 'admin',
   };
   await saveList([...(await localList()), qr]);
   if (isCloud()) {

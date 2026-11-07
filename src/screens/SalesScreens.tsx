@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, AlertTriangle, BellOff, Check, CheckCircle, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
+  AlertCircle, AlertTriangle, BellOff, Plus, Check, CheckCircle, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
 } from 'lucide-react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
-import { setState, toast, useStore } from '../store';
+import { openModal, setState, toast, useStore } from '../store';
+import { dateKeyOf, todayKey } from '../lib/cashClose';
 import { copySales, deleteSalesWithConfirm, generateDailyCloseImage, navigate, openDetail, salesReceipt, shareSales } from '../actions';
 import { currency, cardImage, formatContent, formatUSD, formatUSDShort } from '../lib/format';
 import { fallback } from '../lib/constants';
-import { getLowStockProducts, getOutOfStockProducts, getTodaySales, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
+import { getLowStockProducts, getOutOfStockProducts, lowStockLimit, sellerOf, sortByDateDesc } from '../lib/selectors';
 import Avatar from '../components/Avatar';
 import { exportOutOfStock, exportSalesCSV, exportSalesXLSX, issueReportNumber, shareSalesReport } from '../lib/exporters';
 import { TopbarMenuButton } from './CatalogsScreen';
@@ -40,7 +41,7 @@ const sumBy = (list: Sale[], key: 'actual_price' | 'profit') => list.reduce((a, 
 // ==========================================
 // LISTA DE VENTAS CON SELECCIÓN MÚLTIPLE
 // ==========================================
-function SalesList({ id, title, list, showDate }: { id: string; title: string; list: Sale[]; showDate: boolean }) {
+function SalesList({ id, title, list, showDate, onReport }: { id: string; title: string; list: Sale[]; showDate: boolean; onReport?: (chosen: Sale[]) => void }) {
   const team = useStore(s => s.team);
   const isAdmin = useStore(s => s.isAdmin());
   const [sel, setSel] = useState<Set<string>>(() => new Set());
@@ -92,7 +93,7 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
           </>
         )}
       </div>
-      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Mantén presionada una venta para seleccionarla (recibo, copiar, compartir o eliminar).</p>}
+      {!mode && list.length > 0 && <p className="text-[11px] text-[#756c7e] -mt-2 mb-3">Mantén presionada una venta para seleccionarla (recibo, informe, copiar, compartir o eliminar).</p>}
       <div id={id} className={`space-y-2 ${mode ? 'pb-36' : ''}`}>
         {list.map(s => {
           const on = sel.has(s.id);
@@ -104,6 +105,7 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
               {mode && <span className={`w-5 h-5 rounded-md border-2 flex-shrink-0 grid place-items-center ${on ? 'bg-[#7c43ba] border-[#7c43ba] text-white' : 'border-[#cbbdd6] bg-white'}`}>{on && <Check className="w-3.5 h-3.5" />}</span>}
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm leading-snug line-clamp-2">{s.product_name}{Number(s.quantity) > 1 && <span className="text-[11px] text-[#756c7e] font-bold"> ×{s.quantity}</span>}</p>
+                {s.note && <p className="sale-note text-[10px] text-[#92400e] bg-[#fffbeb] rounded px-1.5 py-0.5 mt-0.5 font-bold">📝 {s.note}</p>}
                 {s.seller_name && <p className="text-[10px] text-[#7c43ba] font-bold flex items-center gap-1 mt-0.5 min-w-0"><Avatar size={16} name={s.seller_name} url={sellerOf(team, s).avatar} /><span className="truncate">{s.seller_name}</span></p>}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {s.payment_method && <span className={`text-[9px] px-2 py-0.5 rounded-full ${s.payment_method === 'QR' ? 'bg-[#f6f1f8] text-[#7c43ba]' : s.payment_method === 'Fiado' ? 'bg-[#fff0f3] text-[#a43658]' : 'bg-[#f0fdf4] text-[#166534]'} font-bold max-w-full truncate`}>{s.payment_method}{s.customer_name ? ` · ${s.customer_name}` : ''}</span>}
@@ -118,7 +120,8 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
       {mode && (
         <div className="sales-actionbar fixed z-40 left-1/2 -translate-x-1/2 w-[calc(100%-24px)] max-w-md rounded-2xl bg-white shadow-2xl border border-[#ede7f0] p-2.5">
           <p className="text-xs font-bold text-center mb-2">{chosen.length} {chosen.length === 1 ? 'venta' : 'ventas'} · <span className="text-[#7c43ba]">{formatUSD(chosen.reduce((a, x) => a + Number(x.actual_price || 0), 0))}</span> <span className="font-normal text-[#756c7e]">· toca para agregar o quitar</span></p>
-          <div className={`grid ${isAdmin ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
+          <div className={`grid ${(isAdmin ? 4 : 3) + (onReport ? 1 : 0) === 5 ? 'grid-cols-5' : (isAdmin ? 4 : 3) + (onReport ? 1 : 0) === 4 ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5`}>
+            {onReport && <button type="button" id="report-selected" disabled={!chosen.length} onClick={() => onReport(chosen)} className="py-2 rounded-xl bg-[#23805d] text-white text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><FileSpreadsheet className="w-4 h-4" /> Informe</button>}
             <button type="button" disabled={!chosen.length} onClick={() => salesReceipt(chosen)} className="py-2 rounded-xl btn-primary text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Receipt className="w-4 h-4" /> Recibo</button>
             <button type="button" disabled={!chosen.length} onClick={() => copySales(chosen)} className="py-2 rounded-xl btn-ghost text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Copy className="w-4 h-4" /> Copiar</button>
             <button type="button" disabled={!chosen.length} onClick={() => shareSales(chosen)} className="py-2 rounded-xl btn-ghost text-[11px] font-bold flex flex-col items-center gap-0.5 disabled:opacity-40"><Share2 className="w-4 h-4" /> Compartir</button>
@@ -135,31 +138,64 @@ function SalesList({ id, title, list, showDate }: { id: string; title: string; l
 // ==========================================
 export function DailySalesScreen() {
   const sales = useStore(s => s.sales);
-  const today = useMemo(() => sortByDateDesc(getTodaySales(sales)), [sales]);
-  const cash = sumBy(today.filter(s => s.payment_method === 'Efec.'), 'actual_price');
-  const qr = sumBy(today.filter(s => s.payment_method === 'QR'), 'actual_price');
-  const fiado = sumBy(today.filter(s => s.payment_method === 'Fiado'), 'actual_price');
+  const day = useStore(s => s.salesDay);
+  const isAdmin = useStore(s => s.isAdmin());
+  const today = todayKey();
+  const isToday = day === today;
+  const list = useMemo(() => sortByDateDesc(sales.filter(s => dateKeyOf(new Date(s.date)) === day)), [sales, day]);
+  const cash = sumBy(list.filter(s => s.payment_method === 'Efec.'), 'actual_price');
+  const qr = sumBy(list.filter(s => s.payment_method === 'QR'), 'actual_price');
+  const fiado = sumBy(list.filter(s => s.payment_method === 'Fiado'), 'actual_price');
+  const setDay = (k: string) => setState({ salesDay: k > today ? today : k });
+  const shift = (n: number) => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + n); setDay(dateKeyOf(d)); };
+  const ago = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return dateKeyOf(d); };
+  const label = new Date(day + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  const word = isToday ? 'hoy' : 'este día';
+  // Días con ventas (para saltar rápido a un día anterior sin cierre)
+  const days = useMemo(() => {
+    const m = new Map<string, number>();
+    sales.forEach(s => { const k = dateKeyOf(new Date(s.date)); m.set(k, (m.get(k) || 0) + 1); });
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 31);
+  }, [sales]);
 
   return (
     <section id="daily-sales-screen" className="screen active">
-      <Header kicker="Hoy" kickerColor="text-[#23805d]" title="Ventas del día" />
+      <Header kicker={isToday ? 'Hoy' : 'Día anterior'} kickerColor="text-[#23805d]" title="Ventas del día" />
       <div className="page-inner pt-6 sm:pt-8">
+        <div id="sales-day-picker" className="mb-4">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => shift(-1)} className="btn-ghost rounded-full w-10 h-10 font-bold flex-shrink-0" aria-label="Día anterior">‹</button>
+            <input id="sales-day" type="date" value={day} max={today} onChange={e => e.target.value && setDay(e.target.value)} className="flex-1 min-w-0 input-field rounded-xl p-2.5 text-center font-bold" />
+            <button type="button" disabled={isToday} onClick={() => shift(1)} className="btn-ghost rounded-full w-10 h-10 font-bold disabled:opacity-40 flex-shrink-0" aria-label="Día siguiente">›</button>
+          </div>
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+            {[['Hoy', today], ['Ayer', ago(1)], ['Anteayer', ago(2)]].map(([t, k]) => (
+              <button key={k} type="button" onClick={() => setDay(k)} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${day === k ? 'bg-[#23805d] text-white' : 'bg-white border border-[#e8dfec] text-[#756c7e]'}`}>{t}</button>
+            ))}
+            {days.filter(([k]) => k < ago(2)).slice(0, 10).map(([k, n]) => (
+              <button key={k} type="button" onClick={() => setDay(k)} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${day === k ? 'bg-[#23805d] text-white' : 'bg-white border border-[#e8dfec] text-[#756c7e]'}`}>{new Date(k + 'T12:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' })} · {n}</button>
+            ))}
+          </div>
+          <p className="text-sm text-[#756c7e] mt-1 first-letter:uppercase">{label}{!isToday && <span className="ml-1 text-[11px] font-bold text-[#d97706]">· puedes sacar el cierre de este día</span>}</p>
+        </div>
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <article className="stat-card rounded-2xl p-4"><Receipt className="w-4 h-4 text-[#23805d] mb-2" /><p className="font-bold text-xl">{today.length}</p><p className="text-[11px] text-[#756c7e]">Ventas hoy</p></article>
-          <article className="stat-card rounded-2xl p-4"><DollarSign className="w-4 h-4 text-[#7c43ba] mb-2" /><p className="font-bold text-xl">{formatUSDShort(sumBy(today, 'actual_price'))}</p><p className="text-[11px] text-[#756c7e]">Ingresos</p></article>
+          <article className="stat-card rounded-2xl p-4"><Receipt className="w-4 h-4 text-[#23805d] mb-2" /><p className="font-bold text-xl">{list.length}</p><p className="text-[11px] text-[#756c7e]">Ventas {word}</p></article>
+          <article className="stat-card rounded-2xl p-4"><DollarSign className="w-4 h-4 text-[#7c43ba] mb-2" /><p className="font-bold text-xl">{formatUSDShort(sumBy(list, 'actual_price'))}</p><p className="text-[11px] text-[#756c7e]">Ingresos</p></article>
           <article className="stat-card rounded-2xl p-4"><CreditCard className="w-4 h-4 text-[#3875a5] mb-2" /><p className="font-bold text-xl">{formatUSDShort(cash)}</p><p className="text-[11px] text-[#756c7e]">Efectivo</p></article>
           <article className="stat-card rounded-2xl p-4"><QrCode className="w-4 h-4 text-[#7c43ba] mb-2" /><p className="font-bold text-xl">{formatUSDShort(qr)}</p><p className="text-[11px] text-[#756c7e]">QR</p></article>
-          {fiado > 0 && <article className="stat-card rounded-2xl p-4 col-span-2 sm:col-span-4 border-l-4 border-l-[#a43658]"><p className="font-bold text-xl text-[#a43658]">{formatUSDShort(fiado)}</p><p className="text-[11px] text-[#756c7e]">Fiado hoy (por cobrar)</p></article>}
+          {fiado > 0 && <article className="stat-card rounded-2xl p-4 col-span-2 sm:col-span-4 border-l-4 border-l-[#a43658]"><p className="font-bold text-xl text-[#a43658]">{formatUSDShort(fiado)}</p><p className="text-[11px] text-[#756c7e]">Fiado {word} (por cobrar)</p></article>}
         </section>
         <section className="grid grid-cols-2 gap-3 mb-6 sensitive-data">
-          <article className="stat-card rounded-2xl p-4 border-l-4 border-l-[#166534]"><TrendingUp className="w-4 h-4 text-[#166534] mb-2" /><p className="font-bold text-xl text-[#166534]">{formatUSDShort(sumBy(today, 'profit'))}</p><p className="text-[11px] text-[#756c7e]">Ganancia hoy</p></article>
+          <article className="stat-card rounded-2xl p-4 border-l-4 border-l-[#166534]"><TrendingUp className="w-4 h-4 text-[#166534] mb-2" /><p className="font-bold text-xl text-[#166534]">{formatUSDShort(sumBy(list, 'profit'))}</p><p className="text-[11px] text-[#756c7e]">Ganancia {word}</p></article>
         </section>
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <button onClick={() => navigate('cash-close')} className="py-3 rounded-xl bg-[#23805d] text-white font-bold flex items-center justify-center gap-2"><Wallet className="w-4 h-4" /> Cierre de caja</button>
-          <button onClick={() => generateDailyCloseImage()} className="py-3 rounded-xl bg-[#7c43ba] text-white font-bold flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Tabla de cierre</button>
+          <button onClick={() => generateDailyCloseImage(day)} className="py-3 rounded-xl bg-[#7c43ba] text-white font-bold flex items-center justify-center gap-2"><Table className="w-4 h-4" /> Tabla de cierre</button>
         </div>
-        <SalesList id="daily-sales-list" title="Historial de hoy" list={today} showDate={false} />
-        {today.length === 0 && <Empty id="no-daily-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas hoy" text="Las ventas de hoy aparecerán aquí" />}
+        <button id="forgotten-sale-btn" type="button" onClick={() => openModal('forgotten-sale-modal')} className="w-full mb-4 py-2.5 rounded-xl btn-ghost text-xs font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Agregar una venta olvidada {isToday ? '' : 'a este día'}</button>
+        <SalesList id="daily-sales-list" title={isToday ? 'Historial de hoy' : 'Ventas de este día'} list={list} showDate={false} />
+        {list.length === 0 && <Empty id="no-daily-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title={isToday ? 'Sin ventas hoy' : 'Sin ventas este día'} text={isToday ? 'Las ventas de hoy aparecerán aquí' : 'Elige otro día o agrega una venta olvidada'} />}
+        {!isAdmin && <p className="text-[11px] text-[#756c7e] mt-3 text-center">Las ventas olvidadas quedan marcadas para que el dueño sepa que se registraron después.</p>}
       </div>
     </section>
   );
@@ -313,10 +349,17 @@ export function ReportsScreen() {
   const allSales = useStore(s => s.sales);
   const sales = useMemo(() => sortByDateDesc(allSales), [allSales]);
   const profit = sumBy(sales, 'profit');
-  const [report, setReport] = useState<{ code: string } | null>(null);
+  const [report, setReport] = useState<{ code: string; list?: Sale[] } | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   /** Primero se numera y se muestra el número; después se descarga o comparte */
-  const makeReport = async () => { setReportBusy(true); try { setReport({ code: await issueReportNumber('Excel') }); } finally { setReportBusy(false); } };
+  const makeReport = async (list?: Sale[]) => {
+    setReportBusy(true);
+    try {
+      setReport({ code: await issueReportNumber('Excel', list), list });
+      setTimeout(() => document.getElementById('report-ready')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+    } finally { setReportBusy(false); }
+  };
+  const repList = report?.list || sales;
   return (
     <section id="reports-screen" className="screen active">
       <Header kicker="Análisis" kickerColor="text-[#756c7e]" title="Informes de venta" />
@@ -331,20 +374,21 @@ export function ReportsScreen() {
           <h3 className="font-bold text-sm mb-3">Ventas de los últimos 7 días</h3>
           <SalesChart sales={allSales} />
         </div>
-        <SalesList id="sales-list" title="Historial de ventas" list={sales} showDate />
+        <SalesList id="sales-list" title="Historial de ventas" list={sales} showDate onReport={list => void makeReport(list)} />
+        <button type="button" onClick={() => openModal('forgotten-sale-modal')} className="mt-3 w-full py-2.5 rounded-xl btn-ghost text-xs font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Agregar una venta olvidada</button>
         {sales.length === 0 && <Empty id="no-sales" icon={<Receipt className="w-8 h-8 mx-auto text-[#7c43ba] mb-3" />} title="Sin ventas aún" text="Registra ventas desde el detalle de cada producto" />}
         <div className="mt-6 flex gap-2 flex-wrap">
-          <button id="make-report" onClick={makeReport} disabled={reportBusy || !sales.length} className="btn-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" /> {reportBusy ? 'Numerando...' : 'Generar informe numerado'}</button>
+          <button id="make-report" onClick={() => void makeReport()} disabled={reportBusy || !sales.length} className="btn-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" /> {reportBusy ? 'Numerando...' : 'Generar informe numerado'}</button>
         </div>
         {report && (
           <div id="report-ready" className="mt-3 p-4 rounded-2xl border-2 border-[#7c43ba] bg-[#f6f1f8]">
-            <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">Informe de ventas</p>
+            <p className="text-[11px] uppercase tracking-[.15em] font-bold text-[#756c7e]">{report.list ? 'Informe personalizado (ventas elegidas)' : 'Informe de ventas'}</p>
             <p className="font-mono font-black text-xl text-[#201728]">{report.code ? `N° ${report.code}` : 'Sin número (sin conexión)'}</p>
-            <p className="text-xs text-[#756c7e] mt-0.5">{sales.length} ventas · {formatUSD(sumBy(sales, 'actual_price'))}</p>
+            <p className="text-xs text-[#756c7e] mt-0.5">{repList.length} ventas · {formatUSD(sumBy(repList, 'actual_price'))}{repList.some(x => x.note) ? ` · ${repList.filter(x => x.note).length} con observación` : ''}</p>
             <div className="grid grid-cols-3 gap-2 mt-3">
-              <button type="button" onClick={() => exportSalesXLSX(report.code || undefined)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
-              <button type="button" onClick={() => exportSalesCSV(report.code || undefined)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileText className="w-4 h-4" /> CSV</button>
-              <button type="button" onClick={() => shareSalesReport(report.code || 'sin-numero')} className="py-2.5 rounded-xl bg-[#25D366] text-white text-xs font-bold flex flex-col items-center gap-0.5"><Share2 className="w-4 h-4" /> Compartir</button>
+              <button type="button" onClick={() => exportSalesXLSX(report.code || undefined, report.list)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+              <button type="button" onClick={() => exportSalesCSV(report.code || undefined, report.list)} className="py-2.5 rounded-xl btn-ghost text-xs font-bold flex flex-col items-center gap-0.5"><FileText className="w-4 h-4" /> CSV</button>
+              <button type="button" onClick={() => shareSalesReport(report.code || 'sin-numero', report.list)} className="py-2.5 rounded-xl bg-[#25D366] text-white text-xs font-bold flex flex-col items-center gap-0.5"><Share2 className="w-4 h-4" /> Compartir</button>
             </div>
             <p className="text-[10px] text-[#756c7e] mt-2">Si no te sirve, simplemente no lo descargues: el número queda registrado en "Recibos y cierres".</p>
           </div>

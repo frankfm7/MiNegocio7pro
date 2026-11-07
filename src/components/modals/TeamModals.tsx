@@ -12,7 +12,7 @@ let reloadTeam: () => void = () => {};
 let lastInvite: { code: string; role: Role } | null = null;
 
 const ROLE_STYLE: Record<string, [string, string]> = {
-  admin: ['👑', '#7c43ba'], coadmin: ['⭐', '#d97706'], supervisor: ['📊', '#3875a5'], vendedor: ['👤', '#23805d'],
+  admin: ['👑', '#7c43ba'], coadmin: ['⭐', '#d97706'], supervisor: ['📊', '#3875a5'], vendedor: ['👤', '#23805d'], eventual: ['⏳', '#be416d'],
 };
 
 /** En línea = la app abierta en los últimos ~2 minutos (la app avisa cada minuto) */
@@ -128,6 +128,7 @@ export function TeamModal() {
                       {blocked && <span className="text-[10px] bg-[#a43658] text-white px-2 py-0.5 rounded-full font-bold">Bloqueado</span>}
                     </div>
                     <p className="text-[11px] text-[#756c7e] truncate">{m.email} · {roleLabel(m.role)}</p>
+                    {m.role === 'eventual' && m.access_until && <p className={`text-[10px] font-bold ${new Date(m.access_until) < new Date() ? 'text-[#a43658]' : 'text-[#be416d]'}`}>{new Date(m.access_until) < new Date() ? '⏳ Acceso vencido' : `⏳ Acceso hasta el ${new Date(m.access_until).toLocaleDateString('es', { day: 'numeric', month: 'long' })}`}</p>}
                     <div className="mt-1"><Presence iso={isMe ? new Date().toISOString() : m.last_seen} /></div>
                   </div>
                   {!isMe && <button onClick={() => { selectedMember = m; openModal('team-user-menu-modal'); }} className="w-9 h-9 rounded-full hover:bg-[#f1ecf4] grid place-items-center flex-shrink-0"><MoreVertical className="w-4 h-4" /></button>}
@@ -150,6 +151,7 @@ export function InviteModal() {
   const [role, setRole] = useState<Role>('vendedor');
   const [days, setDays] = useState(7);
   const [uses, setUses] = useState(1);
+  const [accessDays, setAccessDays] = useState(3);
   const [code, setCode] = useState<string | null>(null);
   const [qr, setQr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -159,7 +161,7 @@ export function InviteModal() {
   const generate = async () => {
     setBusy(true);
     try {
-      const c = await createInvite(role, days, uses);
+      const c = await createInvite(role, days, uses, accessDays);
       lastInvite = { code: c, role };
       setCode(c);
       setQr(await QRCode.toDataURL(inviteLink(c), { width: 220, margin: 1 }));
@@ -179,11 +181,21 @@ export function InviteModal() {
               <label className="block font-bold text-sm mb-1.5">Rol</label>
               <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full input-field rounded-xl p-3">
                 <option value="vendedor">👤 Vendedor — vende, no ve costos ni edita</option>
+                <option value="eventual">⏳ Vendedor eventual — como vendedor, solo por unos días</option>
                 <option value="supervisor">📊 Supervisor — vende y ve informes</option>
-                <option value="coadmin">⭐ Co-Administrador — gestiona productos y equipo</option>
-                {myRole === 'admin' && <option value="admin">👑 Administrador</option>}
+                <option value="coadmin">⭐ Administrador — gestiona productos y equipo</option>
+                {myRole === 'admin' && <option value="admin">👑 Dueño — control total</option>}
               </select>
+              <p className="text-[11px] text-[#756c7e] mt-1">Todos ven el <b>QR de cobro del dueño</b> para cobrar a nombre de la tienda.</p>
             </div>
+            {role === 'eventual' && (
+              <div><label className="block font-bold text-sm mb-1.5">¿Por cuántos días tendrá acceso?</label>
+                <select value={accessDays} onChange={e => setAccessDays(Number(e.target.value))} className="w-full input-field rounded-xl p-3">
+                  {[1, 2, 3, 5, 7, 15, 30].map(d => <option key={d} value={d}>{d} {d === 1 ? 'día' : 'días'} desde que entra</option>)}
+                </select>
+                <p className="text-[11px] text-[#756c7e] mt-1">Al terminar, su acceso se cierra solo. Puedes ampliarlo en “Cambiar rol”.</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block font-bold text-sm mb-1.5">Vence en</label>
                 <select value={days} onChange={e => setDays(Number(e.target.value))} className="w-full input-field rounded-xl p-3">
@@ -249,11 +261,15 @@ export function TeamChangeRoleModal() {
   const myRole = useStore(s => s.currentUser.role);
   const m = open ? selectedMember : null;
   const [role, setRole] = useState<Role>('vendedor');
+  const [accessDays, setAccessDays] = useState(3);
   useEffect(() => { if (m) setRole(m.role); }, [m]);
 
   const confirmRole = async () => {
     if (!m) return;
-    try { await updateMember(m.user_id, { role }); toast('Rol actualizado'); closeModal('team-change-role-modal'); reloadTeam(); }
+    const patch: Parameters<typeof updateMember>[1] = { role };
+    if (role === 'eventual') patch.access_until = new Date(Date.now() + accessDays * 86400000).toISOString();
+    else if (m.access_until) patch.access_until = null;
+    try { await updateMember(m.user_id, patch); toast(role === 'eventual' ? `Acceso por ${accessDays} días ✓` : 'Rol actualizado'); closeModal('team-change-role-modal'); reloadTeam(); }
     catch (e) { toast((e as Error).message, 3500); }
   };
 
@@ -264,9 +280,14 @@ export function TeamChangeRoleModal() {
           <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Cambiar rol</h3><CloseButton onClick={() => closeModal('team-change-role-modal')} /></div>
           <div className="mb-4 p-3 rounded-xl bg-[#f6f1f8]"><p className="font-bold text-sm">{m.name}</p></div>
           <select value={role} onChange={e => setRole(e.target.value as Role)} className="w-full input-field rounded-xl p-3 mb-4">
-            {myRole === 'admin' && <option value="admin">👑 Administrador</option>}
-            <option value="coadmin">⭐ Co-Administrador</option><option value="supervisor">📊 Supervisor</option><option value="vendedor">👤 Vendedor</option>
+            {myRole === 'admin' && <option value="admin">👑 Dueño</option>}
+            <option value="coadmin">⭐ Administrador</option><option value="supervisor">📊 Supervisor</option><option value="vendedor">👤 Vendedor</option><option value="eventual">⏳ Vendedor eventual</option>
           </select>
+          {role === 'eventual' && (
+            <select value={accessDays} onChange={e => setAccessDays(Number(e.target.value))} className="w-full input-field rounded-xl p-3 mb-4">
+              {[1, 2, 3, 5, 7, 15, 30].map(d => <option key={d} value={d}>Acceso por {d} {d === 1 ? 'día' : 'días'} desde hoy</option>)}
+            </select>
+          )}
           <div className="flex gap-2">
             <button onClick={() => closeModal('team-change-role-modal')} className="flex-1 py-2.5 rounded-xl btn-ghost font-bold text-sm">Cancelar</button>
             <button onClick={confirmRole} className="flex-1 py-2.5 rounded-xl btn-primary font-bold text-sm">Confirmar</button>
