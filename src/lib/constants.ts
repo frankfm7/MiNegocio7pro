@@ -25,7 +25,7 @@ export const CONTENT_UNITS = [
 
 export const APP_NAME = 'MiNegocio7pro';
 export const APP_SHORT_NAME = 'N7pro';
-export const APP_VERSION = '2.4';
+export const APP_VERSION = '2.5';
 export const AVATAR_KEY = 'mc7_avatar';
 
 /** Portada generada con el color del catálogo (funciona sin internet) */

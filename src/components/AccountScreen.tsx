@@ -195,9 +195,9 @@ export default function AccountScreen() {
   const visible = useStore(s => s.accountVisible);
   const reason = useStore(s => s.accountReason);
   const authUser = useStore(s => s.authUser);
-  if (!visible) return null;
   const close = () => setState({ accountVisible: false, accountReason: '' });
   useBackClose('account', visible, close);
+  if (!visible) return null;
 
   return (
     <section id="login-screen" className="login-screen overflow-y-auto items-start sm:items-center py-6">

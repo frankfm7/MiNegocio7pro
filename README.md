@@ -74,7 +74,16 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v2.4
+## 4a. Novedades v2.5
+
+1. **Etiquetas: lo elegido ya no se reinicia solo.** Causa: la app se sincroniza con la nube cada 30 segundos y trae
+   una copia nueva de catálogos y productos; la ventana de etiquetas lo tomaba como "recién abierta" y volvía a
+   *Todos* y a la selección inicial. Ahora se reinicia solo al abrirla; con datos nuevos conserva el catálogo,
+   los productos marcados y las cantidades (solo quita los productos que se borraron).
+2. **Corregido (error de la v2.4)**: la pantalla *Iniciar sesión / Cambiar de tienda* no se abría (la app mostraba
+   un error). Revisadas todas las ventanas con el botón atrás: ninguna tenía otro caso.
+
+## 4a·1. Novedades v2.4
 
 1. **Etiquetas "Solo QR + nombre"**: siempre usan la hoja ajustada al QR (antes podía quedar elegida la hoja de
    38 × 25 mm). Etiqueta = QR + 4 mm de ancho (19 mm con QR de 15 mm) y QR + 8,5 mm de alto, QR centrado,

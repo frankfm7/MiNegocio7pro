@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Loader, Minus, Plus, Printer, Search } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, setState, toast, useStore } from '../../store';
@@ -38,13 +38,21 @@ export default function LabelsModal() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [q, setQ] = useState('');
 
+  // Se reinicia SOLO al abrir la ventana. La app se sincroniza con la nube cada 30 segundos y trae
+  // una copia nueva de catálogos y productos: eso ya NO borra lo que elegiste (antes volvía a "Todos").
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    const opening = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!opening) return;
     setScope(productId ? 'one' : 'all');
-    setCatalogId(catalogs[0]?.id || '');
+    setCatalogId(id => (catalogs.some(c => c.id === id) ? id : catalogs[0]?.id || ''));
     setPrinted(loadPrinted());
     setQ('');
-  }, [open, productId, catalogs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, productId]);
+  // Si el catálogo elegido se borró, se pasa al primero (si sigue existiendo, no se toca)
+  useEffect(() => { if (catalogId && !catalogs.some(c => c.id === catalogId)) setCatalogId(catalogs[0]?.id || ''); }, [catalogs, catalogId]);
 
   // "Solo QR + nombre" usa siempre la hoja ajustada al QR (etiqueta = QR + 4 mm, QR centrado)
   const preset = layout === 'qrname' ? LABEL_PRESETS.find(p => p.id === AUTO_PRESET_ID)! : LABEL_PRESETS.find(p => p.id === presetId && p.id !== AUTO_PRESET_ID) || LABEL_PRESETS.find(p => p.id === 'a4-24')!;
@@ -57,13 +65,23 @@ export default function LabelsModal() {
   const perStock = (stock: number) => Math.max(1, Math.min(Number(stock) || 1, 200));
 
   // Al cambiar la lista o la cantidad: se marcan los que AÚN NO tienen etiqueta impresa
+  // La selección se arma de nuevo solo cuando TÚ cambias de dónde (todos / catálogo / stock bajo) o la cantidad.
+  // Cuando llegan datos nuevos de la nube se conserva lo marcado (solo se quitan productos borrados).
+  const pickKey = open ? [scope, scope === 'catalog' ? catalogId : '', copies, productId || ''].join('|') : '';
+  const lastKey = useRef('');
   useEffect(() => {
-    if (!open) return;
+    if (!open) { lastKey.current = ''; return; }
+    if (lastKey.current === pickKey) {
+      setCounts(c => { const ids = new Set(list.map(r => r.id)); const n = Object.fromEntries(Object.entries(c).filter(([id]) => ids.has(id))); return Object.keys(n).length === Object.keys(c).length ? c : n; });
+      return;
+    }
+    lastKey.current = pickKey;
     const pr = loadPrinted();
     const fresh = list.filter(r => !pr[r.id]);
     const pick = scope === 'one' || !fresh.length ? list : fresh;
     setCounts(Object.fromEntries(pick.map(r => [r.id, copies === 'stock' ? perStock(r.stock) : 1])));
-  }, [open, list, copies, scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pickKey, list]);
 
   const shown = useMemo(() => (q.trim() ? searchProducts(list, q) : list), [list, q]);
   const chosen = list.filter(r => (counts[r.id] || 0) > 0);
