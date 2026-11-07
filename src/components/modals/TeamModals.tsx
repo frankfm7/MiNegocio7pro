@@ -172,7 +172,7 @@ export function InviteModal() {
   const copy = (text: string, msg: string) => navigator.clipboard.writeText(text).then(() => toast(msg)).catch(() => toast('No se pudo copiar'));
 
   return (
-    <Modal id="invite-modal" className="z-[60] bg-[#1e1427]/70" closeOnBackdrop={false}>
+    <Modal id="invite-modal" className="z-[60] bg-[#1e1427]/70">
       <article className="modal-card w-full max-w-md bg-white rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Invitar al equipo</h2><CloseButton onClick={() => closeModal('invite-modal')} /></div>
         {!code ? (
@@ -274,7 +274,7 @@ export function TeamChangeRoleModal() {
   };
 
   return (
-    <Modal id="team-change-role-modal" className="z-[70] bg-[#1e1427]/70" closeOnBackdrop={false}>
+    <Modal id="team-change-role-modal" className="z-[70] bg-[#1e1427]/70">
       {m && (
         <article className="modal-card w-full max-w-sm bg-white rounded-3xl p-5">
           <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Cambiar rol</h3><CloseButton onClick={() => closeModal('team-change-role-modal')} /></div>

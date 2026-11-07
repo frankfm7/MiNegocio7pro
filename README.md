@@ -74,7 +74,18 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v2.3
+## 4a. Novedades v2.4
+
+1. **Etiquetas "Solo QR + nombre"**: siempre usan la hoja ajustada al QR (antes podía quedar elegida la hoja de
+   38 × 25 mm). Etiqueta = QR + 4 mm de ancho (19 mm con QR de 15 mm) y QR + 8,5 mm de alto, QR centrado,
+   márgenes mínimos; el nombre se achica hasta entrar en 2 líneas sin salirse del borde. 10 por fila, 120 por hoja.
+2. **Botón atrás del celular y tocar fuera**: todas las ventanas, paneles y visores (detalle, ventas, formulario de
+   producto, menú lateral, cuenta, editor de fotos, visores de imagen y QR, cámara, menú ⋮ del detalle, selección
+   múltiple, catálogo público) se anotan en `src/lib/backClose.ts`. *Atrás* cierra solo la de encima y la pantalla
+   de atrás no se mueve; si no hay nada abierto, navega como antes. Todas las ventanas se cierran tocando fuera
+   (la vista previa de una importación pregunta antes de descartar la lista).
+
+## 4a·1. Novedades v2.3
 
 1. **QR de texto**: el QR del producto ya no es un enlace. Con cualquier celular sin la app solo se ve
    `PERFUME FLORAL - ESIKA - 100 ML - REF 12345678` (sin abrir la web). El escáner de la app lee el `REF` y abre el producto.

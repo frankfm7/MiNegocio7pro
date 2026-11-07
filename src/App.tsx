@@ -23,6 +23,7 @@ import ProductsScreen from './screens/ProductsScreen';
 import { DailySalesScreen, LowStockScreen, OutOfStockScreen, ReportsScreen } from './screens/SalesScreens';
 import CashCloseScreen from './screens/CashCloseScreen';
 import MessagesScreen from './screens/MessagesScreen';
+import { closeTopOverlay } from './lib/backClose';
 import { refreshUnread, watchMessages } from './lib/messages';
 import CustomersScreen from './screens/CustomersScreen';
 import PriceHistoryModal from './components/modals/PriceHistoryModal';
@@ -97,11 +98,8 @@ function useEscapeKey() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      const s = getState();
-      if (s.imageLightbox) { setState({ imageLightbox: null }); return; }
-      s.closeAllModals();
-      closeForm();
-      setState({ sidebarOpen: false, qrLightbox: null });
+      // Escape (teclado) = botón atrás: cierra solo la ventana de encima
+      closeTopOverlay();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -118,7 +116,10 @@ function useBackButton() {
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
       const s = getState();
-      if (s.imageLightbox) { setState({ imageLightbox: null }); history.pushState(e.state, ''); return; }
+      // Hay una ventana, panel o visor abierto: se cierra SOLO ese y lo de atrás se queda como estaba
+      if (closeTopOverlay()) { history.pushState(e.state, ''); return; }
+      // Cualquier ventana que no se haya anotado (por si acaso): se cierran sin mover la pantalla
+      if (Object.values(s.modals).some(Boolean) || s.formOpen || s.sidebarOpen) { s.closeAllModals(); closeForm(); setState({ sidebarOpen: false }); history.pushState(e.state, ''); return; }
       const st = e.state as { view?: string; catalogId?: string | null } | null;
       if (st?.view) setState({ currentView: st.view as typeof s.currentView, currentCatalogId: st.catalogId ?? null });
       else setState({ currentView: 'catalogs', currentCatalogId: null });

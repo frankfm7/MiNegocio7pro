@@ -104,7 +104,7 @@ export function ImportPreviewModal() {
   const app = useStore(s => s.appCurrency);
   const [saving, setSaving] = useState(false);
   const [adj, setAdj] = useState<Adjust>(loadAdjust);
-  if (!pv) return <Modal id="import-preview-modal" closeOnBackdrop={false}>{null}</Modal>;
+  if (!pv) return <Modal id="import-preview-modal">{null}</Modal>;
 
   const normalizeName = (n: string) => n.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const update = (key: string, patch: Record<string, unknown>) =>
@@ -154,7 +154,7 @@ export function ImportPreviewModal() {
   const conv = (v: unknown) => (k !== 1 && Number(v) ? ` → ${formatUSDShort(Number(v) * k)} ${app}` : '');
 
   return (
-    <Modal id="import-preview-modal" className="z-[70] bg-[#1e1427]/70" closeOnBackdrop={false}>
+    <Modal id="import-preview-modal" className="z-[70] bg-[#1e1427]/70" confirmClose={() => confirm('¿Salir sin guardar? Se perderá la lista leída de la factura.')} onClose={() => setState({ importPreview: null })}>
       <article className="modal-card w-full min-w-0 max-w-[min(48rem,calc(100vw-2rem))] bg-white rounded-3xl max-h-[94vh] flex flex-col overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-[#ede7f0] flex justify-between items-start gap-3">
           <div className="min-w-0">

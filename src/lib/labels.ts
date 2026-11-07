@@ -15,13 +15,14 @@ export interface LabelPreset {
 /** Hoja A4 ajustada al tamaño del QR: etiquetas justas, sin espacio de más (≈10 por fila con QR de 1,5 cm) */
 export const AUTO_PRESET_ID = 'a4-auto';
 export function autoPreset(qrMm = 15): LabelPreset {
-  const w = Math.max(qrMm + 4.5, 16), h = qrMm + 10;
+  // Ancho = QR + 4 mm (2 mm de cada lado): con QR de 15 mm la etiqueta mide 19 mm. Alto = QR + texto
+  const w = Math.max(qrMm + 4, 14), h = qrMm + 8.5;
   const cols = Math.max(1, Math.floor(200 / w)), rows = Math.max(1, Math.floor(285 / h));
   return { id: AUTO_PRESET_ID, name: 'Hoja A4 · ajustada al QR', w, h, grid: { cols, rows, marginX: (210 - cols * w) / 2, marginY: (297 - rows * h) / 2 } };
 }
 
 export const LABEL_PRESETS: LabelPreset[] = [
-  { id: AUTO_PRESET_ID, name: 'Hoja A4 · ajustada al QR (≈10 por fila, solo QR + nombre)', w: 19.5, h: 25, grid: { cols: 10, rows: 11, marginX: 7.5, marginY: 11 } },
+  { id: AUTO_PRESET_ID, name: 'Hoja A4 · ajustada al QR (≈10 por fila, solo QR + nombre)', w: 19, h: 23.5, grid: { cols: 10, rows: 12, marginX: 10, marginY: 7.5 } },
   { id: 'a4-24', name: 'Hoja A4 · 24 etiquetas (63 × 34 mm)', w: 63, h: 34, grid: { cols: 3, rows: 8, marginX: 10.5, marginY: 12.5 } },
   { id: 'a4-12', name: 'Hoja A4 · 12 etiquetas grandes (63 × 68 mm)', w: 63, h: 68, grid: { cols: 3, rows: 4, marginX: 10.5, marginY: 12.5 } },
   { id: 'a4-32', name: 'Hoja A4 · 32 etiquetas, 4 por fila (48,5 × 34 mm)', w: 48.5, h: 33.9, grid: { cols: 4, rows: 8, marginX: 8, marginY: 13 } },
@@ -146,15 +147,18 @@ const PT = 0.3528; // 1 punto tipográfico en mm
  */
 function drawQrName(doc: Doc, r: Product, qr: string, x: number, y: number, p: LabelPreset, opt: LabelOptions) {
   // Márgenes chicos: el QR y el texto aprovechan casi toda la etiqueta
-  const pad = Math.max(0.6, Math.min(1.4, p.h * 0.04));
+  const pad = Math.max(0.5, Math.min(1.4, p.h * 0.03));
   const innerW = p.w - pad * 2;
-  const nameFs = p.h >= 40 ? 9 : p.h >= 30 ? 7.5 : p.w < 24 ? 5.4 : 6.2;
-  const subFs = Math.max(4.4, nameFs - 1.2);
+  // El nombre se achica hasta entrar en 2 líneas dentro del ancho de la etiqueta (nunca se sale del borde)
+  let nameFs = p.h >= 40 ? 9 : p.h >= 30 ? 7.5 : p.w < 24 ? 5.6 : 6.2;
+  doc.setFont('helvetica', 'bold');
+  while (nameFs > 4.4) { doc.setFontSize(nameFs); if ((doc.splitTextToSize(r.name, innerW) as string[]).length <= 2) break; nameFs -= 0.2; }
+  const subFs = Math.max(4.2, Math.min(nameFs - 0.8, 5.2));
   const lineN = nameFs * PT * 1.12, lineS = subFs * PT * 1.15;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(nameFs);
   let nameLines = doc.splitTextToSize(r.name, innerW) as string[];
   const sub = [r.brand, formatContent(r)].filter(Boolean).join(' · ');
-  const gap = 0.8;
+  const gap = 0.5;
   const textH = (n: number) => n * lineN + (sub ? lineS : 0);
   // El QR ocupa lo que quede; si con 2 líneas de nombre el QR queda muy chico, se usa 1 línea
   const maxQr = Math.min(opt.qrMm || 99, innerW);

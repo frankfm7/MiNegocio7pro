@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackClose } from '../lib/backClose';
 import { create } from 'zustand';
 import { Brush, Crop, Eraser, FlipHorizontal, Hand, Loader, RotateCcw, RotateCw, Sparkles, Sun, Undo2, Wand2, X } from 'lucide-react';
 import {
@@ -38,6 +39,8 @@ export default function ImageEditor() {
 }
 
 function EditorInner({ src }: { src: string }) {
+  // Botón atrás del celular = Cancelar el editor
+  useBackClose('image-editor', true, () => close(null));
   const initial = useEditor(s => s.initial);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);

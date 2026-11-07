@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useBackClose } from '../../lib/backClose';
 import { AlertTriangle, Copy, FileText, Minus, Plus, Save, Share2, ShoppingBag, Trash2, X } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import NumField from '../NumField';
@@ -23,6 +24,8 @@ export function NotaBar() {
   const sel = useStore(s => s.notaSel);
   const open = useStore(s => !!s.modals['nota-modal']);
   const isAdmin = useStore(s => s.isAdmin());
+  // Atrás con productos elegidos: se quita la selección (no se sale del catálogo)
+  useBackClose('nota-sel', sel.length > 0 && !open, () => setState({ notaSel: [] }));
   if (!sel.length || open) return null;
   const btn = 'py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5';
   return (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { installBackHandler, useBackClose } from './lib/backClose';
 import { BookOpen, ChevronLeft, ChevronRight, Clock, MapPin, MessageCircle, Minus, Plus, Search, Send, ShoppingCart, Truck, X } from 'lucide-react';
 import { fetchPublicImages, fetchPublicShop, magPageUrl as pageUrl, sendOrderToStore, type PublicShopData } from './lib/publicShop';
 import { fallback } from './lib/constants';
@@ -36,6 +37,13 @@ export default function PublicShop({ slug }: { slug: string }) {
   const [sending, setSending] = useState(false);
   const loadedImgs = useRef(new Set<string>());
   useEffect(() => { try { localStorage.setItem(magKey, JSON.stringify(magLines)); } catch { /* sin espacio */ } }, [magLines, magKey]);
+  // Botón atrás del celular: cierra el panel de encima (pedido, revista, formulario) sin salir del catálogo
+  useEffect(() => installBackHandler(), []);
+  useBackClose('shop-order', open, () => setOpen(false));
+  useBackClose('shop-magazine', !!mag, () => { setMag(null); setAsking(false); });
+  useBackClose('shop-ask', asking, () => setAsking(false));
+  useBackClose('shop-sent', !!sent, () => setSent(''));
+  useBackClose('shop-tab', tab === 'revistas', () => setTab('productos'));
 
   useEffect(() => {
     fetchPublicShop(slug).then(setData).catch(e => {

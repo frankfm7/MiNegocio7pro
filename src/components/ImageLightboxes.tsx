@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useBackClose } from '../lib/backClose';
 import { X } from 'lucide-react';
 import { setState, useStore } from '../store';
 
@@ -9,8 +10,9 @@ import { setState, useStore } from '../store';
 export function ProductImageLightbox() {
   const img = useStore(s => s.imageLightbox);
   const lastTap = useRef(0);
-  if (!img) return null;
   const close = () => setState({ imageLightbox: null });
+  useBackClose('image-lightbox', !!img, close);
+  if (!img) return null;
   const onTap = () => {
     const now = Date.now();
     if (now - lastTap.current < 400) { lastTap.current = 0; close(); } else lastTap.current = now;
@@ -30,6 +32,7 @@ export function ProductImageLightbox() {
 /** Visor del QR de cobro a pantalla completa */
 export function QrLightbox() {
   const qr = useStore(s => s.qrLightbox);
+  useBackClose('qr-lightbox', !!qr, () => setState({ qrLightbox: null }));
   return (
     <div id="qr-lightbox" className={`fixed inset-0 z-[10000] bg-black/95 flex-col items-center justify-center p-4 ${qr ? '' : 'hidden'}`} onClick={() => setState({ qrLightbox: null })}>
       <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 text-white grid place-items-center hover:bg-white/30 transition"><X className="w-6 h-6" /></button>

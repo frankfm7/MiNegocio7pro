@@ -93,6 +93,7 @@ interface Section { icon: typeof Cloud; title: string; intro?: string; steps: St
 /** Guía completa, por temas. Cada tema se abre y se cierra tocándolo. */
 const GUIDE: Section[] = [
   { icon: Rocket, title: 'Primeros pasos', intro: 'Puedes usar la app sin cuenta o con tu tienda en la nube.', steps: [
+    'Ventanas: se cierran tocando **fuera** de ellas, con la ✕ o con el botón **atrás** del celular. Atrás cierra solo la ventana de encima; lo que está detrás no se mueve.',
     'Sin cuenta: todo se guarda solo en este celular o computadora. Nadie más ve tus datos.',
     'Con cuenta: toca **Entrar** (arriba a la derecha) → Google o correo → **Crear mi propia tienda**. Tus datos quedan en la nube y en todos tus dispositivos.',
     'Si ya tenías datos sin cuenta, al crear la tienda la app te ofrece subirlos.',
@@ -200,7 +201,7 @@ const GUIDE: Section[] = [
   { icon: QrCode, title: 'QR, etiquetas y cobro', steps: [
     'El **QR del producto** es texto, no un enlace: con la cámara de cualquier celular solo se lee *PERFUME FLORAL - ESIKA - 100 ML - REF 12345678* (nombre, empresa y contenido), sin abrir ninguna página. Con el **escáner de la app** se abre el producto al instante. Es chico como el de las revistas (25 a 29 cuadritos). Los QR antiguos siguen funcionando.',
     'El **código de barras** de la etiqueta es corto (8 números) y de barras gruesas; si el producto tiene su propio código de barras, se usa ese.',
-    'Menú ☰ → **Etiquetas (QR + barras)**: elige de dónde (todos, un catálogo, stock bajo), luego **marca producto por producto** y cuántas etiquetas de cada uno. Los ya impresos quedan con ✓ y el botón **Sin imprimir** elige solo los nuevos. Hay hojas A4 **ajustada al QR** (≈10 por fila y 110 por hoja con QR de 1,5 cm, para *Solo QR + nombre*), de 24, 32 (4 por fila), 40, 55 mini (38 × 25 mm) y 65 etiquetas, y tamaños de impresora térmica.',
+    'Menú ☰ → **Etiquetas (QR + barras)**: elige de dónde (todos, un catálogo, stock bajo), luego **marca producto por producto** y cuántas etiquetas de cada uno. Los ya impresos quedan con ✓ y el botón **Sin imprimir** elige solo los nuevos. Con *Solo QR + nombre* la hoja A4 se **ajusta al QR**: cada etiqueta mide el QR + 4 mm de ancho (19 mm con QR de 1,5 cm), con el QR centrado: 10 por fila y 120 por hoja. En *Completa* hay hojas A4, de 24, 32 (4 por fila), 40, 55 mini (38 × 25 mm) y 65 etiquetas, y tamaños de impresora térmica.',
     '**Diseño**: *Completa* (QR + nombre + precio + código de barras) o *Solo QR + nombre* (el nombre, la marca y los ml o g arriba o abajo del QR; ideal para la hoja mini de 38 × 25 mm). El **tamaño del QR** se elige con la barra (1,5 cm recomendado).',
     'Menú ☰ → **QR de cobro**: sube el QR de tu banco o billetera para mostrarlo al cobrar. El **QR del dueño** lo ven todos en el equipo (administradores, supervisores y vendedores) para cobrar a nombre de la tienda.',
   ] },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useBackClose } from '../lib/backClose';
 import { Camera, Download, Image as ImageIcon, Printer, ScanLine, SlidersHorizontal, X } from 'lucide-react';
 import { getState, setState, toast, useStore } from '../store';
 import { closeForm, openBarcodeScanner } from '../actions';
@@ -38,6 +39,7 @@ function fromProduct(r: Product): FormState {
 
 export default function ProductFormDrawer() {
   const open = useStore(s => s.formOpen);
+  useBackClose('form', open, () => closeForm());
   const editing = useStore(s => s.editing);
   const catalogs = useStore(s => s.catalogs);
   const scanned = useStore(s => s.scannedBarcodeForForm);

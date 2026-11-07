@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBackClose } from '../lib/backClose';
 import {
   AlertCircle, AlertTriangle, BellOff, Plus, Check, CheckCircle, Copy, CreditCard, Share2, Trash2, X, DollarSign, FileDown, FileSpreadsheet, FileText, QrCode, Receipt, Table, Target, TrendingUp, Wallet,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ function SalesList({ id, title, list, showDate, onReport }: { id: string; title:
   useEffect(() => { setSel(prev => { const ids = new Set(list.map(s => s.id)); const next = new Set([...prev].filter(x => ids.has(x))); return next.size === prev.size ? prev : next; }); }, [list]);
   const chosen = list.filter(s => sel.has(s.id));
   const exit = () => setSel(new Set());
+  useBackClose(`sales-sel:${id}`, mode, exit);
   const toggle = (sid: string) => setSel(prev => { const n = new Set(prev); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const all = chosen.length === list.length && list.length > 0;
   const remove = async () => { if (await deleteSalesWithConfirm(chosen)) exit(); };

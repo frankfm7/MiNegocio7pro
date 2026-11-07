@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useBackClose } from '../lib/backClose';
 import {
   ArrowLeft, Check, Cloud, Eye, EyeOff, KeyRound, Loader, LogIn, LogOut, Mail, Smartphone, Store, Ticket, UserPlus,
 } from 'lucide-react';
@@ -196,6 +197,7 @@ export default function AccountScreen() {
   const authUser = useStore(s => s.authUser);
   if (!visible) return null;
   const close = () => setState({ accountVisible: false, accountReason: '' });
+  useBackClose('account', visible, close);
 
   return (
     <section id="login-screen" className="login-screen overflow-y-auto items-start sm:items-center py-6">

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useBackClose } from '../lib/backClose';
 import {
   AlertCircle, AlertTriangle, BarChart3, BookOpen, Wallet, Contact, Globe, Tag, Cloud, Download, FileUp, HelpCircle, Key, LogOut, Moon, MoreVertical,
   Package, Phone, QrCode, RefreshCw, Scan, ScanLine, ShieldCheck, ShoppingCart, Smartphone, Store, Sun, TrendingUp, Tv2, User, Users,
@@ -61,6 +62,7 @@ export default function Sidebar() {
   }, [menuOpen]);
 
   const close = () => setState({ sidebarOpen: false });
+  useBackClose('sidebar', open, close);
   const go = (view: View) => navigate(view);
   // Primero cierra el sidebar, luego abre el modal con un pequeño retraso
   const later = (fn: () => void) => { close(); setTimeout(() => requestAnimationFrame(fn), 150); };

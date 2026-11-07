@@ -1,4 +1,5 @@
 import { toast } from '../store';
+import { registerBack, unregisterBack } from './backClose';
 
 export interface CaptureOptions {
   filename?: string;
@@ -81,6 +82,7 @@ export async function captureFromCamera(opts: CaptureOptions | string = {}): Pro
     attach(stream);
 
     const cleanup = (file: File | null) => {
+      unregisterBack('camera');
       stream.getTracks().forEach(t => t.stop());
       root.remove();
       document.body.style.overflow = '';
@@ -88,6 +90,7 @@ export async function captureFromCamera(opts: CaptureOptions | string = {}): Pro
       resolve(file);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') cleanup(null); };
+    registerBack('camera', () => cleanup(null));
     window.addEventListener('keydown', onKey);
 
     root.querySelector<HTMLButtonElement>('.cam-close')!.onclick = () => cleanup(null);
@@ -167,7 +170,10 @@ function nativeCapture(o: CaptureOptions, why: 'denied' | 'error' | 'unsupported
         <p class="cam-fallback-help">${app ? `Para usar la cámara dentro de la app, toca ⋮ y elige <b>“Abrir en Chrome”</b> (o en Safari).` : 'Para volver a usar la cámara dentro de la app: toca el candado 🔒 junto a la dirección → Permisos → Cámara → Permitir. Si la app está instalada: mantén presionado su ícono → Información de la app → Permisos → Cámara.'}</p>
       </div>`;
     document.body.appendChild(root);
-    const done = (f: File | null) => { root.remove(); resolve(f); };
+    const done = (f: File | null) => { unregisterBack('camera-fallback'); root.remove(); resolve(f); };
+    registerBack('camera-fallback', () => done(null));
+    // Tocar fuera del cuadro también cancela
+    root.addEventListener('click', e => { if (e.target === root) done(null); });
     const pick = (camera: boolean) => {
       const input = document.createElement('input');
       input.type = 'file'; input.accept = 'image/*';

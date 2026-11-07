@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackClose } from '../../lib/backClose';
 import JsBarcode from 'jsbarcode';
 import {
   Check, CheckCircle, Copy, ShoppingCart, Download, History, Info, Loader, EyeOff, Minus, MoreVertical, PackagePlus, Plus, Printer, QrCode, Share2, Tag, Trash2, X, XCircle,
@@ -26,6 +27,8 @@ export function DetailModal() {
   const [menuOpen, setMenuOpen] = useState(false);
   const photoBg = useImageBg(r?.image_url);
   const [showMin, setShowMin] = useState(false);
+  useBackClose('detail-menu', menuOpen, () => setMenuOpen(false));
+  useBackClose('detail-min', showMin, () => setShowMin(false));
   const lastDetailTap = useRef(0);
   const clientMode = useStore(s => s.clientMode);
   const taps = useRef<number[]>([]);
@@ -44,7 +47,7 @@ export function DetailModal() {
     return () => document.removeEventListener('click', close);
   }, [menuOpen]);
 
-  if (!detail || !r) return <Modal id="detail-modal" closeOnBackdrop={false}>{null}</Modal>;
+  if (!detail || !r) return <Modal id="detail-modal">{null}</Modal>;
 
   const content = formatContent(r);
   const outOfStock = Number(r.stock) < 1;
@@ -191,7 +194,7 @@ export function SaleModal() {
     }
   }, [open, r]);
 
-  if (!r) return <Modal id="sale-modal" className="z-[60] bg-[#1e1427]/70" closeOnBackdrop={false}>{null}</Modal>;
+  if (!r) return <Modal id="sale-modal" className="z-[60] bg-[#1e1427]/70">{null}</Modal>;
 
   const actual = Number(price) || Number(r.sale_price) || 0;
   const total = actual * qty;
@@ -205,7 +208,7 @@ export function SaleModal() {
   };
 
   return (
-    <Modal id="sale-modal" className="z-[60] bg-[#1e1427]/70" closeOnBackdrop={false}>
+    <Modal id="sale-modal" className="z-[60] bg-[#1e1427]/70">
       <article className="modal-card w-full max-w-md bg-white rounded-3xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4"><h2 className="font-bold text-xl hero-title">Registrar venta</h2><CloseButton onClick={() => closeModal('sale-modal')} /></div>

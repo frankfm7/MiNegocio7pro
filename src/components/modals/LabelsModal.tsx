@@ -46,7 +46,8 @@ export default function LabelsModal() {
     setQ('');
   }, [open, productId, catalogs]);
 
-  const preset = LABEL_PRESETS.find(p => p.id === presetId) || LABEL_PRESETS[0];
+  // "Solo QR + nombre" usa siempre la hoja ajustada al QR (etiqueta = QR + 4 mm, QR centrado)
+  const preset = layout === 'qrname' ? LABEL_PRESETS.find(p => p.id === AUTO_PRESET_ID)! : LABEL_PRESETS.find(p => p.id === presetId && p.id !== AUTO_PRESET_ID) || LABEL_PRESETS.find(p => p.id === 'a4-24')!;
   const list = useMemo(() => {
     const base = scope === 'one' ? records.filter(r => r.id === productId)
       : scope === 'catalog' ? records.filter(r => r.catalog_id === catalogId)
@@ -153,8 +154,8 @@ export default function LabelsModal() {
 
         <label className="block text-xs font-bold mb-1.5">Diseño</label>
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <button type="button" id="layout-full" className={chip(layout === 'full')} onClick={() => { setLayout('full'); if (presetId === AUTO_PRESET_ID) setPresetId('a4-32'); }}>Completa<span className="block font-normal text-[10px]">QR + nombre + precio + barras</span></button>
-          <button type="button" id="layout-qrname" className={chip(layout === 'qrname')} onClick={() => { setLayout('qrname'); if (layout !== 'qrname' && !['a4-55', 'a4-65', 'a4-40', AUTO_PRESET_ID].includes(presetId)) setPresetId(AUTO_PRESET_ID); }}>Solo QR + nombre<span className="block font-normal text-[10px]">nombre, marca y ml / g</span></button>
+          <button type="button" id="layout-full" className={chip(layout === 'full')} onClick={() => setLayout('full')}>Completa<span className="block font-normal text-[10px]">QR + nombre + precio + barras</span></button>
+          <button type="button" id="layout-qrname" className={chip(layout === 'qrname')} onClick={() => setLayout('qrname')}>Solo QR + nombre<span className="block font-normal text-[10px]">nombre, marca y ml / g</span></button>
         </div>
         {layout === 'qrname' && (
           <div className="flex gap-2 mb-2">
@@ -166,8 +167,8 @@ export default function LabelsModal() {
         <input id="qr-mm" type="range" min={10} max={30} step={1} value={qrMm} onChange={e => setQrMm(Number(e.target.value))} className="w-full accent-[#7c43ba] mb-0.5" />
         <p className="text-[10px] text-[#756c7e] mb-3">Si no entra en la etiqueta elegida, se achica solo lo necesario. Recomendado: 1,5 cm (se lee bien con cualquier celular).</p>
 
-        <label className="block text-xs font-bold mb-1.5">Tamaño de etiqueta</label>
-        <select value={presetId} onChange={e => setPresetId(e.target.value)} className="w-full input-field rounded-xl p-3 mb-1">{LABEL_PRESETS.filter(p => layout === 'qrname' || p.id !== AUTO_PRESET_ID).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        {layout === 'full' && <label className="block text-xs font-bold mb-1.5">Tamaño de etiqueta</label>}
+        {layout === 'full' && <select value={presetId} onChange={e => setPresetId(e.target.value)} className="w-full input-field rounded-xl p-3 mb-1">{LABEL_PRESETS.filter(p => p.id !== AUTO_PRESET_ID).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
         {preset.id === AUTO_PRESET_ID && (() => { const a = autoPreset(qrMm); return <p id="auto-info" className="text-[11px] font-bold text-[#7c43ba] mb-1">{a.grid!.cols} por fila · {a.grid!.cols * a.grid!.rows} por hoja · cada etiqueta {a.w.toFixed(1)} × {a.h.toFixed(1)} mm</p>; })()}
         <p className="text-[11px] text-[#756c7e] mb-3">{preset.grid ? 'Imprime en hoja A4 al 100 % (sin “ajustar a la página”).' : 'Una etiqueta por página: elige ese tamaño en la configuración de tu impresora térmica.'}</p>
 
