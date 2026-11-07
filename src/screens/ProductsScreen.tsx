@@ -66,7 +66,7 @@ export default function ProductsScreen() {
             <button id="back-catalogs" type="button" className="back-btn" aria-label="Volver" onClick={goBack}><ChevronLeft className="w-5 h-5" /></button>
             <label className="search rounded-full flex-1 h-10 flex items-center gap-2 px-3 min-w-0">
               <Search className="w-4 h-4 text-[#7c7384] flex-shrink-0" />
-              <input id="search-input" type="search" value={query} onChange={e => setState({ query: e.target.value })} className="bg-transparent outline-none min-w-0 flex-1 text-sm" placeholder="Buscar en este catálogo..." />
+              <input id="search-input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" value={query} onChange={e => setState({ query: e.target.value })} className="bg-transparent outline-none min-w-0 flex-1 text-sm" placeholder="Buscar en este catálogo..." />
               {query.trim() && (
                 <button type="button" onClick={() => setState({ query: '' })} className="w-7 h-7 grid place-items-center rounded-full hover:bg-[#e8dfec] transition flex-shrink-0" title="Limpiar búsqueda">
                   <X className="w-4 h-4 text-[#756c7e]" />

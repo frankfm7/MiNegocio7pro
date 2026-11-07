@@ -3,7 +3,7 @@ import { closeModal, getState, openAccount, openModal, setState, toast, type Mod
 import { SoundEffects } from './lib/sound';
 import { DB, attachReceipt, issueReceipt, syncPendingChanges } from './lib/db';
 import { formatContent, formatUSD } from './lib/format';
-import { decodeProductQR, findByShortCode, publicFromParams, shortFromParams } from './lib/qr';
+import { decodeProductQR, findByShortCode, publicFromParams, shortFromParams, shortFromPath } from './lib/qr';
 import { openStore } from './lib/session';
 import { businessName, openWhatsApp } from './lib/whatsapp';
 import { esc, htmlToImage } from './lib/htmlImage';
@@ -305,7 +305,7 @@ export function handleBarcodeScanned(code: string): boolean {
   if (product) {
     toast(`Producto: ${product.name}`);
     openDetail(product);
-  } else if (qr?.short) {
+  } else if (qr?.short && /^https?:/i.test(code.trim())) {
     toast('Este QR es de un producto de otra tienda (o de un producto que ya se borró)', 3500);
   } else if (qr) {
     // QR de un producto que no está en esta tienda: mostrar su información pública
@@ -325,7 +325,7 @@ export function handleBarcodeScanned(code: string): boolean {
  * - Si no tienes acceso, muestra la ficha pública que viene en el enlace.
  */
 export async function openProductFromLink(q: URLSearchParams) {
-  const short = shortFromParams(q);
+  const short = shortFromPath(location.pathname) || shortFromParams(q);
   if (short) {
     setState({ welcomeVisible: false, currentView: 'catalogs', currentCatalogId: null });
     let product = findByShortCode(getState().records, short.code);

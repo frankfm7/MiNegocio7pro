@@ -198,9 +198,10 @@ const GUIDE: Section[] = [
     'En modo cliente, para consultarlo sin que se note, **toca 3 veces seguidas el precio de venta**: aparece una ventanita con el **Mínimo**. Ciérrala tocando fuera o en Cerrar.',
   ] },
   { icon: QrCode, title: 'QR, etiquetas y cobro', steps: [
-    'Cada producto tiene su **QR compacto** (como los de las revistas): lleva solo el código del producto, por eso sus puntos son grandes y se lee bien aunque la etiqueta sea chica. Al escanearlo se abre la ficha **actual** del producto (con el precio al día, aunque la etiqueta sea vieja). Los QR antiguos siguen funcionando.',
+    'El **QR del producto** es texto, no un enlace: con la cámara de cualquier celular solo se lee *PERFUME FLORAL - ESIKA - 100 ML - REF 12345678* (nombre, empresa y contenido), sin abrir ninguna página. Con el **escáner de la app** se abre el producto al instante. Es chico como el de las revistas (25 a 29 cuadritos). Los QR antiguos siguen funcionando.',
     'El **código de barras** de la etiqueta es corto (8 números) y de barras gruesas; si el producto tiene su propio código de barras, se usa ese.',
-    'Menú ☰ → **Etiquetas (QR + barras)**: elige de dónde (todos, un catálogo, stock bajo), luego **marca producto por producto** y cuántas etiquetas de cada uno. Los ya impresos quedan con ✓ y el botón **Sin imprimir** elige solo los nuevos. Hay hojas A4 de 24, 40 y 65 etiquetas y tamaños de impresora térmica.',
+    'Menú ☰ → **Etiquetas (QR + barras)**: elige de dónde (todos, un catálogo, stock bajo), luego **marca producto por producto** y cuántas etiquetas de cada uno. Los ya impresos quedan con ✓ y el botón **Sin imprimir** elige solo los nuevos. Hay hojas A4 **ajustada al QR** (≈10 por fila y 110 por hoja con QR de 1,5 cm, para *Solo QR + nombre*), de 24, 32 (4 por fila), 40, 55 mini (38 × 25 mm) y 65 etiquetas, y tamaños de impresora térmica.',
+    '**Diseño**: *Completa* (QR + nombre + precio + código de barras) o *Solo QR + nombre* (el nombre, la marca y los ml o g arriba o abajo del QR; ideal para la hoja mini de 38 × 25 mm). El **tamaño del QR** se elige con la barra (1,5 cm recomendado).',
     'Menú ☰ → **QR de cobro**: sube el QR de tu banco o billetera para mostrarlo al cobrar. El **QR del dueño** lo ven todos en el equipo (administradores, supervisores y vendedores) para cobrar a nombre de la tienda.',
   ] },
   { icon: Globe, title: 'Catálogo público', steps: [

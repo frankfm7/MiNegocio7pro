@@ -176,9 +176,9 @@ export default function App() {
     initSession().then(() => {
       // Accesos directos del ícono de la app (manifest "shortcuts")
       const params = new URLSearchParams(location.search);
-      if (params.get('p') || params.get('q')) {
+      if (params.get('p') || params.get('q') || /^\/q\/\d{8}\/?$/i.test(location.pathname)) {
         openProductFromLink(params);
-        history.replaceState(null, '', location.pathname);
+        history.replaceState(null, '', '/');
         return;
       }
       const action = params.get('action');

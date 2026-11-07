@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Loader, Minus, Plus, Printer, Search } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, setState, toast, useStore } from '../../store';
-import { LABEL_PRESETS, buildLabelsPDF } from '../../lib/labels';
+import { AUTO_PRESET_ID, LABEL_PRESETS, autoPreset, buildLabelsPDF, type LabelLayout } from '../../lib/labels';
 import { getLowStockProducts } from '../../lib/selectors';
 import { datasetId } from '../../lib/db';
 import { formatContent } from '../../lib/format';
@@ -29,6 +29,9 @@ export default function LabelsModal() {
   const [showPrice, setShowPrice] = useState(true);
   const [showBarcode, setShowBarcode] = useState(true);
   const [showBorder, setShowBorder] = useState(true);
+  const [layout, setLayout] = useState<LabelLayout>(() => (localStorage.getItem('mn7_label_layout') as LabelLayout) || 'full');
+  const [textPos, setTextPos] = useState<'top' | 'bottom'>(() => (localStorage.getItem('mn7_label_textpos') as 'top' | 'bottom') || 'bottom');
+  const [qrMm, setQrMm] = useState(() => Number(localStorage.getItem('mn7_label_qrmm')) || 15);
   const [busy, setBusy] = useState(false);
   const [printed, setPrinted] = useState<Record<string, string>>({});
   /** Elegidos y cuántas etiquetas de cada uno */
@@ -77,7 +80,8 @@ export default function LabelsModal() {
     setBusy(true);
     try {
       localStorage.setItem('mc7_label_preset', preset.id);
-      const { doc, count } = await buildLabelsPDF(chosen, { preset, copies, showPrice, showBarcode, showBorder, counts });
+      localStorage.setItem('mn7_label_layout', layout); localStorage.setItem('mn7_label_textpos', textPos); localStorage.setItem('mn7_label_qrmm', String(qrMm));
+      const { doc, count } = await buildLabelsPDF(chosen, { preset, copies, showPrice, showBarcode, showBorder, counts, layout, textPos, qrMm });
       doc.save(`etiquetas_${preset.id}_${Date.now()}.pdf`);
       const now = new Date().toISOString();
       const next = { ...loadPrinted(), ...Object.fromEntries(chosen.map(r => [r.id, now])) };
@@ -147,15 +151,31 @@ export default function LabelsModal() {
           </div>
         </div>
 
+        <label className="block text-xs font-bold mb-1.5">Diseño</label>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button type="button" id="layout-full" className={chip(layout === 'full')} onClick={() => { setLayout('full'); if (presetId === AUTO_PRESET_ID) setPresetId('a4-32'); }}>Completa<span className="block font-normal text-[10px]">QR + nombre + precio + barras</span></button>
+          <button type="button" id="layout-qrname" className={chip(layout === 'qrname')} onClick={() => { setLayout('qrname'); if (layout !== 'qrname' && !['a4-55', 'a4-65', 'a4-40', AUTO_PRESET_ID].includes(presetId)) setPresetId(AUTO_PRESET_ID); }}>Solo QR + nombre<span className="block font-normal text-[10px]">nombre, marca y ml / g</span></button>
+        </div>
+        {layout === 'qrname' && (
+          <div className="flex gap-2 mb-2">
+            <button type="button" className={chip(textPos === 'top')} onClick={() => setTextPos('top')}>Nombre arriba del QR</button>
+            <button type="button" className={chip(textPos === 'bottom')} onClick={() => setTextPos('bottom')}>Nombre abajo del QR</button>
+          </div>
+        )}
+        <label className="block text-xs font-bold mb-1">Tamaño del QR: <span id="qr-mm-label" className="text-[#7c43ba]">{(qrMm / 10).toFixed(1)} cm ({qrMm} mm)</span></label>
+        <input id="qr-mm" type="range" min={10} max={30} step={1} value={qrMm} onChange={e => setQrMm(Number(e.target.value))} className="w-full accent-[#7c43ba] mb-0.5" />
+        <p className="text-[10px] text-[#756c7e] mb-3">Si no entra en la etiqueta elegida, se achica solo lo necesario. Recomendado: 1,5 cm (se lee bien con cualquier celular).</p>
+
         <label className="block text-xs font-bold mb-1.5">Tamaño de etiqueta</label>
-        <select value={presetId} onChange={e => setPresetId(e.target.value)} className="w-full input-field rounded-xl p-3 mb-1">{LABEL_PRESETS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        <select value={presetId} onChange={e => setPresetId(e.target.value)} className="w-full input-field rounded-xl p-3 mb-1">{LABEL_PRESETS.filter(p => layout === 'qrname' || p.id !== AUTO_PRESET_ID).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+        {preset.id === AUTO_PRESET_ID && (() => { const a = autoPreset(qrMm); return <p id="auto-info" className="text-[11px] font-bold text-[#7c43ba] mb-1">{a.grid!.cols} por fila · {a.grid!.cols * a.grid!.rows} por hoja · cada etiqueta {a.w.toFixed(1)} × {a.h.toFixed(1)} mm</p>; })()}
         <p className="text-[11px] text-[#756c7e] mb-3">{preset.grid ? 'Imprime en hoja A4 al 100 % (sin “ajustar a la página”).' : 'Una etiqueta por página: elige ese tamaño en la configuración de tu impresora térmica.'}</p>
 
-        <div className="space-y-2 mb-4 text-sm">
+        {layout === 'full' && <div className="space-y-2 mb-4 text-sm">
           <label className="flex items-center gap-2"><input type="checkbox" checked={showPrice} onChange={e => setShowPrice(e.target.checked)} className="accent-[#7c43ba]" /> Mostrar precio</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={showBarcode} onChange={e => setShowBarcode(e.target.checked)} className="accent-[#7c43ba]" /> Código de barras {preset.h < 24 && <span className="text-[11px] text-[#756c7e]">(no cabe en este tamaño)</span>}</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={showBorder} onChange={e => setShowBorder(e.target.checked)} className="accent-[#7c43ba]" /> Borde de recorte</label>
-        </div>
+        </div>}
+        <label className="flex items-center gap-2 mb-4 text-sm"><input type="checkbox" checked={showBorder} onChange={e => setShowBorder(e.target.checked)} className="accent-[#7c43ba]" /> Borde de recorte</label>
 
         <button type="button" id="labels-generate" disabled={busy || !chosen.length} onClick={generate} className="w-full py-3 rounded-xl btn-primary font-bold flex items-center justify-center gap-2 disabled:opacity-50">
           {busy ? <><Loader className="w-4 h-4 animate-spin" /> Generando...</> : <><Printer className="w-4 h-4" /> Generar PDF ({total} etiquetas)</>}

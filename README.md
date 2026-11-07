@@ -74,7 +74,27 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v2.1
+## 4a. Novedades v2.3
+
+1. **QR de texto**: el QR del producto ya no es un enlace. Con cualquier celular sin la app solo se ve
+   `PERFUME FLORAL - ESIKA - 100 ML - REF 12345678` (sin abrir la web). El escáner de la app lee el `REF` y abre el producto.
+   Sigue siendo chico (25 a 29 cuadritos; nombres de más de 30 letras se acortan en el QR). Los QR anteriores siguen funcionando.
+   Como el QR lleva el nombre, ahora sí cambia en el formulario al editar nombre, marca o contenido.
+2. **Hoja A4 ajustada al QR** (diseño *Solo QR + nombre*): etiquetas justas de (QR + 4,5) × (QR + 10) mm con márgenes
+   mínimos: con QR de 1,5 cm entran **10 por fila y 110 por hoja** (19,5 × 25 mm).
+
+## 4a·0. Novedades v2.2
+
+1. **Buscador del catálogo con una sola X**: la regla CSS que ocultaba la X del navegador tenía un selector de Microsoft
+   (`::-ms-clear`) junto con los de Chrome, y Chrome descartaba toda la regla. Ahora va en reglas separadas.
+2. **QR aún más grande, como el de las revistas**: el enlace va en mayúsculas y sin `?` ni `=`
+   (`HTTPS://MINEGOCIO7PRO.VERCEL.APP/Q/12345678`), así el QR usa el modo alfanumérico: **25 × 25 cuadritos**
+   (antes 33 × 33 en la v2.1 y 53 × 53 en la v2.0). `vercel.json` redirige `/Q/...` a la app. Los QR anteriores siguen funcionando.
+3. **Etiquetas**: diseño *Solo QR + nombre* (nombre, marca y ml/g arriba o abajo del QR), **tamaño del QR configurable**
+   (1 a 3 cm, 1,5 cm por defecto), hoja A4 de **4 por fila** (32 etiquetas de 48,5 × 34 mm) y hoja **mini 38 × 25 mm** (55 etiquetas).
+   El PDF "Códigos QR" de Exportar ahora pone 4 por fila.
+
+## 4a·1. Novedades v2.1
 
 1. **Ventas de días anteriores**: en *Ventas del día* hay calendario, flechas y botones *Ayer / Anteayer* (y los últimos
    días con ventas). El *Cierre de caja* y la *Tabla de cierre* salen del día elegido. Las ventas quedan guardadas siempre.

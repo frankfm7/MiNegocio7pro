@@ -462,18 +462,13 @@ body.client-mode .client-mode-badge { display:inline-flex !important; }
   border-radius:12px;
 }
 
-/* Eliminar la X nativa del navegador en buscadores */
-input[type="search"]::-webkit-search-cancel-button,
-input[type="search"]::-webkit-search-decoration,
-input[type="search"]::-ms-clear,
+/* Eliminar la X nativa del navegador en buscadores (una regla por navegador: si se juntan,
+   Chrome descarta toda la regla por el selector de Microsoft y aparecen dos X) */
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 input[type="search"]::-webkit-search-results-button,
-input[type="search"]::-webkit-search-results-decoration {
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
+input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; display: none; }
+input[type="search"]::-ms-clear { display: none; width: 0; height: 0; }
 
 input[type="search"] {
   -webkit-appearance: none !important;

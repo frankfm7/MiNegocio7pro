@@ -1,6 +1,8 @@
 {
   "rewrites": [
-    { "source": "/app.html", "destination": "/index.html" }
+    { "source": "/app.html", "destination": "/index.html" },
+    { "source": "/Q/:code", "destination": "/index.html" },
+    { "source": "/q/:code", "destination": "/index.html" }
   ],
   "headers": [
     { "source": "/sw.js", "headers": [
