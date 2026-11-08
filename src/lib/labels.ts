@@ -1,6 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import type { Product } from '../types';
-import { generateProductQRImage, productShortCode } from './qr';
+import QRCode from 'qrcode';
+import { generateProductQRText, productShortCode } from './qr';
 import { formatContent, formatUSDShort } from './format';
 
 export interface LabelPreset {
@@ -92,12 +93,12 @@ export async function buildLabelsPDF(products: Product[], opt: LabelOptions) {
     if (opt.showBorder) { doc.setDrawColor(200, 190, 210); doc.setLineWidth(0.15); doc.rect(x + 0.4, y + 0.4, p.w - 0.8, p.h - 0.8); }
 
     let qr = qrCache.get(r.id);
-    if (!qr) { qr = await generateProductQRImage(r, 400); qrCache.set(r.id, qr); }
+    if (!qr) { qr = labelQRText(r, opt.qrMm || 15); qrCache.set(r.id, qr); }
 
     if (opt.layout === 'qrname') { drawQrName(doc, r, qr, x, y, p, opt); continue; }
 
     const qrSize = Math.min(p.h - pad * 2, p.w * 0.42, opt.qrMm || 99);
-    doc.addImage(qr, 'PNG', x + pad, y + (p.h - qrSize) / 2, qrSize, qrSize, undefined, 'FAST');
+    drawQR(doc, qr, x + pad, y + (p.h - qrSize) / 2, qrSize);
 
     const tx = x + pad + qrSize + 1.8;
     const tw = p.w - (tx - x) - pad;
@@ -172,7 +173,7 @@ function drawQrName(doc: Doc, r: Product, qr: string, x: number, y: number, p: L
   const cx = x + p.w / 2;
   const textTop = opt.textPos === 'top' ? top : top + qrSize + gap;
   const qrTop = opt.textPos === 'top' ? top + th + gap : top;
-  doc.addImage(qr, 'PNG', cx - qrSize / 2, qrTop, qrSize, qrSize, undefined, 'FAST');
+  drawQR(doc, qr, cx - qrSize / 2, qrTop, qrSize);
   doc.setTextColor(32, 23, 40); doc.setFont('helvetica', 'bold'); doc.setFontSize(nameFs);
   nameLines.forEach((l, i) => doc.text(l, cx, textTop + i * lineN + nameFs * PT * 0.9, { align: 'center' }));
   if (sub) {
@@ -187,4 +188,45 @@ function fitText(doc: Doc, text: string, w: number) {
   let t = text;
   while (t.length > 1 && doc.getTextWidth(t + '…') > w) t = t.slice(0, -1);
   return t.trimEnd() + '…';
+}
+
+/** Por debajo de este tamaño el QR lleva solo el código (REF): menos cuadritos y más grandes */
+export const SMALL_QR_MM = 14;
+
+/**
+ * Contenido del QR de la etiqueta según su tamaño impreso:
+ *  - 1,4 cm o más: "PERFUME FLORAL - ESIKA - 100 ML - REF 12345678" (cualquier celular ve el nombre)
+ *  - menos de 1,4 cm (ej. 1 cm): solo el número "12345678" → QR mínimo de 21 × 21 cuadritos con la
+ *    corrección de errores más alta (H: se lee aunque el 30 % esté manchado o borroso). El escáner de la
+ *    app lo reconoce igual que el código de barras de la etiqueta. El nombre ya va impreso.
+ */
+export function labelQRText(r: Product, qrMm: number) {
+  return qrMm < SMALL_QR_MM ? productShortCode(r) : generateProductQRText(r);
+}
+
+/**
+ * QR dibujado con cuadrados vectoriales (no como imagen): bordes nítidos a cualquier tamaño y en
+ * cualquier impresora. Margen blanco de 1 cuadrito; corrección de errores lo más alta posible sin
+ * agrandar el QR (en el QR chico: nivel H, recupera hasta 30 % dañado o manchado).
+ */
+export function drawQR(doc: Doc, text: string, x: number, y: number, size: number) {
+  const levels = ['H', 'Q', 'M', 'L'] as const;
+  const minV = QRCode.create(text, { errorCorrectionLevel: 'L' }).version;
+  const level = levels.find(l => QRCode.create(text, { errorCorrectionLevel: l }).version === minV) || 'L';
+  const qr = QRCode.create(text, { errorCorrectionLevel: level });
+  const n = qr.modules.size, margin = 1;
+  const m = size / (n + margin * 2);
+  doc.setFillColor(255, 255, 255); doc.rect(x, y, size, size, 'F');
+  doc.setFillColor(0, 0, 0);
+  for (let row = 0; row < n; row++) {
+    let col = 0;
+    while (col < n) {
+      if (!qr.modules.get(row, col)) { col++; continue; }
+      let end = col;
+      while (end + 1 < n && qr.modules.get(row, end + 1)) end++;
+      // +0.02 mm para que no queden líneas blancas finas entre cuadritos vecinos
+      doc.rect(x + (margin + col) * m, y + (margin + row) * m, (end - col + 1) * m + 0.02, m + 0.02, 'F');
+      col = end + 1;
+    }
+  }
 }

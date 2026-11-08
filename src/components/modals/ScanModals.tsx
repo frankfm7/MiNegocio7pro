@@ -22,6 +22,13 @@ export function BarcodeScannerModal() {
   const open = useStore(s => !!s.modals['barcode-scanner-modal']);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const [camErr, setCamErr] = useState(false);
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const savedZoom = () => Number(localStorage.getItem('mn7_scan_zoom')) || 2;
+  const applyZoom = async (v: number) => {
+    setZoom(v);
+    try { localStorage.setItem('mn7_scan_zoom', String(v)); await scannerRef.current?.getRunningTrackCameraCapabilities().zoomFeature().apply(v); } catch { /* sin zoom */ }
+  };
   const [running, setRunning] = useState(false);
 
   const stop = async () => {
@@ -58,11 +65,28 @@ export function BarcodeScannerModal() {
         useBarCodeDetectorIfSupported: true,
       });
       scannerRef.current = sc;
-      await sc.start({ facingMode: 'environment' }, {
-        fps: 12,
-        qrbox: (w, h) => { const side = Math.floor(Math.min(w, h) * 0.75); return { width: Math.max(180, Math.floor(Math.min(w * 0.85, side * 1.25))), height: Math.max(150, side) }; },
-      }, onDecoded, () => {});
+      const qrbox = (w: number, h: number) => { const side = Math.floor(Math.min(w, h) * 0.75); return { width: Math.max(180, Math.floor(Math.min(w * 0.85, side * 1.25))), height: Math.max(150, side) }; };
+      try {
+        // Más resolución y enfoque continuo: los QR chicos (1 cm) se leen sin acercar tanto el celular
+        await sc.start({ facingMode: 'environment' }, {
+          fps: 15, qrbox,
+          videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] },
+        }, onDecoded, () => {});
+      } catch {
+        // Cámaras que no aceptan esa configuración: se abre con la normal
+        await sc.start({ facingMode: 'environment' }, { fps: 15, qrbox }, onDecoded, () => {});
+      }
       setRunning(true); setCamErr(false);
+      // Zoom (si la cámara lo permite): arranca en 2× para QR chicos
+      try {
+        const z = sc.getRunningTrackCameraCapabilities().zoomFeature();
+        if (z.isSupported()) {
+          const min = z.min(), max = z.max();
+          setZoomRange({ min, max });
+          const start = Math.min(max, Math.max(min, savedZoom()));
+          await z.apply(start); setZoom(start);
+        } else setZoomRange(null);
+      } catch { setZoomRange(null); }
     } catch {
       setCamErr(true);
     }
@@ -106,7 +130,16 @@ export function BarcodeScannerModal() {
         )}
         <div id="barcode-reader" className={`rounded-xl overflow-hidden bg-black ${camErr ? 'hidden' : 'min-h-[260px]'}`} />
         <div id="barcode-file-reader" className="hidden" />
-        <p className="text-xs text-[#756c7e] mt-3 text-center">Apunta la cámara a un <b>código QR</b> o a un <b>código de barras</b></p>
+        {running && zoomRange && (
+          <div id="scan-zoom" className="mt-3 flex items-center gap-2">
+            <span className="text-xs font-bold text-[#756c7e]">Zoom</span>
+            {[1, 2, 3].filter(v => v >= zoomRange.min && v <= zoomRange.max).map(v => (
+              <button key={v} type="button" onClick={() => applyZoom(v)} className={`px-3 py-1.5 rounded-full text-xs font-bold ${Math.round(zoom) === v ? 'bg-[#7c43ba] text-white' : 'bg-[#f1ecf4] text-[#756c7e]'}`}>{v}×</button>
+            ))}
+            <input type="range" min={zoomRange.min} max={Math.min(zoomRange.max, 5)} step={0.1} value={zoom} onChange={e => applyZoom(Number(e.target.value))} className="flex-1 accent-[#7c43ba]" />
+          </div>
+        )}
+        <p className="text-xs text-[#756c7e] mt-3 text-center">Apunta la cámara a un <b>código QR</b> o a un <b>código de barras</b>{zoomRange ? '. Para QR chicos usa 2× o 3× y aléjate un poco (unos 15 cm) para que enfoque.' : ''}</p>
         <div className="grid grid-cols-2 gap-2 mt-4">
           {running
             ? <button type="button" onClick={async () => { await stop(); toast('Escáner detenido'); }} className="py-3 rounded-xl btn-ghost font-bold text-sm">Detener</button>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Loader, Minus, Plus, Printer, Search } from 'lucide-react';
 import Modal, { CloseButton } from '../Modal';
 import { closeModal, setState, toast, useStore } from '../../store';
-import { AUTO_PRESET_ID, LABEL_PRESETS, autoPreset, buildLabelsPDF, type LabelLayout } from '../../lib/labels';
+import { AUTO_PRESET_ID, LABEL_PRESETS, SMALL_QR_MM, autoPreset, buildLabelsPDF, type LabelLayout } from '../../lib/labels';
 import { getLowStockProducts } from '../../lib/selectors';
 import { datasetId } from '../../lib/db';
 import { formatContent } from '../../lib/format';
@@ -183,7 +183,10 @@ export default function LabelsModal() {
         )}
         <label className="block text-xs font-bold mb-1">Tamaño del QR: <span id="qr-mm-label" className="text-[#7c43ba]">{(qrMm / 10).toFixed(1)} cm ({qrMm} mm)</span></label>
         <input id="qr-mm" type="range" min={10} max={30} step={1} value={qrMm} onChange={e => setQrMm(Number(e.target.value))} className="w-full accent-[#7c43ba] mb-0.5" />
-        <p className="text-[10px] text-[#756c7e] mb-3">Si no entra en la etiqueta elegida, se achica solo lo necesario. Recomendado: 1,5 cm (se lee bien con cualquier celular).</p>
+        <p className="text-[10px] text-[#756c7e] mb-1">Si no entra en la etiqueta elegida, se achica solo lo necesario. El QR se imprime nítido (vectorial) a cualquier tamaño.</p>
+        {qrMm < SMALL_QR_MM
+          ? <p id="small-qr-info" className="text-[11px] text-[#166534] bg-[#f0fdf4] rounded-lg p-2 mb-3">✅ <b>QR chico optimizado:</b> lleva solo el número del producto, así tiene el mínimo de cuadritos (21 × 21), más grandes y con la corrección de errores más alta (se lee aunque esté algo borroso o manchado). Se lee rápido con el escáner de la app (usa el zoom 2×). El nombre va impreso en la etiqueta. Imprime al 100 % y, si puedes, en impresora de 300 ppp o más.</p>
+          : <p className="text-[10px] text-[#756c7e] mb-3">Con 1,4 cm o más el QR también lleva el nombre, la empresa y los ml/g (los ve cualquier celular).</p>}
 
         {layout === 'full' && <label className="block text-xs font-bold mb-1.5">Tamaño de etiqueta</label>}
         {layout === 'full' && <select value={presetId} onChange={e => setPresetId(e.target.value)} className="w-full input-field rounded-xl p-3 mb-1">{LABEL_PRESETS.filter(p => p.id !== AUTO_PRESET_ID).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}

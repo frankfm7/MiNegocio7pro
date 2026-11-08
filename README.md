@@ -74,7 +74,19 @@ Archivos de la PWA:
 - **Buscar por foto**: combina código de barras/QR, parecido visual (red neuronal MobileNet, incluida en la app),
   el texto de la etiqueta (OCR) y los colores.
 
-## 4a. Novedades v2.5
+## 4a. Novedades v2.6 · QR chico (1 cm) legible
+
+1. **QR de menos de 1,4 cm** (ej. 1 cm): lleva solo el número del producto (`12345678`). Así queda en el mínimo
+   posible, **21 × 21 cuadritos** (antes 25–29), con la corrección de errores más alta (**H**, se lee aunque el 30 %
+   esté borroso o manchado). En 1 cm cada cuadrito mide ~0,44 mm. El nombre, la empresa y los ml/g ya van impresos.
+   Desde 1,4 cm el QR sigue llevando el texto con el nombre.
+2. **QR vectorial en el PDF**: se dibuja con cuadrados (no como imagen), bordes nítidos en cualquier impresora.
+3. **Escáner de la app**: más resolución (1920 × 1080), enfoque continuo y **zoom** (1×, 2×, 3× o barra) que
+   arranca en 2× y se recuerda; si la cámara no acepta esa configuración, abre con la normal.
+4. Prueba simulada (foto borrosa, lector ZXing): el QR de 1 cm nuevo se leyó hasta con 36 píxeles de ancho;
+   el anterior dejaba de leerse por debajo de 44.
+
+## 4a·1. Novedades v2.5
 
 1. **Etiquetas: lo elegido ya no se reinicia solo.** Causa: la app se sincroniza con la nube cada 30 segundos y trae
    una copia nueva de catálogos y productos; la ventana de etiquetas lo tomaba como "recién abierta" y volvía a
